@@ -91,6 +91,25 @@ class JohannesQuery(GraphQLQuery):
         document = "query Johannes {\n  capsules {\n    id\n    missions {\n      flight\n    }\n  }\n}"
 
 
+class InsertUserMutationInsert_usersReturning(GraphQLObject):
+    typename: Optional[Literal["users"]] = Field(alias="__typename")
+    id: str
+
+
+class InsertUserMutationInsert_users(GraphQLObject):
+    typename: Optional[Literal["users_mutation_response"]] = Field(alias="__typename")
+    returning: List[InsertUserMutationInsert_usersReturning]
+    "data of the affected rows by the mutation"
+
+
+class InsertUserMutation(GraphQLMutation):
+    insert_users: Optional[InsertUserMutationInsert_users]
+
+    class Meta:
+        domain = "default"
+        document = "mutation InsertUser($id: uuid) {\n  insert_users(objects: {id: $id}) {\n    returning {\n      id\n    }\n  }\n}"
+
+
 async def auseJohannes() -> JohannesQuery:
     """Query Johannes"""
     return await JohannesQuery.aquery({})
@@ -99,3 +118,19 @@ async def auseJohannes() -> JohannesQuery:
 def useJohannes() -> JohannesQuery:
     """Query Johannes"""
     return JohannesQuery.query({})
+
+
+async def auseInsertUser(id: str = None) -> InsertUserMutation:
+    '''Query InsertUser
+
+
+    insert_users: insert data into the table: "users"'''
+    return await InsertUserMutation.aquery({"id": id})
+
+
+def useInsertUser(id: str = None) -> InsertUserMutation:
+    '''Query InsertUser
+
+
+    insert_users: insert data into the table: "users"'''
+    return InsertUserMutation.query({"id": id})

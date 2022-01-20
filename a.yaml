@@ -10,3 +10,5 @@ default:
       funcs_glob: graphql/**.graphql
   processors:
     - type: turms.processor.black.BlackProcessor
+  scalar_definitions:
+    uuid: str

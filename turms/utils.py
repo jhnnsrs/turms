@@ -24,6 +24,29 @@ class NoDocumentsFoundError(Exception):
     pass
 
 
+class NoScalarEquivalentDefined(Exception):
+    pass
+
+
+def get_scalar_equivalent(scalar_type: str, config: GeneratorConfig):
+
+    defaults = {
+        "ID": "str",
+        "String": "str",
+        "Int": "int",
+        "Boolean": "bool",
+        "GenericScalar": "Dict",
+    }
+
+    updated_dict = {**defaults, **config.scalar_definitions}
+    try:
+        return updated_dict[scalar_type]
+    except KeyError as e:
+        raise NoScalarEquivalentDefined(
+            f"No python equivalent found for {scalar_type}. Please define in scalar_definitions"
+        )
+
+
 def target_from_node(node: FieldNode) -> str:
     return (
         node.alias.value if hasattr(node, "alias") and node.alias else node.name.value

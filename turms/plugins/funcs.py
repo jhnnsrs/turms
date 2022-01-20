@@ -27,6 +27,7 @@ from graphql.language.ast import (
 from turms.utils import (
     NoDocumentsFoundError,
     generate_typename_field,
+    get_scalar_equivalent,
     parse_documents,
     target_from_node,
 )
@@ -76,9 +77,7 @@ def generate_query_args(
                     ast.arg(
                         arg=v.variable.name.value,
                         annotation=ast.Name(
-                            id=config.scalar_definitions.get(
-                                v.type.type.name.value, v.type.type.name.value
-                            ),
+                            id=get_scalar_equivalent(v.type.type.name.value, config),
                             ctx=ast.Load(),
                         ),
                     )
@@ -95,9 +94,7 @@ def generate_query_args(
                     ast.arg(
                         arg=v.variable.name.value,
                         annotation=ast.Name(
-                            id=config.scalar_definitions.get(
-                                v.type.name.value, v.type.name.value
-                            ),
+                            id=get_scalar_equivalent(v.type.name.value, config),
                             ctx=ast.Load(),
                         ),
                     )
@@ -179,7 +176,7 @@ def generate_query_doc(
     return ast.Expr(value=ast.Constant(value=description))
 
 
-def generate_query_func(
+def generate_operation_func(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
@@ -187,7 +184,12 @@ def generate_query_func(
 ):
     tree = []
 
-    query_name = f"{o.name.value}Query"
+    if o.operation == OperationType.QUERY:
+        o_name = f"{o.name.value}Query"
+    if o.operation == OperationType.MUTATION:
+        o_name = f"{o.name.value}Mutation"
+    if o.operation == OperationType.SUBSCRIPTION:
+        o_name = f"{o.name.value}Subscription"
 
     if plugin_config.generate_async:
         tree.append(
@@ -201,7 +203,7 @@ def generate_query_func(
                             value=ast.Call(
                                 func=ast.Attribute(
                                     value=ast.Name(
-                                        id=query_name,
+                                        id=o_name,
                                         ctx=ast.Load(),
                                     ),
                                     attr="aquery",
@@ -214,7 +216,7 @@ def generate_query_func(
                     ),
                 ],
                 decorator_list=[],
-                returns=ast.Name(id=query_name, ctx=ast.Load()),
+                returns=ast.Name(id=o_name, ctx=ast.Load()),
             )
         )
 
@@ -229,7 +231,7 @@ def generate_query_func(
                         value=ast.Call(
                             func=ast.Attribute(
                                 value=ast.Name(
-                                    id=query_name,
+                                    id=o_name,
                                     ctx=ast.Load(),
                                 ),
                                 attr="query",
@@ -241,7 +243,7 @@ def generate_query_func(
                     ),
                 ],
                 decorator_list=[],
-                returns=ast.Name(id=query_name, ctx=ast.Load()),
+                returns=ast.Name(id=o_name, ctx=ast.Load()),
             )
         )
 
@@ -270,9 +272,8 @@ class OperationsFuncPlugin(Plugin):
         ]
 
         for operation in operations:
-            if operation.operation == OperationType.QUERY:
-                plugin_tree += generate_query_func(
-                    operation, client_schema, config, self.plugin_config
-                )
+            plugin_tree += generate_operation_func(
+                operation, client_schema, config, self.plugin_config
+            )
 
         return plugin_tree

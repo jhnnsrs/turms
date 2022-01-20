@@ -6,3 +6,11 @@ query Johannes {
     }
   }
 }
+
+mutation InsertUser($id: uuid) {
+  insert_users(objects: { id: $id }) {
+    returning {
+      id
+    }
+  }
+}

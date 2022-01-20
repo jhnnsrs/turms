@@ -9,6 +9,7 @@ from graphql.language.ast import (
 from turms.utils import (
     generate_typename_field,
     get_additional_bases_for_type,
+    get_scalar_equivalent,
     parse_documents,
     target_from_node,
 )
@@ -253,14 +254,14 @@ def recurse_annotation(
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
                 slice=ast.Name(
-                    id=config.scalar_definitions.get(type.name, type.name),
+                    id=get_scalar_equivalent(type.name, config),
                     ctx=ast.Load(),
                 ),
             )
 
         else:
             return ast.Name(
-                id=config.scalar_definitions.get(type.name, type.name),
+                id=get_scalar_equivalent(type.name, config),
                 ctx=ast.Load(),
             )
 
