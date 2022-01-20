@@ -19,9 +19,10 @@ It makes heavy use of pydantic and its serialization capablities and provides fu
 
 ## Features
 
-- Fully Modular (agnostic of graphql engine)
+- Fully Modular (agnostic of graphql transport)
 - Specify type mixins, baseclasses...
 - Fully Support type hints for variables (Pylance)
+- Compliant with graphl-config
 
 ## Installation
 
@@ -37,8 +38,7 @@ Open your workspace (create a virtual env), in the root folder
 turms init
 ```
 
-This creates a configuration file in the working directory, edit this to reflect your
-settings (see Configuration)
+This creates a graphql-config compliant configuration file in the working directory, edit this to reflect your settings (see Configuration)
 
 ```bash
 turms gen
