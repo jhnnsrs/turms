@@ -261,7 +261,9 @@ class OperationsFuncPlugin(Plugin):
         plugin_tree = []
 
         try:
-            documents = parse_documents(client_schema, self.plugin_config.funcs_glob)
+            documents = parse_documents(
+                client_schema, self.plugin_config.funcs_glob or config.documents
+            )
         except NoDocumentsFoundError as e:
             logger.exception(e)
             return plugin_tree

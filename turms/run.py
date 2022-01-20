@@ -1,5 +1,5 @@
 from graphql import get_introspection_query
-from turms.config import GeneratorConfig
+from turms.config import GeneratorConfig, GraphQLConfig
 from turms.helpers import import_string
 from turms.parser.imports import generate_imports
 from turms.plugins.structure import StructurePlugin
@@ -31,13 +31,16 @@ class GenerationError(Exception):
 
 
 def gen(filepath: str):
+
     with open(filepath, "r") as f:
-        settings = yaml.safe_load(f)
+        yaml_dict = yaml.safe_load(f)
 
-    for key, domain in settings.items():
-        config = GeneratorConfig(**domain, domain=key)
+    assert "projects" in yaml_dict, "Right now only projects is supported"
 
-        if config.schema_url:
+    for key, project in yaml_dict["projects"].items():
+        config = GraphQLConfig(**project, domain=key)
+
+        if config.schema:
             jdata = json.dumps({"query": get_introspection_query()}).encode("utf-8")
             req = request.Request(config.schema_url, data=jdata)
             req.add_header("Content-Type", "application/json")
@@ -49,10 +52,13 @@ def gen(filepath: str):
         else:
             raise NotImplementedError("Right now not supported")
 
+        turms_config = project["extensions"]["turms"]
+
+        gen_config = GeneratorConfig(**turms_config, documents=project["documents"])
         plugins = []
 
-        if "plugins" in domain:
-            plugin_configs = domain["plugins"]
+        if "plugins" in turms_config:
+            plugin_configs = turms_config["plugins"]
             for plugin_config in plugin_configs:
                 assert "type" in plugin_config, "A plugin must at least specify type"
                 plugin_class = import_string(plugin_config["type"])
@@ -61,15 +67,15 @@ def gen(filepath: str):
 
         processors = []
 
-        if "processors" in domain:
-            proc_configs = domain["processors"]
+        if "processors" in turms_config:
+            proc_configs = turms_config["processors"]
             for proc_config in proc_configs:
                 assert "type" in proc_config, "A processor must at least specify type"
                 proc_class = import_string(proc_config["type"])
                 processors.append(proc_class(**proc_config))
                 print(f"Using Processor {proc_class}")
 
-        generate(config, introspection, plugins=plugins, processors=processors)
+        generate(gen_config, introspection, plugins=plugins, processors=processors)
 
 
 def generate(

@@ -180,7 +180,7 @@ class StructurePlugin(Plugin):
 
         try:
             documents = parse_documents(
-                client_schema, self.plugin_config.structure_glob
+                client_schema, self.plugin_config.structure_glob or config.documents
             )
         except NoDocumentsFoundError as e:
             logger.exception(e)

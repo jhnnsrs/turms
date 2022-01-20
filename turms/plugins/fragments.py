@@ -118,7 +118,7 @@ class FragmentsPlugin(Plugin):
 
         try:
             documents = parse_documents(
-                client_schema, self.plugin_config.fragments_glob
+                client_schema, self.plugin_config.fragments_glob or config.documents
             )
         except NoDocumentsFoundError as e:
             logger.exception(e)

@@ -36,6 +36,7 @@ def get_scalar_equivalent(scalar_type: str, config: GeneratorConfig):
         "Int": "int",
         "Boolean": "bool",
         "GenericScalar": "Dict",
+        "DateTime": "str",
     }
 
     updated_dict = {**defaults, **config.scalar_definitions}

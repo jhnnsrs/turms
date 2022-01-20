@@ -57,8 +57,8 @@ fragment_searcher = re.compile(r"\.\.\.(?P<fragment>[a-zA-Z]*)")
 
 class OperationsPluginConfig(BaseModel):
     query_bases: List[str] = ["turms.types.query.GraphQLQuery"]
-    mutation_bases: List[str] = ["turms.types.query.GraphQLMutation"]
-    subscription_bases: List[str] = ["turms.types.query.GraphQLSubscription"]
+    mutation_bases: List[str] = ["turms.types.mutation.GraphQLMutation"]
+    subscription_bases: List[str] = ["turms.types.subscription.GraphQLSubscription"]
 
     operations_glob: str
     prepend_query: str = ""
@@ -263,7 +263,7 @@ class OperationsPlugin(Plugin):
 
         try:
             documents = parse_documents(
-                client_schema, self.plugin_config.operations_glob
+                client_schema, self.plugin_config.operations_glob or config.documents
             )
         except NoDocumentsFoundError as e:
             logger.exception(e)
