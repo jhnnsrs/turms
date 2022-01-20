@@ -4,9 +4,9 @@
 
 ### DEVELOPMENT
 
-# Insipiration
+## Inspiration
 
-Baldr is a pure python implementation of the awesome graphql-codegen library, following a simliar extensible design.
+Turms is a pure python implementation of the awesome graphql-codegen library, following a simliar extensible design.
 It makes heavy use of pydantic and its serialization capablities and provides fully typed querys, mutations and subscriptions
 
 ## Supports
@@ -16,11 +16,11 @@ It makes heavy use of pydantic and its serialization capablities and provides fu
 - Enums
 - Query Functions
 
-## Featurs
+## Features
 
 - Fully Modular (agnostic of graphql engine)
 - Specify type mixins, baseclasses...
-- Fully Support type hints for variables (Pylance, VSCode)
+- Fully Support type hints for variables (Pylance)
 
 ## Installation
 
@@ -45,6 +45,6 @@ turms gen
 
 Generate beautifully typed Operations, Enums,...
 
-## Why Turms
+### Why Turms
 
-In Etruscan religion, Turms (usually written as 𐌕𐌖𐌓𐌌𐌑 Turmś in the Etruscan alphabet) was the equivalent of Roman Mercury and Greek Hermes, both gods of trade and the messenger god between people and gods.
+In Etruscan religion, Turms (usually written as 𐌕𐌖𐌓𐌌𐌑 Turmś in the Etruscan alphabet) was the equivalent of Roman Mercury and Greek Hermes, both gods of trade and the **messenger** god between people and gods.
