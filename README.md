@@ -1,6 +1,7 @@
 # turms
 
 [![codecov](https://codecov.io/gh/jhnnsrs/turms/branch/master/graph/badge.svg?token=UGXEA2THBV)](https://codecov.io/gh/jhnnsrs/turms)
+[![PyPI version](https://badge.fury.io/py/turms.svg)](https://pypi.org/project/turms/)
 
 ### DEVELOPMENT
 
