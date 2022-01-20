@@ -1,0 +1,8 @@
+query Johannes {
+  capsules {
+    id
+    missions {
+      flight
+    }
+  }
+}

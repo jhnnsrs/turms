@@ -56,11 +56,11 @@ fragment_searcher = re.compile(r"\.\.\.(?P<fragment>[a-zA-Z]*)")
 
 
 class OperationsPluginConfig(BaseModel):
-    query_bases: List[str] = ["herre.access.query.GraphQLQuery"]
-    mutation_bases: List[str] = ["herre.access.query.GraphQLQuery"]
-    subscription_bases: List[str] = ["herre.access.query.GraphQLQuery"]
+    query_bases: List[str] = ["turms.types.query.GraphQLQuery"]
+    mutation_bases: List[str] = ["turms.types.query.GraphQLMutation"]
+    subscription_bases: List[str] = ["turms.types.query.GraphQLSubscription"]
 
-    operations_glob: Optional[str]
+    operations_glob: str
     prepend: str = ""
     append: str = "Query"
 
@@ -118,8 +118,8 @@ def generate_query(
             keywords=[],
             body=[
                 ast.Assign(
-                    targets=[ast.Name(id="ward", ctx=ast.Store())],
-                    value=ast.Constant(value=str("arkitekt")),
+                    targets=[ast.Name(id="domain", ctx=ast.Store())],
+                    value=ast.Constant(value=str(config.domain)),
                 ),
                 ast.Assign(
                     targets=[ast.Name(id="document", ctx=ast.Store())],
@@ -145,8 +145,8 @@ def generate_query(
 
 
 class OperationsPlugin(Plugin):
-    def __init__(self, config=None):
-        self.plugin_config = config or OperationsPluginConfig()
+    def __init__(self, config=None, **data):
+        self.plugin_config = config or OperationsPluginConfig(**data)
 
     def generate_imports(
         self, config: GeneratorConfig, client_schema: GraphQLSchema

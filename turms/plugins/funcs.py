@@ -58,7 +58,7 @@ class OperationsFuncPluginConfig(BaseModel):
     generate_async: bool = True
     generate_sync: bool = True
 
-    func_glob: Optional[str]
+    funcs_glob: Optional[str]
 
 
 def generate_query_args(
@@ -249,8 +249,8 @@ def generate_query_func(
 
 
 class OperationsFuncPlugin(Plugin):
-    def __init__(self, config=None):
-        self.plugin_config = config or OperationsFuncPluginConfig()
+    def __init__(self, config=None, **data):
+        self.plugin_config = config or OperationsFuncPluginConfig(**data)
 
     def generate_body(
         self, client_schema: GraphQLSchema, config: GeneratorConfig
@@ -259,7 +259,7 @@ class OperationsFuncPlugin(Plugin):
         plugin_tree = []
 
         try:
-            documents = parse_documents(client_schema, self.plugin_config.func_glob)
+            documents = parse_documents(client_schema, self.plugin_config.funcs_glob)
         except NoDocumentsFoundError as e:
             logger.exception(e)
             return plugin_tree

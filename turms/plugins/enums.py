@@ -48,7 +48,7 @@ def generate_enums(
 
             potential_comment = (
                 value.description
-                if not value.is_deprecated
+                if not value.deprecation_reason
                 else f"DEPRECATED: {value.description}"
             )
 
@@ -79,8 +79,23 @@ def generate_enums(
 
 
 class EnumsPlugin(Plugin):
-    def __init__(self, config=None):
-        self.plugin_config = config or EnumsPluginConfig()
+    def __init__(self, config=None, **data):
+        self.plugin_config = config or EnumsPluginConfig(**data)
+
+    def generate_imports(
+        self, config: GeneratorConfig, client_schema: GraphQLSchema
+    ) -> List[ast.AST]:
+        imports = []
+
+        imports.append(
+            ast.ImportFrom(
+                module="enum",
+                names=[ast.alias(name="Enum")],
+                level=0,
+            )
+        )
+
+        return imports
 
     def generate_body(
         self, client_schema: GraphQLSchema, config: GeneratorConfig

@@ -77,8 +77,8 @@ def generate_schema(
 
 
 class SchemaPlugin(Plugin):
-    def __init__(self, config=None):
-        self.plugin_config = config or SchemaPluginConfig()
+    def __init__(self, config=None, **data):
+        self.plugin_config = config or SchemaPluginConfig(**data)
 
     def generate_body(
         self, client_schema: GraphQLSchema, config: GeneratorConfig

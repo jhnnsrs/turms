@@ -57,8 +57,8 @@ logger = logging.getLogger(__name__)
 
 
 class StructurePluginsConfig(BaseModel):
-    query_bases: List[str] = ["herre.access.GraphQLQuery"]
-    mutation_bases: List[str] = ["herre.access.GraphQLMutation"]
+    query_bases: List[str] = ["turms.types.query.GraphQLQuery"]
+    mutation_bases: List[str] = ["turms.types.mutation.GraphQLMutation"]
 
     structure_bases: List[str] = ["herre.access.GraphQLStructure"]
 
@@ -147,8 +147,8 @@ def generate_structure(
 
 
 class StructurePlugin(Plugin):
-    def __init__(self, config=None):
-        self.plugin_config = config or StructurePluginsConfig()
+    def __init__(self, config=None, **data):
+        self.plugin_config = config or StructurePluginsConfig(**data)
 
     def generate_imports(
         self, config: GeneratorConfig, client_schema: GraphQLSchema

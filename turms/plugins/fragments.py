@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 
 
 class FragmentsPluginConfig(BaseModel):
-    fragment_bases: List[str] = ["herre.access.newobject.GraphQLObject"]
-    fragments_glob: Optional[str]
+    fragment_bases: List[str] = ["turms.types.object.GraphQLObject"]
+    fragments_glob: str
     prepend: str = ""
     append: str = "Fragment"
 
@@ -89,8 +89,8 @@ def generate_fragment(
 
 
 class FragmentsPlugin(Plugin):
-    def __init__(self, config=None):
-        self.plugin_config = config or FragmentsPluginConfig()
+    def __init__(self, config=None, **data):
+        self.plugin_config = config or FragmentsPluginConfig(**data)
 
     def generate_imports(
         self, config: GeneratorConfig, client_schema: GraphQLSchema

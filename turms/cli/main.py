@@ -3,6 +3,8 @@ from enum import Enum
 import os
 from rich.console import Console
 
+from turms.run import gen
+
 directory = os.getcwd()
 
 
@@ -13,20 +15,22 @@ class TurmsOptions(str, Enum):
 
 
 default_settings = """
-    arkitekt:
-        schema: http://localhost:3000/graphql
-        out_dir: arkitekt
-        plugins: 
-            - type: turms.plugins.enums.EnumsPlugin
-            - type: turms.plugins.fragments.FragmentsPlugin
-              fragment_bases: 
-                    - turms.graphql.GraphQLObject
-
+default:
+  schema_url: https://api.spacex.land/graphql/
+  plugins:
+    - type: turms.plugins.enums.EnumsPlugin
+    - type: turms.plugins.fragments.FragmentsPlugin
+      fragments_glob: graphql/**.graphql
+    - type: turms.plugins.operation.OperationsPlugin
+      operations_glob: graphql/**.graphql
+    - type: turms.plugins.funcs.OperationsFuncPlugin
+      funcs_glob: graphql/**.graphql
+  processors:
+    - type: turms.processor.black.BlackProcessor
 """
 
 
 def main(script: TurmsOptions, path: str):
-
     console = Console()
 
     if path == ".":
@@ -37,12 +41,12 @@ def main(script: TurmsOptions, path: str):
         name = path
 
     if script.INIT:
-        console.log(f"Creating balrd.yaml in {app_directory}")
-        with open(os.path.join(app_directory, "baldr.yaml"), "w") as f:
+        console.log(f"Creating turms.yaml in {app_directory}")
+        with open(os.path.join(app_directory, "turms.yaml"), "w") as f:
             f.write(default_settings)
 
     if script.GEN:
-        console.log("[red]Error")
+        gen(os.path.join(app_directory, "turms.yaml"))
 
 
 def entrypoint():

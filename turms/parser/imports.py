@@ -37,11 +37,6 @@ def generate_imports(schema: GraphQLSchema, config: GeneratorConfig):
 
     imports += [
         ast.ImportFrom(
-            module="enum",
-            names=[ast.alias(name="Enum")],
-            level=0,
-        ),
-        ast.ImportFrom(
             module="pydantic.fields",
             names=[ast.alias(name="Field")],
             level=0,

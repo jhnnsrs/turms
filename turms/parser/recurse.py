@@ -359,8 +359,8 @@ def type_field_node(
 
     potential_comment = (
         field.description
-        if not field.is_deprecated
-        else f"DEPRECATED: {field.description}"
+        if not field.deprecation_reason
+        else f"DEPRECATED {field.deprecation_reason}: : {field.description} "
     )
 
     if potential_comment:
