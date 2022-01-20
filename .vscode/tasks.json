@@ -1,0 +1,18 @@
+// tasks.json
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Patch",
+            "type": "shell",
+            "command": "source venv/bin/activate && poetry version patch && poetry build "
+        },
+        {
+            "label": "Publish",
+            "type": "shell",
+            "command": "source venv/bin/activate && poetry publish"
+        },
+    ]
+}

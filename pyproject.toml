@@ -1,9 +1,10 @@
 [tool.poetry]
 name = "turms"
-version = "0.1.1"
-description = "graphql-codegen"
+version = "0.1.2"
+description = "graphql-codegen powered by pydantic"
 authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
 license = "CC BY-NC 3.0"
+readme = "README.md"
 packages = [{include = "turms"}]
 
 [tool.poetry.dependencies]

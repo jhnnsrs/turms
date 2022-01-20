@@ -1,6 +1,6 @@
-# graphql_codegen
+# turms
 
-[![codecov](https://codecov.io/gh/jhnnsrs/baldr/branch/master/graph/badge.svg?token=UGXEA2THBV)](https://codecov.io/gh/jhnnsrs/baldr)
+[![codecov](https://codecov.io/gh/jhnnsrs/turms/branch/master/graph/badge.svg?token=UGXEA2THBV)](https://codecov.io/gh/jhnnsrs/turms)
 
 ### DEVELOPMENT
 
