@@ -1,10 +1,7 @@
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from turms.globals import ENUM_CLASS_MAP, FRAGMENT_CLASS_MAP
-from turms.plugins.base import Plugin
-from pydantic import BaseModel
 from graphql.language.ast import (
-    FragmentDefinitionNode,
     FieldNode,
     FragmentSpreadNode,
     InlineFragmentNode,
@@ -15,9 +12,7 @@ from turms.utils import (
     parse_documents,
     target_from_node,
 )
-import re
 import ast
-from black import format_str, FileMode
 
 from graphql.type.definition import (
     GraphQLEnumType,

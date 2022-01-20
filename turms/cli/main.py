@@ -40,12 +40,12 @@ def main(script: TurmsOptions, path: str):
         app_directory = os.path.join(os.getcwd(), path)
         name = path
 
-    if script.INIT:
+    if script == TurmsOptions.INIT:
         console.log(f"Creating turms.yaml in {app_directory}")
         with open(os.path.join(app_directory, "turms.yaml"), "w") as f:
             f.write(default_settings)
 
-    if script.GEN:
+    if script == TurmsOptions.GEN:
         gen(os.path.join(app_directory, "turms.yaml"))
 
 

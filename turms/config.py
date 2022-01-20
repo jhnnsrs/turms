@@ -1,8 +1,6 @@
 from pydantic import AnyHttpUrl, BaseModel
 from typing import List, Optional
 
-from pyparsing import Opt
-
 
 class GeneratorConfig(BaseModel):
     domain: str = "default"
