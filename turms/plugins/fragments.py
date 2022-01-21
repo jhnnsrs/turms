@@ -26,9 +26,7 @@ logger = logging.getLogger(__name__)
 
 class FragmentsPluginConfig(BaseModel):
     fragment_bases: List[str] = ["turms.types.object.GraphQLObject"]
-    fragments_glob: str
-    prepend: str = ""
-    append: str = "Fragment"
+    fragments_glob: Optional[str]
 
 
 def generate_fragment(
@@ -41,7 +39,7 @@ def generate_fragment(
     fields = []
     type = client_schema.get_type(f.type_condition.name.value)
 
-    name = f"{plugin_config.prepend}{f.name.value}{plugin_config.append}"
+    name = f"{config.prepend_fragment}{f.name.value}{config.append_fragment}"
 
     fields += [generate_typename_field(type.name)]
 

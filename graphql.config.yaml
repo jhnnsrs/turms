@@ -4,6 +4,7 @@ projects:
     documents: graphql/**.graphql
     extensions:
       turms:
+        out_dir: arkitekt/api
         plugins:
           - type: turms.plugins.enums.EnumsPlugin
           - type: turms.plugins.fragments.FragmentsPlugin

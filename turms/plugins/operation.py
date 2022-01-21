@@ -56,17 +56,10 @@ fragment_searcher = re.compile(r"\.\.\.(?P<fragment>[a-zA-Z]*)")
 
 
 class OperationsPluginConfig(BaseModel):
-    query_bases: List[str] = ["turms.types.query.GraphQLQuery"]
-    mutation_bases: List[str] = ["turms.types.mutation.GraphQLMutation"]
-    subscription_bases: List[str] = ["turms.types.subscription.GraphQLSubscription"]
-
-    operations_glob: str
-    prepend_query: str = ""
-    append_query: str = "Query"
-    prepend_mutation: str = ""
-    append_mutation: str = "Mutation"
-    prepend_subscription: str = ""
-    append_subscription: str = "Subscription"
+    query_bases: List[str] = ["turms.types.herre.GraphQLQuery"]
+    mutation_bases: List[str] = ["turms.types.herre.GraphQLMutation"]
+    subscription_bases: List[str] = ["turms.types.herre.GraphQLSubscription"]
+    operations_glob: Optional[str]
 
 
 def generate_query(
@@ -80,7 +73,7 @@ def generate_query(
 
     x = get_operation_root_type(client_schema, o)
     query_fields = []
-    name = f"{plugin_config.prepend_query}{o.name.value}{plugin_config.append_query}"
+    name = f"{config.prepend_query}{o.name.value.capitalize()}{config.append_query}"
 
     for field_node in o.selection_set.selections:
 
@@ -160,7 +153,7 @@ def generate_mutation(
     x = get_operation_root_type(client_schema, o)
     query_fields = []
     name = (
-        f"{plugin_config.prepend_mutation}{o.name.value}{plugin_config.append_mutation}"
+        f"{config.prepend_mutation}{o.name.value.capitalize()}{config.append_mutation}"
     )
 
     for field_node in o.selection_set.selections:

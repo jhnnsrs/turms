@@ -13,7 +13,7 @@ from graphql import (
     build_client_schema,
 )
 import ast
-from turms.globals import FRAGMENT_DOCUMENT_MAP
+from turms.globals import FRAGMENT_DOCUMENT_MAP, SCALAR_DEFAULTS
 
 
 class FragmentNotFoundError(Exception):
@@ -30,22 +30,16 @@ class NoScalarEquivalentDefined(Exception):
 
 def get_scalar_equivalent(scalar_type: str, config: GeneratorConfig):
 
-    defaults = {
-        "ID": "str",
-        "String": "str",
-        "Int": "int",
-        "Boolean": "bool",
-        "GenericScalar": "Dict",
-        "DateTime": "str",
-    }
+    updated_dict = {**SCALAR_DEFAULTS, **config.scalar_definitions}
 
-    updated_dict = {**defaults, **config.scalar_definitions}
     try:
-        return updated_dict[scalar_type]
+        scalar_type = updated_dict[scalar_type]
     except KeyError as e:
         raise NoScalarEquivalentDefined(
             f"No python equivalent found for {scalar_type}. Please define in scalar_definitions"
         )
+
+    return scalar_type.split(".")[-1]
 
 
 def target_from_node(node: FieldNode) -> str:

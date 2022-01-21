@@ -9,17 +9,15 @@ def clean_dict(obj, func):
     if isinstance(obj, dict):
         # the call to `list` is useless for py2 but makes
         # the code py2/py3 compatible
-        for key in list(obj.keys()):
-            if func(key):
+
+        for key, value in dict(**obj).items():
+            if func(key, value):
                 del obj[key]
             else:
                 clean_dict(obj[key], func)
     elif isinstance(obj, list):
         for i in reversed(range(len(obj))):
-            if func(obj[i]):
-                del obj[i]
-            else:
-                clean_dict(obj[i], func)
+            clean_dict(obj[i], func)
 
     else:
         # neither a dict nor a list, do nothing

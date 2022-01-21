@@ -44,6 +44,12 @@ def recurse_annotation(
         mother_class_fields = []
         target = target_from_node(node)
         base_name = f"{parent_name}{target.capitalize()}"
+
+        if type.description:
+            mother_class_fields.append(
+                ast.Expr(value=ast.Constant(value=type.description))
+            )
+
         mother_class_fields += [
             ast.AnnAssign(
                 target=ast.Name(id="typename", ctx=ast.Store()),
@@ -80,6 +86,7 @@ def recurse_annotation(
 
         mother_class_name = f"{base_name}Base"
         additional_bases = get_additional_bases_for_type(type.name, config)
+
         mother_class = ast.ClassDef(
             mother_class_name,
             bases=[
@@ -191,8 +198,11 @@ def recurse_annotation(
     if isinstance(type, GraphQLObjectType):
         pick_fields = []
         additional_bases = get_additional_bases_for_type(type.name, config)
+
         target = target_from_node(node)
         nana = f"{parent_name}{target.capitalize()}"
+        if type.description:
+            pick_fields.append(ast.Expr(value=ast.Constant(value=type.description)))
         pick_fields += [generate_typename_field(type.name)]
 
         for sub_node in node.selection_set.selections:

@@ -1,8 +1,12 @@
 from abc import abstractmethod
 import ast
 from typing import List
+
+from graphql import NamedTypeNode
+from numpy import isin
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
+from turms.globals import INPUTTYPE_CLASS_MAP
 from turms.plugins.base import Plugin
 from pydantic import BaseModel
 from graphql.language.ast import OperationDefinitionNode, OperationType
@@ -26,6 +30,7 @@ from graphql.language.ast import (
 )
 from turms.utils import (
     NoDocumentsFoundError,
+    NoScalarEquivalentDefined,
     generate_typename_field,
     get_scalar_equivalent,
     parse_documents,
@@ -60,6 +65,27 @@ class OperationsFuncPluginConfig(BaseModel):
     generate_sync: bool = True
 
     funcs_glob: Optional[str]
+    prepend_sync: str = ""
+    prepend_async: str = "a"
+    collapse_lonely: bool = True
+
+
+def get_input_type_annotation(input_type: NamedTypeNode, config: GeneratorConfig):
+
+    if isinstance(input_type, NamedTypeNode):
+
+        try:
+            type_name = get_scalar_equivalent(input_type.name.value, config)
+        except NoScalarEquivalentDefined as e:
+            type_name = INPUTTYPE_CLASS_MAP[input_type.name.value]
+
+        print(type_name)
+        return ast.Name(
+            id=type_name,
+            ctx=ast.Load(),
+        )
+
+    raise NotImplementedError()
 
 
 def generate_query_args(
@@ -71,32 +97,44 @@ def generate_query_args(
     for v in o.variable_definitions:
         if isinstance(v.type, NonNullTypeNode):
             if isinstance(v.type.type, ListTypeNode):
-                raise NotImplementedError()
+                pos_args.append(
+                    ast.arg(
+                        arg=v.variable.name.value,
+                        annotation=ast.Subscript(
+                            value=ast.Name("List", ctx=ast.Load()),
+                            slice=get_input_type_annotation(v.type.type, config),
+                        ),
+                    )
+                )
             else:
                 pos_args.append(
                     ast.arg(
                         arg=v.variable.name.value,
-                        annotation=ast.Name(
-                            id=get_scalar_equivalent(v.type.type.name.value, config),
-                            ctx=ast.Load(),
-                        ),
+                        annotation=get_input_type_annotation(v.type.type, config),
                     )
                 )
 
     kw_args = []
     kw_values = []
+
     for v in o.variable_definitions:
         if not isinstance(v.type, NonNullTypeNode):
             if isinstance(v.type, ListTypeNode):
-                raise NotImplementedError()
+                kw_args.append(
+                    ast.arg(
+                        arg=v.variable.name.value,
+                        annotation=ast.Subscript(
+                            value=ast.Name("List", ctx=ast.Load()),
+                            slice=get_input_type_annotation(v.type.type, config),
+                        ),
+                    )
+                )
+                kw_values.append(ast.Constant(value=None))
             else:
                 kw_args.append(
                     ast.arg(
                         arg=v.variable.name.value,
-                        annotation=ast.Name(
-                            id=get_scalar_equivalent(v.type.name.value, config),
-                            ctx=ast.Load(),
-                        ),
+                        annotation=get_input_type_annotation(v.type, config),
                     )
                 )
                 kw_values.append(ast.Constant(value=None))
@@ -119,61 +157,160 @@ def generate_query_dict(
 
     for v in o.variable_definitions:
         if isinstance(v.type, NonNullTypeNode):
-            if isinstance(v.type.type, ListTypeNode):
-                raise NotImplementedError()
-            else:
-                keys.append(ast.Constant(value=v.variable.name.value))
-                values.append(ast.Name(id=v.variable.name.value, ctx=ast.Load()))
+            keys.append(ast.Constant(value=v.variable.name.value))
+            values.append(ast.Name(id=v.variable.name.value, ctx=ast.Load()))
 
     for v in o.variable_definitions:
         if not isinstance(v.type, NonNullTypeNode):
-            if isinstance(v.type, ListTypeNode):
-                raise NotImplementedError()
-            else:
-                keys.append(ast.Constant(value=v.variable.name.value))
-                values.append(ast.Name(id=v.variable.name.value, ctx=ast.Load()))
+            keys.append(ast.Constant(value=v.variable.name.value))
+            values.append(ast.Name(id=v.variable.name.value, ctx=ast.Load()))
 
     return ast.Dict(keys=keys, values=values)
 
 
 def generate_query_doc(
-    o: OperationDefinitionNode, client_schema: GraphQLSchema, config: GeneratorConfig
+    o: OperationDefinitionNode,
+    client_schema: GraphQLSchema,
+    config: GeneratorConfig,
+    collapse=False,
 ):
 
     pos_args = []
     x = get_operation_root_type(client_schema, o)
+    o.__annotations__
+
+    if o.operation == OperationType.QUERY:
+        o_name = (
+            f"{config.prepend_query}{o.name.value.capitalize()}{config.append_query}"
+        )
+    if o.operation == OperationType.MUTATION:
+        o_name = f"{config.prepend_mutation}{o.name.value.capitalize()}{config.append_mutation}"
+    if o.operation == OperationType.SUBSCRIPTION:
+        o_name = f"{config.prepend_subscription}{o.name.value.capitalize()}{config.append_subscription}"
+
+    return_type = (
+        f"{o_name}{o.selection_set.selections[0].name.value.capitalize()}"
+        if collapse
+        else o_name
+    )
+
+    header = f"{o.name.value} \n\n"
+
+    if collapse:
+        field = o.selection_set.selections[0]
+        field_definition = get_field_def(client_schema, x, field)
+        description = (
+            header + field_definition.description
+            if field_definition.description
+            else header
+        )
+
+    else:
+        query_descriptions = []
+
+        for field in o.selection_set.selections:
+            if isinstance(field, FieldNode):
+                target = target_from_node(field)
+                field_definition = get_field_def(client_schema, x, field)
+                if field_definition.description:
+                    query_descriptions.append(
+                        f"{target}: {field_definition.description}"
+                    )
+
+        description = "\n ".join([header] + query_descriptions)
+
+    description += "\n\nArguments:\n"
 
     for v in o.variable_definitions:
         if isinstance(v.type, NonNullTypeNode):
             if isinstance(v.type.type, ListTypeNode):
-                raise NotImplementedError()
+                description += f"    {v.variable.name.value}](List[{v.type.type.type.name.value}]): {v.type.type.type.name.value}\n"
             else:
-                pos_args.append(ast.arg(arg=v.variable.name.value))
+                description += f"    {v.variable.name.value}({v.type.type.name.value}): {v.type.type.name.value}\n"
 
-    kw_args = []
-    kw_values = []
     for v in o.variable_definitions:
         if not isinstance(v.type, NonNullTypeNode):
             if isinstance(v.type, ListTypeNode):
-                raise NotImplementedError()
+                description += f"    {v.variable.name.value}](List[{v.type.type.name.value}], Optional): {v.type.type.name.value}\n"
             else:
-                kw_args.append(ast.arg(arg=v.variable.name.value))
-                kw_values.append(ast.Constant(value=None))
+                description += f"    {v.variable.name.value}({v.type.name.value}, Optional): {v.type.name.value}\n"
 
-    header = f"Query {o.name.value}  \n\n"
-
-    query_descriptions = []
-
-    for field in o.selection_set.selections:
-        if isinstance(field, FieldNode):
-            target = target_from_node(field)
-            field_definition = get_field_def(client_schema, x, field)
-            if field_definition.description:
-                query_descriptions.append(f"{target}: {field_definition.description}")
-
-    description = "\n ".join([header] + query_descriptions)
+    description += "\nReturns:\n"
+    description += f"    {return_type}: The returned Mutation\n"
 
     return ast.Expr(value=ast.Constant(value=description))
+
+
+def genereate_async_call(o_name, o, client_schema, config, collapse):
+
+    if not collapse:
+        return ast.Await(
+            value=ast.Call(
+                func=ast.Attribute(
+                    value=ast.Name(
+                        id=o_name,
+                        ctx=ast.Load(),
+                    ),
+                    attr="aexecute",
+                    ctx=ast.Load(),
+                ),
+                keywords=[],
+                args=[generate_query_dict(o, client_schema, config)],
+            )
+        )
+    else:
+        return ast.Attribute(
+            value=ast.Await(
+                value=ast.Call(
+                    func=ast.Attribute(
+                        value=ast.Name(
+                            id=o_name,
+                            ctx=ast.Load(),
+                        ),
+                        attr="aexecute",
+                        ctx=ast.Load(),
+                    ),
+                    keywords=[],
+                    args=[generate_query_dict(o, client_schema, config)],
+                )
+            ),
+            attr=o.selection_set.selections[0].name.value,
+            ctx=ast.Load(),
+        )
+
+
+def genereate_sync_call(o_name, o, client_schema, config, collapse):
+
+    if not collapse:
+        return ast.Call(
+            func=ast.Attribute(
+                value=ast.Name(
+                    id=o_name,
+                    ctx=ast.Load(),
+                ),
+                attr="execute",
+                ctx=ast.Load(),
+            ),
+            keywords=[],
+            args=[generate_query_dict(o, client_schema, config)],
+        )
+    else:
+        return ast.Attribute(
+            value=ast.Call(
+                func=ast.Attribute(
+                    value=ast.Name(
+                        id=o_name,
+                        ctx=ast.Load(),
+                    ),
+                    attr="execute",
+                    ctx=ast.Load(),
+                ),
+                keywords=[],
+                args=[generate_query_dict(o, client_schema, config)],
+            ),
+            attr=o.selection_set.selections[0].name.value,
+            ctx=ast.Load(),
+        )
 
 
 def generate_operation_func(
@@ -185,65 +322,76 @@ def generate_operation_func(
     tree = []
 
     if o.operation == OperationType.QUERY:
-        o_name = f"{o.name.value}Query"
+        o_name = (
+            f"{config.prepend_query}{o.name.value.capitalize()}{config.append_query}"
+        )
     if o.operation == OperationType.MUTATION:
-        o_name = f"{o.name.value}Mutation"
+        o_name = f"{config.prepend_mutation}{o.name.value.capitalize()}{config.append_mutation}"
     if o.operation == OperationType.SUBSCRIPTION:
-        o_name = f"{o.name.value}Subscription"
+        o_name = f"{config.prepend_subscription}{o.name.value.capitalize()}{config.append_subscription}"
+
+    collapse = len(o.selection_set.selections) == 1 and plugin_config.collapse_lonely
+
+    return_type = (
+        f"{o_name}{o.selection_set.selections[0].name.value.capitalize()}"
+        if collapse
+        else o_name
+    )
+
+    if collapse:
+        x = get_operation_root_type(client_schema, o)
+        field_definition = get_field_def(
+            client_schema, x, o.selection_set.selections[0]
+        )
+        return_type = f"{o_name}{o.selection_set.selections[0].name.value.capitalize()}"
+        if isinstance(field_definition.type, GraphQLList):
+            returns = ast.Subscript(
+                value=ast.Name(id="List", ctx=ast.Load()),
+                slice=ast.Name(id=return_type, ctx=ast.Load()),
+            )
+        else:
+            returns = ast.Name(id=return_type, ctx=ast.Load())
+    else:
+        returns = ast.Subscript(
+            value=ast.Name(id="List", ctx=ast.Load()),
+            slice=ast.Name(id=o_name, ctx=ast.Load()),
+        )
+
+    doc = generate_query_doc(o, client_schema, config, collapse=collapse)
 
     if plugin_config.generate_async:
         tree.append(
             ast.AsyncFunctionDef(
-                name=f"ause{o.name.value}",
+                name=f"{plugin_config.prepend_async}{o.name.value}",
                 args=generate_query_args(o, client_schema, config),
                 body=[
-                    generate_query_doc(o, client_schema, config),
+                    doc,
                     ast.Return(
-                        value=ast.Await(
-                            value=ast.Call(
-                                func=ast.Attribute(
-                                    value=ast.Name(
-                                        id=o_name,
-                                        ctx=ast.Load(),
-                                    ),
-                                    attr="aquery",
-                                    ctx=ast.Load(),
-                                ),
-                                keywords=[],
-                                args=[generate_query_dict(o, client_schema, config)],
-                            )
+                        value=genereate_async_call(
+                            o_name, o, client_schema, config, collapse
                         )
                     ),
                 ],
                 decorator_list=[],
-                returns=ast.Name(id=o_name, ctx=ast.Load()),
+                returns=returns,
             )
         )
 
     if plugin_config.generate_sync:
         tree.append(
             ast.FunctionDef(
-                name=f"use{o.name.value}",
+                name=f"{plugin_config.prepend_sync}{o.name.value}",
                 args=generate_query_args(o, client_schema, config),
                 body=[
-                    generate_query_doc(o, client_schema, config),
+                    doc,
                     ast.Return(
-                        value=ast.Call(
-                            func=ast.Attribute(
-                                value=ast.Name(
-                                    id=o_name,
-                                    ctx=ast.Load(),
-                                ),
-                                attr="query",
-                                ctx=ast.Load(),
-                            ),
-                            keywords=[],
-                            args=[generate_query_dict(o, client_schema, config)],
+                        value=genereate_sync_call(
+                            o_name, o, client_schema, config, collapse
                         )
                     ),
                 ],
                 decorator_list=[],
-                returns=ast.Name(id=o_name, ctx=ast.Load()),
+                returns=returns,
             )
         )
 

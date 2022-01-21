@@ -2,16 +2,11 @@ from graphql import get_introspection_query
 from turms.config import GeneratorConfig, GraphQLConfig
 from turms.helpers import import_string
 from turms.parser.imports import generate_imports
-from turms.plugins.structure import StructurePlugin
 from turms.processor.base import Processor
 from turms.processor.black import BlackProcessor
 from turms.utils import build_schema
 from turms.plugins.base import Plugin
 from typing import Dict, List
-from turms.plugins.enums import EnumsPlugin
-from turms.plugins.fragments import FragmentsPlugin
-from turms.plugins.operation import OperationsPlugin
-from turms.plugins.funcs import OperationsFuncPlugin
 import ast
 import yaml
 import json
@@ -30,7 +25,7 @@ class GenerationError(Exception):
     pass
 
 
-def gen(filepath: str):
+def gen(filepath: str, project=None):
 
     with open(filepath, "r") as f:
         yaml_dict = yaml.safe_load(f)
@@ -54,7 +49,9 @@ def gen(filepath: str):
 
         turms_config = project["extensions"]["turms"]
 
-        gen_config = GeneratorConfig(**turms_config, documents=project["documents"])
+        gen_config = GeneratorConfig(
+            **turms_config, documents=project["documents"], domain=config.domain
+        )
         plugins = []
 
         if "plugins" in turms_config:
@@ -110,7 +107,7 @@ def generate(
         generated = processor.run(generated)
 
     if not os.path.isdir(config.out_dir):
-        os.mkdir(config.out_dir)
+        os.makedirs(config.out_dir)
 
     with open(os.path.join(config.out_dir, config.generated_name), "w") as f:
         f.write(generated)

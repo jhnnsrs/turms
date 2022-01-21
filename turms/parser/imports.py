@@ -17,6 +17,18 @@ def generate_imports(schema: GraphQLSchema, config: GeneratorConfig):
                 )
             )
 
+    for key, definition in config.scalar_definitions.items():
+        if definition in ["str", "int", "float", "bool", "complex"]:
+            continue
+
+        imports.append(
+            ast.ImportFrom(
+                module=".".join(definition.split(".")[:-1]),
+                names=[ast.alias(name=definition.split(".")[-1])],
+                level=0,
+            )
+        )
+
     for item in config.object_bases:
         imports.append(
             ast.ImportFrom(

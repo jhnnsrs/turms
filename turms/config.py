@@ -17,7 +17,17 @@ class GeneratorConfig(BaseModel):
     additional_bases = {}
     extensions: Dict = {}
 
+    prepend_fragment: str = ""
+    append_fragment: str = "Fragment"
+    prepend_query: str = ""
+    append_query: str = "Query"
+    prepend_mutation: str = ""
+    append_mutation: str = "Mutation"
+    prepend_subscription: str = ""
+    append_subscription: str = "Subscription"
+
 
 class GraphQLConfig(BaseModel):
     schema_url: Optional[AnyHttpUrl] = Field(alias="schema")
     documents: Optional[str]
+    domain: str = "default"

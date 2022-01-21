@@ -1,8 +1,7 @@
-from typing import Type
 from pydantic.main import BaseModel, ModelMetaclass
 
 
-class QueryMeta(ModelMetaclass):
+class OperationMeta(ModelMetaclass):
     """
     The Model Meta class extends the Pydantic Metaclass and adds in
     syncrhonous and asynchronous Managers. These Managers allow direct
@@ -33,15 +32,15 @@ class QueryMeta(ModelMetaclass):
             slots.remove("__dict__")
         attrs["__slots__"] = tuple(slots)
 
-        return super(QueryMeta, mcls).__new__(mcls, name, bases, attrs)
+        return super(OperationMeta, mcls).__new__(mcls, name, bases, attrs)
 
     @property
     def get_meta(cls):
         return cls.__meta
 
     def __init__(self, name, bases, attrs):
-        super(QueryMeta, self).__init__(name, bases, attrs)
-        if attrs["__qualname__"] != "Model":
+        super(OperationMeta, self).__init__(name, bases, attrs)
+        if attrs["__qualname__"] not in "Operation":
             # This gets allso called for our Baseclass which is abstract
             self.__meta = attrs["Meta"] if "Meta" in attrs else None
             assert (
@@ -54,7 +53,6 @@ class QueryMeta(ModelMetaclass):
             except:
                 pass
 
-            register = getattr(self.__meta, "register", True)
             assert hasattr(
                 self.__meta, "domain"
             ), f"Please specifiy which Ward this Model should use in Meta of  {attrs['__qualname__']}"
@@ -64,14 +62,29 @@ class QueryMeta(ModelMetaclass):
             ), f"Please specifiy the document to use for this Operation in Meta document"
 
 
-class GraphQLQuery(BaseModel, metaclass=QueryMeta):
+class GraphQLOperation(BaseModel, metaclass=OperationMeta):
     @classmethod
-    def query(cls, variables):
+    def execute(cls, variables):
         raise NotImplementedError()
 
     @classmethod
-    async def aquery(cls, variables):
+    async def aexecute(cls, variables):
         raise NotImplementedError()
 
+    class Meta:
+        abstract = True
+
+
+class GraphQLQuery(GraphQLOperation):
+    class Meta:
+        abstract = True
+
+
+class GraphQLMutation(GraphQLOperation):
+    class Meta:
+        abstract = True
+
+
+class GraphQLSubscription(GraphQLOperation):
     class Meta:
         abstract = True
