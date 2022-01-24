@@ -15,11 +15,14 @@ It makes heavy use of pydantic and its serialization capablities and provides fu
 - Documents
 - Fragments
 - Enums
-- Query Functions
+- Operations
+- Operation Functions
 
 ## Features
 
 - Fully Modular (agnostic of graphql transport)
+- Tries to minimise Class Generation if using Fragments
+- Autocollapsing operation (if mutation or query has only one operation) functions
 - Specify type mixins, baseclasses...
 - Fully Support type hints for variables (Pylance)
 - Compliant with graphl-config
@@ -49,3 +52,16 @@ Generate beautifully typed Operations, Enums,...
 ### Why Turms
 
 In Etruscan religion, Turms (usually written as 𐌕𐌖𐌓𐌌𐌑 Turmś in the Etruscan alphabet) was the equivalent of Roman Mercury and Greek Hermes, both gods of trade and the **messenger** god between people and gods.
+
+## Experimental
+
+```bash
+turms watch $PROJECT_NAME
+```
+
+Turms watch is able to automatically monitor your graphql folder for changes and autogenerate the api on save again.
+Requires additional dependency for watchdog
+
+```bash
+pip install turms[watch]
+```
