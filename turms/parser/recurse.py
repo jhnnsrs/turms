@@ -45,6 +45,24 @@ def recurse_annotation(
         target = target_from_node(node)
         base_name = f"{parent_name}{target.capitalize()}"
 
+        if len(node.selection_set.selections) == 1:
+            subnode = node.selection_set.selections[0]
+            if isinstance(subnode, FragmentSpreadNode):
+                if is_optional:
+                    return ast.Subscript(
+                        value=ast.Name("Optional", ctx=ast.Load()),
+                        slice=ast.Name(
+                            id=FRAGMENT_CLASS_MAP[subnode.name.value],
+                            ctx=ast.Load(),
+                        ),
+                    )
+
+                else:
+                    return ast.Name(
+                        id=FRAGMENT_CLASS_MAP[subnode.name.value],
+                        ctx=ast.Load(),
+                    )
+
         if type.description:
             mother_class_fields.append(
                 ast.Expr(value=ast.Constant(value=type.description))
@@ -204,6 +222,24 @@ def recurse_annotation(
         if type.description:
             pick_fields.append(ast.Expr(value=ast.Constant(value=type.description)))
         pick_fields += [generate_typename_field(type.name)]
+
+        if len(node.selection_set.selections) == 1:
+            subnode = node.selection_set.selections[0]
+            if isinstance(subnode, FragmentSpreadNode):
+                if is_optional:
+                    return ast.Subscript(
+                        value=ast.Name("Optional", ctx=ast.Load()),
+                        slice=ast.Name(
+                            id=FRAGMENT_CLASS_MAP[subnode.name.value],
+                            ctx=ast.Load(),
+                        ),
+                    )
+
+                else:
+                    return ast.Name(
+                        id=nana,
+                        ctx=ast.Load(),
+                    )
 
         for sub_node in node.selection_set.selections:
 

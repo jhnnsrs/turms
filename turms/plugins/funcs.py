@@ -2,10 +2,10 @@ from abc import abstractmethod
 import ast
 from typing import List
 
-from graphql import NamedTypeNode
+from graphql import FragmentSpreadNode, NamedTypeNode
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
-from turms.globals import INPUTTYPE_CLASS_MAP
+from turms.globals import FRAGMENT_CLASS_MAP, INPUTTYPE_CLASS_MAP
 from turms.plugins.base import Plugin
 from pydantic import BaseModel
 from graphql.language.ast import OperationDefinitionNode, OperationType
@@ -328,7 +328,22 @@ def generate_operation_func(
         field_definition = get_field_def(
             client_schema, x, o.selection_set.selections[0]
         )
-        return_type = f"{o_name}{o.selection_set.selections[0].name.value.capitalize()}"
+
+        potential_item = o.selection_set.selections[0]
+
+        # Check if was collapsed from fragment
+        if len(potential_item.selection_set.selections) == 1:
+            if isinstance(
+                potential_item.selection_set.selections[0], FragmentSpreadNode
+            ):
+                return_type = FRAGMENT_CLASS_MAP[
+                    potential_item.selection_set.selections[0].name.value
+                ]
+        else:
+            return_type = (
+                f"{o_name}{o.selection_set.selections[0].name.value.capitalize()}"
+            )
+
         if isinstance(field_definition.type, GraphQLList):
             returns = ast.Subscript(
                 value=ast.Name(id="List", ctx=ast.Load()),

@@ -18,6 +18,7 @@ class GraphQLOperation(BaseModel, metaclass=OperationMeta):
     async def aexecute(cls, variables):
         x = get_ward_registry().get_ward_instance(cls.get_meta().domain)
         data = await x.arun(cls.get_meta().document, variables)
+        print(data)
         try:
             return cls(**data)
         except ValidationError as e:

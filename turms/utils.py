@@ -114,7 +114,7 @@ def replace_iteratively(pattern, taken=[]):
             level_down_pattern = "\n\n".join(
                 [FRAGMENT_DOCUMENT_MAP[key] for key in new_fragments] + [pattern]
             )
-            return replace_iteratively(level_down_pattern, taken=new_fragments)
+            return replace_iteratively(level_down_pattern, taken=new_fragments + taken)
         except KeyError as e:
             raise FragmentNotFoundError(
                 f"Could not find in Fragment Map {FRAGMENT_DOCUMENT_MAP}"
