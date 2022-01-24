@@ -1,4 +1,4 @@
-query Johannes {
+query Test_Query {
   capsules {
     id
     missions {
@@ -7,7 +7,7 @@ query Johannes {
   }
 }
 
-mutation InsertUser($id: uuid) {
+mutation Test_Mutation($id: uuid) {
   insert_users(objects: { id: $id }) {
     returning {
       id

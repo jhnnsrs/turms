@@ -3,7 +3,6 @@ import ast
 from typing import List
 
 from graphql import NamedTypeNode
-from numpy import isin
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from turms.globals import INPUTTYPE_CLASS_MAP
@@ -15,18 +14,11 @@ from graphql.utilities.build_client_schema import GraphQLSchema
 from turms.plugins.base import Plugin
 from pydantic import BaseModel
 from graphql.language.ast import (
-    DefinitionNode,
-    DocumentNode,
     FieldNode,
-    FragmentDefinitionNode,
-    FragmentSpreadNode,
-    InlineFragmentNode,
     ListTypeNode,
     NonNullTypeNode,
     OperationDefinitionNode,
     OperationType,
-    SelectionNode,
-    SelectionSetNode,
 )
 from turms.utils import (
     NoDocumentsFoundError,
@@ -40,14 +32,7 @@ import re
 import ast
 
 from graphql.type.definition import (
-    GraphQLEnumType,
-    GraphQLField,
-    GraphQLInterfaceType,
     GraphQLList,
-    GraphQLNonNull,
-    GraphQLObjectType,
-    GraphQLScalarType,
-    GraphQLType,
     get_named_type,
     is_list_type,
 )
@@ -224,16 +209,16 @@ def generate_query_doc(
     for v in o.variable_definitions:
         if isinstance(v.type, NonNullTypeNode):
             if isinstance(v.type.type, ListTypeNode):
-                description += f"    {v.variable.name.value}](List[{v.type.type.type.name.value}]): {v.type.type.type.name.value}\n"
+                description += f"    {v.variable.name.value} (List[{v.type.type.type.name.value}]): {v.type.type.type.name.value}\n"
             else:
-                description += f"    {v.variable.name.value}({v.type.type.name.value}): {v.type.type.name.value}\n"
+                description += f"    {v.variable.name.value} ({v.type.type.name.value}): {v.type.type.name.value}\n"
 
     for v in o.variable_definitions:
         if not isinstance(v.type, NonNullTypeNode):
             if isinstance(v.type, ListTypeNode):
-                description += f"    {v.variable.name.value}](List[{v.type.type.name.value}], Optional): {v.type.type.name.value}\n"
+                description += f"    {v.variable.name.value} (List[{v.type.type.name.value}], Optional): {v.type.type.name.value}\n"
             else:
-                description += f"    {v.variable.name.value}({v.type.name.value}, Optional): {v.type.name.value}\n"
+                description += f"    {v.variable.name.value} ({v.type.name.value}, Optional): {v.type.name.value}\n"
 
     description += "\nReturns:\n"
     description += f"    {return_type}: The returned Mutation\n"
