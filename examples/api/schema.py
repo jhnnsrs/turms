@@ -135,7 +135,7 @@ async def aUser() -> UserFragment:
     Arguments:
 
     Returns:
-        UserQueryUsers: The returned Mutation"""
+        UserFragment: The returned Mutation"""
     return (await UserQuery.aexecute({})).users
 
 
@@ -147,7 +147,7 @@ def User() -> UserFragment:
     Arguments:
 
     Returns:
-        UserQueryUsers: The returned Mutation"""
+        UserFragment: The returned Mutation"""
     return UserQuery.execute({}).users
 
 

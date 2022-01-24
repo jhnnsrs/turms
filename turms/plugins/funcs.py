@@ -173,11 +173,24 @@ def generate_query_doc(
     if o.operation == OperationType.SUBSCRIPTION:
         o_name = f"{config.prepend_subscription}{o.name.value.capitalize()}{config.append_subscription}"
 
-    return_type = (
-        f"{o_name}{o.selection_set.selections[0].name.value.capitalize()}"
-        if collapse
-        else o_name
-    )
+    if collapse:
+        # Check if was collapsed from fragment
+
+        return_type = f"{o_name}{o.selection_set.selections[0].name.value.capitalize()}"
+
+        potential_item = o.selection_set.selections[0]
+
+        if len(potential_item.selection_set.selections) == 1:
+            if isinstance(
+                potential_item.selection_set.selections[0], FragmentSpreadNode
+            ):
+                return_type = FRAGMENT_CLASS_MAP[
+                    potential_item.selection_set.selections[0].name.value
+                ]
+
+    else:
+
+        return_type = f"{o_name}"
 
     header = f"{o.name.value} \n\n"
 
