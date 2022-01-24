@@ -17,6 +17,7 @@ It makes heavy use of pydantic and its serialization capablities and provides fu
 - Enums
 - Operations
 - Operation Functions
+- Scalar (mapping to python equivalent)
 
 ## Features
 
@@ -32,6 +33,8 @@ It makes heavy use of pydantic and its serialization capablities and provides fu
 ```bash
 pip install turms
 ```
+
+## Config
 
 ## Usage
 
@@ -52,6 +55,14 @@ Generate beautifully typed Operations, Enums,...
 ### Why Turms
 
 In Etruscan religion, Turms (usually written as 𐌕𐌖𐌓𐌌𐌑 Turmś in the Etruscan alphabet) was the equivalent of Roman Mercury and Greek Hermes, both gods of trade and the **messenger** god between people and gods.
+
+## Transport Layer
+
+Turms does not come with a default transport layer, but by specifiyng custom queries classes you can easily incorporate your logic (look at turms.types.herre for inspiration)
+
+## Examples
+
+This github repository also contains an example graphql.config.yaml with the public SpaceX api, as well as a sample of the generated api.
 
 ## Experimental
 
