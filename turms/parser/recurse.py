@@ -237,7 +237,7 @@ def recurse_annotation(
 
                 else:
                     return ast.Name(
-                        id=nana,
+                        id=FRAGMENT_CLASS_MAP[subnode.name.value],
                         ctx=ast.Load(),
                     )
 

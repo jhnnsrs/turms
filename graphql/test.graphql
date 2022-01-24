@@ -1,4 +1,14 @@
-query Test_Query {
+query User {
+  users {
+    ...User
+  }
+}
+
+fragment User on users {
+  id
+}
+
+query TestQuery {
   capsules {
     id
     missions {
@@ -7,7 +17,7 @@ query Test_Query {
   }
 }
 
-mutation Test_Mutation($id: uuid) {
+mutation TestMutation($id: uuid) {
   insert_users(objects: { id: $id }) {
     returning {
       id
