@@ -7,15 +7,18 @@ def generate_imports(schema: GraphQLSchema, config: GeneratorConfig):
 
     imports = []
 
-    for key, lis in config.additional_bases.items():
-        for item in lis:
-            imports.append(
-                ast.ImportFrom(
-                    module=".".join(item.split(".")[:-1]),
-                    names=[ast.alias(name=item.split(".")[-1])],
-                    level=0,
-                )
+    additional_bases_imports = {
+        item for key, lis in config.additional_bases.items() for item in lis
+    }
+
+    for item in additional_bases_imports:
+        imports.append(
+            ast.ImportFrom(
+                module=".".join(item.split(".")[:-1]),
+                names=[ast.alias(name=item.split(".")[-1])],
+                level=0,
             )
+        )
 
     for key, definition in config.scalar_definitions.items():
         if definition in ["str", "int", "float", "bool", "complex"]:

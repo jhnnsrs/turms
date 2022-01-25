@@ -7,6 +7,10 @@ from turms.types.utils import clean_dict
 # Mixin CLass is not Possible because of BaseModel Metaclass
 
 
+class GraphQLObjectError(Exception):
+    pass
+
+
 class GraphQLObject(BaseModel):
     def dict(self, *args, by_alias=True, **kwargs):
 
@@ -19,6 +23,18 @@ class GraphQLObject(BaseModel):
         )
 
     async def to_variable(self):
+        """WIll be called by the ward"""
+        assert (
+            self.id
+        ), "Cannot convert an object to a variable if you didn't query its unique id"
+        return self.id
+
+    def __getattr__(self, attr):
+        raise GraphQLObjectError(
+            f"{attr} is not a valid attribute of {self.__class__.__name__}. Have you checked the schema?"
+        )
+
+    async def shrink(self):
         """WIll be called by the ward"""
         assert (
             self.id

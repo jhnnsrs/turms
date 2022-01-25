@@ -177,10 +177,16 @@ def generate_query_doc(
         # Check if was collapsed from fragment
 
         return_type = f"{o_name}{o.selection_set.selections[0].name.value.capitalize()}"
+        field_definition = get_field_def(
+            client_schema, x, o.selection_set.selections[0]
+        )
 
         potential_item = o.selection_set.selections[0]
 
-        if len(potential_item.selection_set.selections) == 1:
+        if potential_item.selection_set is None:
+            return_type = get_scalar_equivalent(field_definition.type.name, config)
+
+        elif len(potential_item.selection_set.selections) == 1:
             if isinstance(
                 potential_item.selection_set.selections[0], FragmentSpreadNode
             ):
@@ -345,7 +351,10 @@ def generate_operation_func(
         potential_item = o.selection_set.selections[0]
 
         # Check if was collapsed from fragment
-        if len(potential_item.selection_set.selections) == 1:
+        if potential_item.selection_set is None:
+            return_type = get_scalar_equivalent(field_definition.type.name, config)
+
+        elif len(potential_item.selection_set.selections) == 1:
             if isinstance(
                 potential_item.selection_set.selections[0], FragmentSpreadNode
             ):

@@ -37,7 +37,7 @@ def generate_enums(
         if plugin_config.skip_underscore and key.startswith("_"):
             continue
 
-        name = f"{plugin_config.prepend}{key}{plugin_config.append}"
+        name = f"{config.prepend_enum}{key}{config.append_enum}"
         fields = [ast.Expr(value=ast.Constant(value=type.description))]
 
         for value_key, value in type.values.items():

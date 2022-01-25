@@ -7,10 +7,8 @@ from graphql import (
     GraphQLScalarType,
     GraphQLWrappingType,
 )
-from numpy import isin
-from turms.globals import ENUM_CLASS_MAP, INPUTTYPE_CLASS_MAP
+from turms.globals import INPUTTYPE_CLASS_MAP
 from turms.plugins.base import Plugin
-from abc import abstractmethod
 import ast
 from typing import List, Optional
 from turms.config import GeneratorConfig
@@ -56,11 +54,11 @@ def generate_input_annotation(
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
                 slice=ast.Constant(
-                    value=f"{plugin_config.prepend}{type.name}{plugin_config.append}",
+                    value=f"{config.prepend_input}{type.name}{config.append_input}",
                 ),
             )
         return ast.Constant(
-            value=f"{plugin_config.prepend}{type.name}{plugin_config.append}",
+            value=f"{config.prepend_input}{type.name}{config.append_input}",
         )
 
     if isinstance(type, GraphQLEnumType):
@@ -68,11 +66,11 @@ def generate_input_annotation(
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
                 slice=ast.Constant(
-                    value=f"{plugin_config.prepend}{type.name}{plugin_config.append}",
+                    value=f"{config.prepend_enum}{type.name}{config.append_enum}",
                 ),
             )
         return ast.Constant(
-            value=f"{plugin_config.prepend}{type.name}{plugin_config.append}",
+            value=f"{config.prepend_enum}{type.name}{config.append_enum}",
         )
     if isinstance(type, GraphQLNonNull):
         return generate_input_annotation(
@@ -117,15 +115,20 @@ def generate_inputs(
         if isinstance(value, GraphQLInputObjectType)
     }
 
+    self_referential = []
+
     for key, type in inputobjects_type.items():
 
         if plugin_config.skip_underscore and key.startswith("_"):
             continue
 
-        name = f"{plugin_config.prepend}{key}{plugin_config.append}"
+        name = f"{config.prepend_input}{key}{config.append_input}"
         fields = [ast.Expr(value=ast.Constant(value=type.description))]
 
         for value_key, value in type.fields.items():
+            if value.type == type:
+                self_referential.append(name)
+
             assign = ast.AnnAssign(
                 target=ast.Name(value_key, ctx=ast.Store()),
                 annotation=generate_input_annotation(
@@ -160,6 +163,24 @@ def generate_inputs(
                 decorator_list=[],
                 keywords=[],
                 body=fields,
+            )
+        )
+
+    for input_name in self_referential:
+        tree.append(
+            ast.Expr(
+                value=ast.Call(
+                    func=ast.Attribute(
+                        value=ast.Name(
+                            id=input_name,
+                            ctx=ast.Load(),
+                        ),
+                        attr="update_forward_refs",
+                        ctx=ast.Load(),
+                    ),
+                    keywords=[],
+                    args=[],
+                )
             )
         )
 

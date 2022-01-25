@@ -176,7 +176,8 @@ def recurse_annotation(
                 )
                 cls = ast.ClassDef(
                     name,
-                    bases=[
+                    bases=additional_bases
+                    + [
                         ast.Name(id=mother_class_name, ctx=ast.Load()),
                     ],
                     decorator_list=[],

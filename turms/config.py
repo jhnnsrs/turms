@@ -26,6 +26,11 @@ class GeneratorConfig(BaseModel):
     prepend_subscription: str = ""
     append_subscription: str = "Subscription"
 
+    prepend_input: str = ""
+    append_input: str = ""
+    prepend_enum: str = ""
+    append_enum: str = ""
+
 
 class GraphQLConfig(BaseModel):
     schema_url: Optional[AnyHttpUrl] = Field(alias="schema")

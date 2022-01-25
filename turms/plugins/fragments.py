@@ -268,7 +268,7 @@ class FragmentsPlugin(Plugin):
     ) -> List[ast.AST]:
         imports = []
 
-        all_bases = self.plugin_config.fragment_bases
+        all_bases = {base for base in self.plugin_config.fragment_bases}
 
         for item in all_bases:
             imports.append(
