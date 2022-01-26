@@ -1,6 +1,5 @@
-from ast import alias
 from pydantic import AnyHttpUrl, BaseModel, Field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 
 class GeneratorConfig(BaseModel):
@@ -33,6 +32,6 @@ class GeneratorConfig(BaseModel):
 
 
 class GraphQLConfig(BaseModel):
-    schema_url: Optional[AnyHttpUrl] = Field(alias="schema")
+    schema_url: Optional[Union[AnyHttpUrl, str]] = Field(alias="schema")
     documents: Optional[str]
     domain: str = "default"

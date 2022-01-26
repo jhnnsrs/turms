@@ -1,4 +1,6 @@
-from graphql import get_introspection_query
+from graphql import get_introspection_query, parse, build_ast_schema
+from graphql.language.parser import parse
+from pydantic import AnyHttpUrl, NoneIsNotAllowedError
 from turms.config import GeneratorConfig, GraphQLConfig
 from turms.helpers import import_string
 from turms.parser.imports import generate_imports
@@ -11,7 +13,7 @@ import ast
 import yaml
 import json
 import os
-from urllib import request, parse
+from urllib import request
 
 
 plugins: List[Plugin] = []
@@ -35,7 +37,7 @@ def gen(filepath: str, project=None):
     for key, project in yaml_dict["projects"].items():
         config = GraphQLConfig(**project, domain=key)
 
-        if config.schema:
+        if isinstance(config.schema_url, AnyHttpUrl):
             jdata = json.dumps({"query": get_introspection_query()}).encode("utf-8")
             req = request.Request(config.schema_url, data=jdata)
             req.add_header("Content-Type", "application/json")
@@ -44,8 +46,15 @@ def gen(filepath: str, project=None):
             resp = request.urlopen(req)
             x = json.loads(resp.read().decode("utf-8"))
             introspection = x["data"]
+            dsl = None
         else:
-            raise NotImplementedError("Right now not supported")
+            with open(os.path.join(os.getcwd(), config.schema_url), "r") as f:
+                if config.schema_url.endswith(".graphql"):
+                    dsl = parse(f.read())
+                    introspection = None
+                elif config.schema_url.endswith(".json"):
+                    introspection = json.load(f)
+                    dsl = None
 
         turms_config = project["extensions"]["turms"]
 
@@ -72,17 +81,28 @@ def gen(filepath: str, project=None):
                 processors.append(proc_class(**proc_config))
                 print(f"Using Processor {proc_class}")
 
-        generate(gen_config, introspection, plugins=plugins, processors=processors)
+        generate(
+            gen_config,
+            plugins=plugins,
+            processors=processors,
+            introspection_query=introspection,
+            dsl=dsl,
+        )
 
 
 def generate(
     config: GeneratorConfig,
-    introspection_query: Dict[str, str],
+    introspection_query: Dict[str, str] = None,
+    dsl: any = None,
     plugins=plugins,
     processors=processors,
 ):
-
-    client_schema = build_schema(introspection_query)
+    if introspection_query is not None:
+        client_schema = build_schema(introspection_query)
+    elif dsl is not None:
+        client_schema = build_ast_schema(dsl)
+    else:
+        raise GenerationError("Either introspection_query or dsl must be provided")
 
     global_tree = []
 
