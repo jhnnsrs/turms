@@ -126,7 +126,8 @@ def generate_inputs(
         fields = [ast.Expr(value=ast.Constant(value=type.description))]
 
         for value_key, value in type.fields.items():
-            if value.type == type:
+
+            if isinstance(value.type, GraphQLInputObjectType):
                 self_referential.append(name)
 
             assign = ast.AnnAssign(

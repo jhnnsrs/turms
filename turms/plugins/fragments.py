@@ -83,6 +83,7 @@ def generate_fragment(
         for sub_node in f.selection_set.selections:
 
             if isinstance(sub_node, FieldNode):
+
                 if sub_node.name.value == "__typename":
                     continue
 
