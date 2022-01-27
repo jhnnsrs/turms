@@ -9,7 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [3.8, 3.9]
+        python-version: [3.7, 3.8, 3.9]
         poetry-version: [1.1.4]
         os: [ubuntu-18.04, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
@@ -24,8 +24,6 @@ jobs:
           poetry-version: ${{ matrix.poetry-version }}
       - name: Run Poetry Install
         run: poetry install
-      - name: Run Poetry Install
-        run: poetry run black
       - name: Run Tests
         run: poetry run pytest --cov --cov-report=xml .
       - name: Upload coverage to Codecov
