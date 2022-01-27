@@ -8,19 +8,21 @@ readme = "README.md"
 packages = [{include = "turms"}]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.7"
 rich = "^11.0.0"
 graphql-core = "^3.2.0"
 pydantic = "^1.9.0"
 PyYAML = "^6.0"
 watchdog = {version = "^2.1.6", optional = true}
+astunparse = {version = "^1.6.3",python = ">=3.7,<3.9"}
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.5"
 pytest-aiohttp = "^0.3.0"
-tox = "^3.24.3"
 pytest-cov = "^3.0.0"
 black = "^21.12b0"
+tox = "^3.24.5"
+
 
 [tool.poetry.extras]
 watch = ["watchdog"]

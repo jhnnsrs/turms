@@ -8,6 +8,7 @@ from turms.processor.base import Processor
 from turms.processor.black import BlackProcessor
 from turms.utils import build_schema
 from turms.plugins.base import Plugin
+from turms.compat.funcs import unparse
 from typing import Dict, List
 import ast
 import yaml
@@ -121,7 +122,7 @@ def generate(
             raise GenerationError(f"Plugin Body:{plugin} failed!") from e
 
     md = ast.Module(body=global_tree, type_ignores=[])
-    generated = ast.unparse(ast.fix_missing_locations(md))
+    generated = unparse(ast.fix_missing_locations(md))
 
     for processor in processors:
         generated = processor.run(generated)
