@@ -8,6 +8,7 @@ def test_config():
 
 
 def test_unparse():
+    """Needs to be tested for compliance with older python versions via astunparse"""
     instring = """
 class TestClass:
     number: int
@@ -15,3 +16,7 @@ class TestClass:
 
     x = parse(instring)
     unparse(x)
+
+
+def test_gen():
+    gen("graphql.config.yaml")

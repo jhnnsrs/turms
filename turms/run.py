@@ -82,7 +82,7 @@ def gen(filepath: str, project=None):
                 processors.append(proc_class(**proc_config))
                 print(f"Using Processor {proc_class}")
 
-        generate(
+        generated_ast = generate_ast(
             gen_config,
             plugins=plugins,
             processors=processors,
@@ -90,8 +90,22 @@ def gen(filepath: str, project=None):
             dsl=dsl,
         )
 
+        md = ast.Module(body=generated_ast, type_ignores=[])
+        generated = unparse(ast.fix_missing_locations(md))
 
-def generate(
+        for processor in processors:
+            generated = processor.run(generated)
+
+        if not os.path.isdir(gen_config.out_dir):
+            os.makedirs(gen_config.out_dir)
+
+        with open(
+            os.path.join(gen_config.out_dir, gen_config.generated_name), "w"
+        ) as f:
+            f.write(generated)
+
+
+def generate_ast(
     config: GeneratorConfig,
     introspection_query: Dict[str, str] = None,
     dsl: any = None,
@@ -121,14 +135,4 @@ def generate(
         except Exception as e:
             raise GenerationError(f"Plugin Body:{plugin} failed!") from e
 
-    md = ast.Module(body=global_tree, type_ignores=[])
-    generated = unparse(ast.fix_missing_locations(md))
-
-    for processor in processors:
-        generated = processor.run(generated)
-
-    if not os.path.isdir(config.out_dir):
-        os.makedirs(config.out_dir)
-
-    with open(os.path.join(config.out_dir, config.generated_name), "w") as f:
-        f.write(generated)
+    return global_tree

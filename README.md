@@ -2,6 +2,11 @@
 
 [![codecov](https://codecov.io/gh/jhnnsrs/turms/branch/master/graph/badge.svg?token=UGXEA2THBV)](https://codecov.io/gh/jhnnsrs/turms)
 [![PyPI version](https://badge.fury.io/py/turms.svg)](https://pypi.org/project/turms/)
+[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://pypi.org/project/turms/)
+![Maintainer](https://img.shields.io/badge/maintainer-jhnnsrs-blue)
+[![PyPI pyversions](https://img.shields.io/pypi/pyversions/turms.svg)](https://pypi.python.org/pypi/turms/)
+[![PyPI status](https://img.shields.io/pypi/status/turms.svg)](https://pypi.python.org/pypi/turms/)
+[![PyPI download day](https://img.shields.io/pypi/dm/turms.svg)](https://pypi.python.org/pypi/turms/)
 
 ### DEVELOPMENT
 
