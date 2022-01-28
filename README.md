@@ -33,6 +33,11 @@ It makes heavy use of pydantic and its serialization capablities and provides fu
 - Fully Support type hints for variables (Pylance)
 - Compliant with graphl-config
 
+## Companion Library
+
+If you are searching for an Apollo-like GraphQL Client you can check out [rath](https://github.com/jhnnnsrs/rath), that works especially
+well with turms.
+
 ## Installation
 
 ```bash
