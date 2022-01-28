@@ -6,7 +6,7 @@
 ![Maintainer](https://img.shields.io/badge/maintainer-jhnnsrs-blue)
 [![PyPI pyversions](https://img.shields.io/pypi/pyversions/turms.svg)](https://pypi.python.org/pypi/turms/)
 [![PyPI status](https://img.shields.io/pypi/status/turms.svg)](https://pypi.python.org/pypi/turms/)
-[![PyPI download day](https://img.shields.io/pypi/dm/turms.svg)](https://pypi.python.org/pypi/turms/)
+[![PyPI download month](https://img.shields.io/pypi/dm/turms.svg)](https://pypi.python.org/pypi/turms/)
 
 ### DEVELOPMENT
 

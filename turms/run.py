@@ -15,7 +15,7 @@ import yaml
 import json
 import os
 from urllib import request
-
+import glob
 
 plugins: List[Plugin] = []
 
@@ -49,13 +49,23 @@ def gen(filepath: str, project=None):
             introspection = x["data"]
             dsl = None
         else:
-            with open(os.path.join(os.getcwd(), config.schema_url), "r") as f:
-                if config.schema_url.endswith(".graphql"):
-                    dsl = parse(f.read())
-                    introspection = None
-                elif config.schema_url.endswith(".json"):
-                    introspection = json.load(f)
-                    dsl = None
+            schema_glob = glob.glob(config.schema_url, recursive=True)
+            dsl_string = ""
+            introspection_string = ""
+            for file in schema_glob:
+                with open(file, "r") as f:
+                    if file.endswith(".graphql"):
+                        dsl_string += f.read()
+                    elif file.endswith(".json"):
+                        # not really necessary as json files are generally not splitable
+                        introspection_string += f.read
+
+            dsl = parse(dsl_string.read()) if dsl_string is not "" else None
+            introspection = (
+                json.loads(introspection_string)
+                if introspection_string is not ""
+                else None
+            )
 
         turms_config = project["extensions"]["turms"]
 
