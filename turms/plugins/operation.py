@@ -56,9 +56,9 @@ fragment_searcher = re.compile(r"\.\.\.(?P<fragment>[a-zA-Z]*)")
 
 
 class OperationsPluginConfig(BaseModel):
-    query_bases: List[str] = ["turms.types.herre.GraphQLQuery"]
-    mutation_bases: List[str] = ["turms.types.herre.GraphQLMutation"]
-    subscription_bases: List[str] = ["turms.types.herre.GraphQLSubscription"]
+    query_bases: List[str] = ["turms.types.operation.GraphQLQuery"]
+    mutation_bases: List[str] = ["turms.types.operation.GraphQLMutation"]
+    subscription_bases: List[str] = ["turms.types.operation.GraphQLSubscription"]
     operations_glob: Optional[str]
 
 

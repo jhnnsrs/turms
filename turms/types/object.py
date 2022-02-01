@@ -29,11 +29,6 @@ class GraphQLObject(BaseModel):
         ), "Cannot convert an object to a variable if you didn't query its unique id"
         return self.id
 
-    def __getattr__(self, attr):
-        raise GraphQLObjectError(
-            f"{attr} is not a valid attribute of {self.__class__.__name__}. Have you checked the schema?"
-        )
-
     async def shrink(self):
         """WIll be called by the ward"""
         assert (

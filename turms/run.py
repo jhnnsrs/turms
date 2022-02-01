@@ -60,7 +60,7 @@ def gen(filepath: str, project=None):
                         # not really necessary as json files are generally not splitable
                         introspection_string += f.read
 
-            dsl = parse(dsl_string.read()) if dsl_string is not "" else None
+            dsl = parse(dsl_string) if dsl_string is not "" else None
             introspection = (
                 json.loads(introspection_string)
                 if introspection_string is not ""
