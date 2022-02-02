@@ -38,7 +38,7 @@ def generate_enums(
             continue
 
         name = f"{config.prepend_enum}{key}{config.append_enum}"
-        fields = [ast.Expr(value=ast.Constant(value=type.description))]
+        fields = [ast.Expr(value=ast.Constant(value=type.description))] if type.description else []
 
         for value_key, value in type.values.items():
             assign = ast.Assign(

@@ -123,7 +123,7 @@ def generate_inputs(
             continue
 
         name = f"{config.prepend_input}{key}{config.append_input}"
-        fields = [ast.Expr(value=ast.Constant(value=type.description))]
+        fields = [ast.Expr(value=ast.Constant(value=type.description))] if type.description else []
 
         for value_key, value in type.fields.items():
 

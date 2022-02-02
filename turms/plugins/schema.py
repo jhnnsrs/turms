@@ -36,7 +36,7 @@ def generate_schema(
             continue
 
         name = f"{plugin_config.prepend}{key}{plugin_config.append}"
-        fields = [ast.Expr(value=ast.Constant(value=type.description))]
+        fields = [ast.Expr(value=ast.Constant(value=type.description))] if type.description else []
 
         for value_key, value in type.values.items():
             assign = ast.Assign(
