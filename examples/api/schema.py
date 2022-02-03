@@ -363,8 +363,8 @@ class users_obj_rel_insert_input(GraphQLInputObject):
 
 users_bool_exp.update_forward_refs()
 users_arr_rel_insert_input.update_forward_refs()
-users_obj_rel_insert_input.update_forward_refs()
 users_aggregate_order_by.update_forward_refs()
+users_obj_rel_insert_input.update_forward_refs()
 
 
 class UserFragment(GraphQLObject):
