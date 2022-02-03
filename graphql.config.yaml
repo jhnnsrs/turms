@@ -1,12 +1,13 @@
 projects:
   default:
-    schema: https://api.spacex.land/graphql/
+    schema: http://api.spacex.land/graphql/
     documents: graphql/**.graphql
     extensions:
       turms:
         out_dir: examples/api
         plugins:
           - type: turms.plugins.enums.EnumsPlugin
+          - type: turms.plugins.inputs.InputsPlugin
           - type: turms.plugins.fragments.FragmentsPlugin
           - type: turms.plugins.operation.OperationsPlugin
           - type: turms.plugins.funcs.OperationsFuncPlugin
@@ -14,3 +15,5 @@ projects:
           - type: turms.processor.black.BlackProcessor
         scalar_definitions:
           uuid: str
+          timestamptz: str
+          Date: str

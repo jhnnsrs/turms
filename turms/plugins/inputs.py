@@ -18,8 +18,9 @@ from pydantic import BaseModel
 from graphql.type.definition import (
     GraphQLEnumType,
 )
+import keyword
 
-from turms.utils import get_scalar_equivalent
+from turms.utils import get_scalar_equivalent, target_from_node
 
 
 class InputsPluginConfig(BaseModel):
@@ -115,7 +116,7 @@ def generate_inputs(
         if isinstance(value, GraphQLInputObjectType)
     }
 
-    self_referential = []
+    self_referential = set()
 
     for key, type in inputobjects_type.items():
 
@@ -128,15 +129,31 @@ def generate_inputs(
         for value_key, value in type.fields.items():
 
             if isinstance(value.type, GraphQLInputObjectType):
-                self_referential.append(name)
+                self_referential.add(name)
 
-            assign = ast.AnnAssign(
-                target=ast.Name(value_key, ctx=ast.Store()),
-                annotation=generate_input_annotation(
-                    value.type, config, plugin_config, is_optional=True
-                ),
-                simple=1,
-            )
+            if keyword.iskeyword(value_key):
+
+                assign = ast.AnnAssign(
+                    target=ast.Name(f"{value_key}_", ctx=ast.Store()),
+                    annotation=generate_input_annotation(
+                        value.type, config, plugin_config, is_optional=True
+                    ),
+                    value= ast.Call(
+                            func=ast.Name(id="Field", ctx=ast.Load()),
+                            args=[],
+                            keywords=[ast.keyword(arg="alias", value=ast.Constant(value=value_key))],
+                        ),
+                    simple=1
+                    )
+            else:
+                assign = ast.AnnAssign(
+                    target=ast.Name(value_key, ctx=ast.Store()),
+                    annotation=generate_input_annotation(
+                                value.type, config, plugin_config, is_optional=True
+                            ),
+                    simple=1,
+                )
+
 
             potential_comment = (
                 value.description

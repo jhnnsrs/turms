@@ -10,7 +10,11 @@ from pydantic import BaseModel
 from graphql.type.definition import (
     GraphQLEnumType,
 )
+import keyword
 
+
+class EnumsPluginsError(Exception):
+    pass
 
 class EnumsPluginConfig(BaseModel):
     skip_underscore: bool = True
@@ -41,9 +45,13 @@ def generate_enums(
         fields = [ast.Expr(value=ast.Constant(value=type.description))] if type.description else []
 
         for value_key, value in type.values.items():
+            if keyword.iskeyword(value_key):
+                value_key = f"{value_key}_"
+
+
             assign = ast.Assign(
                 targets=[ast.Name(id=str(value_key), ctx=ast.Store())],
-                value=ast.Constant(value=str(value.value)),
+                value=ast.Constant(value=value.value),
             )
 
             potential_comment = (
