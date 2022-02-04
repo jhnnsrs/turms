@@ -27,7 +27,7 @@ from graphql.type.definition import (
     get_named_type,
     is_list_type,
 )
-
+import keyword
 
 def recurse_annotation(
     node: FieldNode,
@@ -385,20 +385,39 @@ def type_field_node(
 ):
 
     target = target_from_node(node)
-
-    assign = ast.AnnAssign(
-        target=ast.Name(target, ctx=ast.Store()),
-        annotation=recurse_annotation(
-            node,
-            field.type,
-            client_schema,
-            config,
-            subtree,
-            parent_name=parent_name,
-            is_optional=True,
-        ),
-        simple=1,
-    )
+    if keyword.iskeyword(target):
+        assign = ast.AnnAssign(
+            target=ast.Name(f"{target}_", ctx=ast.Store()),
+            annotation=recurse_annotation(
+                node,
+                field.type,
+                client_schema,
+                config,
+                subtree,
+                parent_name=parent_name,
+                is_optional=True,
+            ),
+            value= ast.Call(
+                func=ast.Name(id="Field", ctx=ast.Load()),
+                args=[],
+                keywords=[ast.keyword(arg="alias", value=ast.Constant(value=target))],
+            ),
+            simple=1,
+        )
+    else:
+        assign = ast.AnnAssign(
+            target=ast.Name(target, ctx=ast.Store()),
+            annotation=recurse_annotation(
+                node,
+                field.type,
+                client_schema,
+                config,
+                subtree,
+                parent_name=parent_name,
+                is_optional=True,
+            ),
+            simple=1,
+        )
 
     potential_comment = (
         field.description
