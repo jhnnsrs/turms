@@ -22,14 +22,14 @@ class GraphQLObject(BaseModel):
             },
         )
 
-    async def to_variable(self):
+    async def shrink(self):
         """WIll be called by the ward"""
         assert (
             self.id
         ), "Cannot convert an object to a variable if you didn't query its unique id"
         return self.id
 
-    async def shrink(self):
+    def shrink(self):
         """WIll be called by the ward"""
         assert (
             self.id
