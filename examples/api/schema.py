@@ -4,9 +4,9 @@ from pydantic.fields import Field
 from typing import Optional, List, Dict, Union, Literal
 from enum import Enum
 from turms.types.object import GraphQLObject
-from turms.types.herre import GraphQLQuery
-from turms.types.herre import GraphQLMutation
-from turms.types.herre import GraphQLSubscription
+from turms.types.operation import GraphQLQuery
+from turms.types.operation import GraphQLMutation
+from turms.types.operation import GraphQLSubscription
 
 
 class users_select_column(str, Enum):

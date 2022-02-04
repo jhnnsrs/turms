@@ -374,10 +374,7 @@ def generate_operation_func(
         else:
             returns = ast.Name(id=return_type, ctx=ast.Load())
     else:
-        returns = ast.Subscript(
-            value=ast.Name(id="List", ctx=ast.Load()),
-            slice=ast.Name(id=o_name, ctx=ast.Load()),
-        )
+        returns = ast.Name(id=return_type, ctx=ast.Load())
 
     doc = generate_query_doc(o, client_schema, config, collapse=collapse)
 
