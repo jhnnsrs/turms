@@ -1,6 +1,10 @@
-from turms.run import gen
+import ast
+from turms.config import GeneratorConfig
+from turms.run import gen, generate_ast
 from turms.compat.funcs import unparse
-from ast import parse
+from graphql.language import parse
+from turms.plugins.enums import EnumsPlugin
+from turms.plugins.inputs import InputsPlugin
 
 
 def test_config():
@@ -18,5 +22,65 @@ class TestClass:
     unparse(x)
 
 
-def test_gen():
-    gen("graphql.config.yaml")
+def test_small():
+    schema = parse(
+        """type Query {
+        hello(orderBy: HelloWorldOrder! = ASC, filter: HelloWorldFilter,
+            first: Int, last: Int, before: String, after: String): [World!]!
+        }
+
+        enum HelloWorldOrder {
+        ASC
+        DESC
+        }
+
+        input HelloWorldFilter {
+        search: String!
+        }
+
+        type World {
+        message: String!
+        }
+    """
+    )
+    config = GeneratorConfig()
+    generated_ast = generate_ast(
+        config, dsl=schema, plugins=[EnumsPlugin(), InputsPlugin()]
+    )
+
+    md = ast.Module(body=generated_ast, type_ignores=[])
+    generated = unparse(ast.fix_missing_locations(md))
+    assert "from enum import Enum" in generated, "EnumPlugin not working"
+    assert "class HelloWorldOrder(str, Enum):" in generated, "EnumPlugin not working"
+
+
+def test_small():
+    schema = parse(
+        """type Query {
+        hello(orderBy: HelloWorldOrder! = ASC, filter: HelloWorldFilter,
+            first: Int, last: Int, before: String, after: String): [World!]!
+        }
+
+        enum HelloWorldOrder {
+        ASC
+        DESC
+        }
+
+        input HelloWorldFilter {
+        searchMassimo: String!
+        }
+
+        type World {
+        message: String!
+        }
+    """
+    )
+    config = GeneratorConfig()
+    generated_ast = generate_ast(
+        config, dsl=schema, plugins=[EnumsPlugin(), InputsPlugin()]
+    )
+
+    md = ast.Module(body=generated_ast, type_ignores=[])
+    generated = unparse(ast.fix_missing_locations(md))
+    assert "from enum import Enum" in generated, "EnumPlugin not working"
+    assert "class HelloWorldOrder(str, Enum):" in generated, "EnumPlugin not working"

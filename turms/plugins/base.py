@@ -14,7 +14,7 @@ class Plugin:
     """
 
     @abstractmethod
-    def generate_tree(
+    def generate_ast(
         self,
         config: GeneratorConfig,
         client_schema: GraphQLSchema,
