@@ -118,6 +118,9 @@ def generate_inputs(
         if isinstance(value, GraphQLInputObjectType)
     }
 
+    for base in plugin_config.inputtype_bases:
+        registry.register_import(base)
+
     self_referential = set()
 
     for key, type in inputobjects_type.items():
@@ -140,6 +143,7 @@ def generate_inputs(
             field_name = registry.generate_node_name(value_key)
 
             if field_name != value_key:
+                registry.register_import("pydantic.Field")
                 assign = ast.AnnAssign(
                     target=ast.Name(field_name, ctx=ast.Store()),
                     annotation=generate_input_annotation(
@@ -181,6 +185,7 @@ def generate_inputs(
                 fields += [assign]
 
         registry.register_inputtype_class(key, name)
+
         tree.append(
             ast.ClassDef(
                 name,

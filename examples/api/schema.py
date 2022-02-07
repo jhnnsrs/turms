@@ -1,8 +1,10 @@
-from turms.types.operation import GraphQLMutation, GraphQLQuery
-from turms.types.object import GraphQLInputObject, GraphQLObject
 from enum import Enum
 from typing import List, Literal, Optional
+
 from pydantic import Field
+
+from turms.types.object import GraphQLInputObject, GraphQLObject
+from turms.types.operation import GraphQLMutation, GraphQLQuery
 
 
 class Users_select_column(str, Enum):
@@ -139,7 +141,7 @@ class Timestamptz_comparison_exp(GraphQLInputObject):
     _nin: Optional[List[str]]
 
 
-class Capsulesfind(GraphQLInputObject):
+class CapsulesFind(GraphQLInputObject):
     id: Optional[str]
     landings: Optional[int]
     mission: Optional[str]
@@ -149,7 +151,7 @@ class Capsulesfind(GraphQLInputObject):
     type: Optional[str]
 
 
-class Coresfind(GraphQLInputObject):
+class CoresFind(GraphQLInputObject):
     asds_attempts: Optional[int]
     asds_landings: Optional[int]
     block: Optional[int]
@@ -163,14 +165,14 @@ class Coresfind(GraphQLInputObject):
     water_landing: Optional[bool]
 
 
-class Historyfind(GraphQLInputObject):
+class HistoryFind(GraphQLInputObject):
     end: Optional[str]
     flight_number: Optional[int]
     id: Optional[str]
     start: Optional[str]
 
 
-class Launchfind(GraphQLInputObject):
+class LaunchFind(GraphQLInputObject):
     apoapsis_km: Optional[float]
     block: Optional[int]
     cap_serial: Optional[str]
@@ -233,14 +235,14 @@ class Launchfind(GraphQLInputObject):
     tentative: Optional[str]
 
 
-class Missionsfind(GraphQLInputObject):
+class MissionsFind(GraphQLInputObject):
     id: Optional[str]
     manufacturer: Optional[str]
     name: Optional[str]
     payload_id: Optional[str]
 
 
-class Payloadsfind(GraphQLInputObject):
+class PayloadsFind(GraphQLInputObject):
     apoapsis_km: Optional[float]
     customer: Optional[str]
     eccentricity: Optional[float]
@@ -264,7 +266,7 @@ class Payloadsfind(GraphQLInputObject):
     semi_major_axis_km: Optional[float]
 
 
-class Shipsfind(GraphQLInputObject):
+class ShipsFind(GraphQLInputObject):
     id: Optional[str]
     name: Optional[str]
     model: Optional[str]
@@ -356,10 +358,10 @@ class Users_obj_rel_insert_input(GraphQLInputObject):
     on_conflict: Optional["Users_on_conflict"]
 
 
-Users_bool_exp.update_forward_refs()
+Users_obj_rel_insert_input.update_forward_refs()
 Users_arr_rel_insert_input.update_forward_refs()
 Users_aggregate_order_by.update_forward_refs()
-Users_obj_rel_insert_input.update_forward_refs()
+Users_bool_exp.update_forward_refs()
 
 
 class User(GraphQLObject):
@@ -372,45 +374,45 @@ class User(GraphQLQuery):
 
     class Meta:
         domain = "default"
-        document = "User\n\nquery User {\n  users {\n    ...User\n  }\n}"
+        document = "fragment User on users {\n  id\n}\n\nquery User {\n  users {\n    ...User\n  }\n}"
 
 
-class TestqueryCapsulesMissions(GraphQLObject):
+class TestQueryCapsulesMissions(GraphQLObject):
     typename: Optional[Literal["CapsuleMission"]] = Field(alias="__typename")
     flight: Optional[int]
 
 
-class TestqueryCapsules(GraphQLObject):
+class TestQueryCapsules(GraphQLObject):
     typename: Optional[Literal["Capsule"]] = Field(alias="__typename")
     id: Optional[str]
-    missions: Optional[List[Optional[TestqueryCapsulesMissions]]]
+    missions: Optional[List[Optional[TestQueryCapsulesMissions]]]
 
 
-class Testquery(GraphQLQuery):
-    capsules: Optional[List[Optional[TestqueryCapsules]]]
+class TestQuery(GraphQLQuery):
+    capsules: Optional[List[Optional[TestQueryCapsules]]]
 
     class Meta:
         domain = "default"
         document = "query TestQuery {\n  capsules {\n    id\n    missions {\n      flight\n    }\n  }\n}"
 
 
-class TestmutationInsert_usersReturning(GraphQLObject):
+class TestMutationInsert_usersReturning(GraphQLObject):
     '''columns and relationships of "users"'''
 
     typename: Optional[Literal["users"]] = Field(alias="__typename")
     id: str
 
 
-class TestmutationInsert_users(GraphQLObject):
+class TestMutationInsert_users(GraphQLObject):
     '''response of any mutation on the table "users"'''
 
     typename: Optional[Literal["users_mutation_response"]] = Field(alias="__typename")
-    returning: List[TestmutationInsert_usersReturning]
+    returning: List[TestMutationInsert_usersReturning]
     "data of the affected rows by the mutation"
 
 
-class Testmutation(GraphQLMutation):
-    insert_users: Optional[TestmutationInsert_users]
+class TestMutation(GraphQLMutation):
+    insert_users: Optional[TestMutationInsert_users]
 
     class Meta:
         domain = "default"
@@ -441,7 +443,7 @@ def User() -> User:
     return User.execute({}).users
 
 
-async def aTestQuery() -> List[TestqueryCapsules]:
+async def aTestQuery() -> List[TestQueryCapsules]:
     """TestQuery
 
 
@@ -449,11 +451,11 @@ async def aTestQuery() -> List[TestqueryCapsules]:
     Arguments:
 
     Returns:
-        TestqueryCapsules: The returned Mutation"""
-    return (await Testquery.aexecute({})).capsules
+        TestQueryCapsules: The returned Mutation"""
+    return (await TestQuery.aexecute({})).capsules
 
 
-def TestQuery() -> List[TestqueryCapsules]:
+def TestQuery() -> List[TestQueryCapsules]:
     """TestQuery
 
 
@@ -461,11 +463,11 @@ def TestQuery() -> List[TestqueryCapsules]:
     Arguments:
 
     Returns:
-        TestqueryCapsules: The returned Mutation"""
-    return Testquery.execute({}).capsules
+        TestQueryCapsules: The returned Mutation"""
+    return TestQuery.execute({}).capsules
 
 
-async def aTestMutation(id: str = None) -> TestmutationInsert_users:
+async def aTestMutation(id: str = None) -> TestMutationInsert_users:
     """TestMutation
 
     insert data into the table: "users"
@@ -474,11 +476,11 @@ async def aTestMutation(id: str = None) -> TestmutationInsert_users:
         id (uuid, Optional): uuid
 
     Returns:
-        TestmutationInsert_users: The returned Mutation"""
-    return (await Testmutation.aexecute({"id": id})).insert_users
+        TestMutationInsert_users: The returned Mutation"""
+    return (await TestMutation.aexecute({"id": id})).insert_users
 
 
-def TestMutation(id: str = None) -> TestmutationInsert_users:
+def TestMutation(id: str = None) -> TestMutationInsert_users:
     """TestMutation
 
     insert data into the table: "users"
@@ -487,5 +489,5 @@ def TestMutation(id: str = None) -> TestmutationInsert_users:
         id (uuid, Optional): uuid
 
     Returns:
-        TestmutationInsert_users: The returned Mutation"""
-    return Testmutation.execute({"id": id}).insert_users
+        TestMutationInsert_users: The returned Mutation"""
+    return TestMutation.execute({"id": id}).insert_users

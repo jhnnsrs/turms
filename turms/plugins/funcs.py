@@ -260,22 +260,7 @@ def generate_query_doc(
 def genereate_async_call(o_name, o, client_schema, config, collapse):
 
     if not collapse:
-        return ast.Await(
-            value=ast.Call(
-                func=ast.Attribute(
-                    value=ast.Name(
-                        id=o_name,
-                        ctx=ast.Load(),
-                    ),
-                    attr="aexecute",
-                    ctx=ast.Load(),
-                ),
-                keywords=[],
-                args=[generate_query_dict(o, client_schema, config)],
-            )
-        )
-    else:
-        return ast.Attribute(
+        return ast.Return(
             value=ast.Await(
                 value=ast.Call(
                     func=ast.Attribute(
@@ -289,29 +274,35 @@ def genereate_async_call(o_name, o, client_schema, config, collapse):
                     keywords=[],
                     args=[generate_query_dict(o, client_schema, config)],
                 )
-            ),
-            attr=o.selection_set.selections[0].name.value,
-            ctx=ast.Load(),
+            )
+        )
+    else:
+        return ast.Return(
+            value=ast.Attribute(
+                value=ast.Await(
+                    value=ast.Call(
+                        func=ast.Attribute(
+                            value=ast.Name(
+                                id=o_name,
+                                ctx=ast.Load(),
+                            ),
+                            attr="aexecute",
+                            ctx=ast.Load(),
+                        ),
+                        keywords=[],
+                        args=[generate_query_dict(o, client_schema, config)],
+                    )
+                ),
+                attr=o.selection_set.selections[0].name.value,
+                ctx=ast.Load(),
+            )
         )
 
 
 def genereate_sync_call(o_name, o, client_schema, config, collapse):
 
     if not collapse:
-        return ast.Call(
-            func=ast.Attribute(
-                value=ast.Name(
-                    id=o_name,
-                    ctx=ast.Load(),
-                ),
-                attr="execute",
-                ctx=ast.Load(),
-            ),
-            keywords=[],
-            args=[generate_query_dict(o, client_schema, config)],
-        )
-    else:
-        return ast.Attribute(
+        return ast.Return(
             value=ast.Call(
                 func=ast.Attribute(
                     value=ast.Name(
@@ -323,9 +314,130 @@ def genereate_sync_call(o_name, o, client_schema, config, collapse):
                 ),
                 keywords=[],
                 args=[generate_query_dict(o, client_schema, config)],
+            )
+        )
+    else:
+        return ast.Return(
+            value=ast.Attribute(
+                value=ast.Call(
+                    func=ast.Attribute(
+                        value=ast.Name(
+                            id=o_name,
+                            ctx=ast.Load(),
+                        ),
+                        attr="execute",
+                        ctx=ast.Load(),
+                    ),
+                    keywords=[],
+                    args=[generate_query_dict(o, client_schema, config)],
+                ),
+                attr=o.selection_set.selections[0].name.value,
+                ctx=ast.Load(),
+            )
+        )
+
+
+def genereate_async_iterator(o_name, o, client_schema, config, collapse):
+
+    if not collapse:
+        return ast.AsyncFor(
+            target=ast.Name(id="event", ctx=ast.Store()),
+            iter=ast.Call(
+                func=ast.Attribute(
+                    value=ast.Name(
+                        id=o_name,
+                        ctx=ast.Load(),
+                    ),
+                    attr="asubscribe",
+                    ctx=ast.Load(),
+                ),
+                args=[generate_query_dict(o, client_schema, config)],
+                keywords=[],
             ),
-            attr=o.selection_set.selections[0].name.value,
-            ctx=ast.Load(),
+            body=[
+                ast.Expr(value=ast.Yield(value=ast.Name(id="event", ctx=ast.Load()))),
+            ],
+            orelse=[],
+        )
+    else:
+        return ast.AsyncFor(
+            target=ast.Name(id="event", ctx=ast.Store()),
+            iter=ast.Call(
+                func=ast.Attribute(
+                    value=ast.Name(
+                        id=o_name,
+                        ctx=ast.Load(),
+                    ),
+                    attr="asubscribe",
+                    ctx=ast.Load(),
+                ),
+                args=[generate_query_dict(o, client_schema, config)],
+                keywords=[],
+            ),
+            body=[
+                ast.Expr(
+                    value=ast.Yield(
+                        value=ast.Attribute(
+                            value=ast.Name(id="event", ctx=ast.Load()),
+                            ctx=ast.Load(),
+                            attr=o.selection_set.selections[0].name.value,
+                        )
+                    )
+                ),
+            ],
+            orelse=[],
+        )
+
+
+def genereate_sync_iterator(o_name, o, client_schema, config, collapse):
+
+    if not collapse:
+        return ast.For(
+            target=ast.Name(id="event", ctx=ast.Store()),
+            iter=ast.Call(
+                func=ast.Attribute(
+                    value=ast.Name(
+                        id=o_name,
+                        ctx=ast.Load(),
+                    ),
+                    attr="subscribe",
+                    ctx=ast.Load(),
+                ),
+                args=[generate_query_dict(o, client_schema, config)],
+                keywords=[],
+            ),
+            body=[
+                ast.Expr(value=ast.Yield(value=ast.Name(id="event", ctx=ast.Load()))),
+            ],
+            orelse=[],
+        )
+    else:
+        return ast.For(
+            target=ast.Name(id="event", ctx=ast.Store()),
+            iter=ast.Call(
+                func=ast.Attribute(
+                    value=ast.Name(
+                        id=o_name,
+                        ctx=ast.Load(),
+                    ),
+                    attr="subscribe",
+                    ctx=ast.Load(),
+                ),
+                args=[generate_query_dict(o, client_schema, config)],
+                keywords=[],
+            ),
+            body=[
+                ast.Expr(
+                    value=ast.Yield(
+                        value=ast.Attribute(
+                            value=ast.Name(id="event", ctx=ast.Load()),
+                            ctx=ast.Load(),
+                            attr=o.selection_set.selections[0].name.value,
+                        )
+                    )
+                ),
+            ],
+            orelse=[],
         )
 
 
@@ -396,10 +508,10 @@ def generate_operation_func(
                 args=generate_query_args(o, client_schema, config, registry),
                 body=[
                     doc,
-                    ast.Return(
-                        value=genereate_async_call(
-                            o_name, o, client_schema, config, collapse
-                        )
+                    genereate_async_call(o_name, o, client_schema, config, collapse)
+                    if o.operation != OperationType.SUBSCRIPTION
+                    else genereate_async_iterator(
+                        o_name, o, client_schema, config, collapse
                     ),
                 ],
                 decorator_list=[],
@@ -414,10 +526,10 @@ def generate_operation_func(
                 args=generate_query_args(o, client_schema, config, registry),
                 body=[
                     doc,
-                    ast.Return(
-                        value=genereate_sync_call(
-                            o_name, o, client_schema, config, collapse
-                        )
+                    genereate_sync_call(o_name, o, client_schema, config, collapse)
+                    if o.operation != OperationType.SUBSCRIPTION
+                    else genereate_sync_iterator(
+                        o_name, o, client_schema, config, collapse
                     ),
                 ],
                 decorator_list=[],
