@@ -44,7 +44,61 @@ well with turms.
 pip install turms
 ```
 
-## Config
+## Configuration
+
+Turms configuration is compliant with the graphql-config specification, allowing interoperability with other frameworks.
+
+```yaml
+projects:
+  default:
+    schema: http://api.spacex.land/graphql/
+    documents: graphql/**.graphql
+    extensions:
+      turms: # path for configuration for turms
+        out_dir: examples/api
+        stylers:
+          - type: turms.stylers.capitalize.Capitalizer
+          - type: turms.stylers.snake.SnakeNodeName
+        plugins:
+          - type: turms.plugins.enums.EnumsPlugin
+          - type: turms.plugins.inputs.InputsPlugin
+          - type: turms.plugins.fragments.FragmentsPlugin
+          - type: turms.plugins.operation.OperationsPlugin
+          - type: turms.plugins.funcs.OperationsFuncPlugin
+        processors:
+          - type: turms.processor.black.BlackProcessor
+          - type: turms.processor.isort.IsortProcessor
+        scalar_definitions:
+          uuid: str
+          timestamptz: str
+          Date: str
+```
+
+Turms configuration is based on plugins that can be configured in the graphql.config. There exist three major classes:
+
+### Stylers
+
+Stylers are responsible for applying different styles to the class names and field names (e.g. snakecasing of graphqls pascalcase),
+they are chained in order of notation in the graphql config (they receive the output of the last styler). Turms takes care of automatically
+aliasing these names if they are not the same as the graphql style)
+
+### Plugins
+
+Plugins are the generators of code, that traverse through the direcotry and ad new ast nodes to the global tree. Examplary pluings are:
+
+- turms.plugins.enums.EnumsPlugin
+- turms.plugins.inputs.InputsPlugin
+- turms.plugins.fragments.FragmentsPlugin
+- turms.plugins.operation.OperationsPlugin
+- turms.plugins.funcs.OperationsFuncPlugin
+
+## Processors
+
+Processors take the generated code (already a string), and can parse this code. (e.g. black processor for enforcing black style formatting) or isort of sorting imports.
+Includes Processors are
+
+- turms.processor.black.BlackProcessor
+- turms.processor.isort.IsortProcessor
 
 ## Usage
 

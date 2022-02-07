@@ -1,0 +1,2 @@
+class NoScalarEquivalentFound(Exception):
+    pass

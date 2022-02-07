@@ -1,4 +1,3 @@
-from turms.globals import ENUM_CLASS_MAP
 from turms.plugins.base import Plugin
 from abc import abstractmethod
 import ast
@@ -12,9 +11,12 @@ from graphql.type.definition import (
 )
 import keyword
 
+from turms.registry import ClassRegistry
+
 
 class EnumsPluginsError(Exception):
     pass
+
 
 class EnumsPluginConfig(BaseModel):
     skip_underscore: bool = True
@@ -26,6 +28,7 @@ def generate_enums(
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
     plugin_config: EnumsPluginConfig,
+    registry: ClassRegistry,
 ):
 
     tree = []
@@ -41,13 +44,17 @@ def generate_enums(
         if plugin_config.skip_underscore and key.startswith("_"):
             continue
 
-        name = f"{config.prepend_enum}{key}{config.append_enum}"
-        fields = [ast.Expr(value=ast.Constant(value=type.description))] if type.description else []
+        name = registry.generate_enum_classname(key)
+        fields = (
+            [ast.Expr(value=ast.Constant(value=type.description))]
+            if type.description
+            else []
+        )
 
         for value_key, value in type.values.items():
+
             if keyword.iskeyword(value_key):
                 value_key = f"{value_key}_"
-
 
             assign = ast.Assign(
                 targets=[ast.Name(id=str(value_key), ctx=ast.Store())],
@@ -69,7 +76,7 @@ def generate_enums(
             else:
                 fields += [assign]
 
-        ENUM_CLASS_MAP[key] = name
+        registry.register_enum_class(key, name)
         tree.append(
             ast.ClassDef(
                 name,
@@ -90,23 +97,13 @@ class EnumsPlugin(Plugin):
     def __init__(self, config=None, **data):
         self.plugin_config = config or EnumsPluginConfig(**data)
 
-    def generate_imports(
-        self, config: GeneratorConfig, client_schema: GraphQLSchema
-    ) -> List[ast.AST]:
-        imports = []
-
-        imports.append(
-            ast.ImportFrom(
-                module="enum",
-                names=[ast.alias(name="Enum")],
-                level=0,
-            )
-        )
-
-        return imports
-
-    def generate_body(
-        self, client_schema: GraphQLSchema, config: GeneratorConfig
+    def generate_ast(
+        self,
+        client_schema: GraphQLSchema,
+        config: GeneratorConfig,
+        registry: ClassRegistry,
     ) -> List[ast.AST]:
 
-        return generate_enums(client_schema, config, self.plugin_config)
+        registry.register_import("enum.Enum")
+
+        return generate_enums(client_schema, config, self.plugin_config, registry)

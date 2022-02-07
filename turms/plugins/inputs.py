@@ -7,7 +7,6 @@ from graphql import (
     GraphQLScalarType,
     GraphQLWrappingType,
 )
-from turms.globals import INPUTTYPE_CLASS_MAP
 from turms.plugins.base import Plugin
 import ast
 from typing import List, Optional
@@ -19,82 +18,84 @@ from graphql.type.definition import (
     GraphQLEnumType,
 )
 import keyword
-
-from turms.utils import get_scalar_equivalent, target_from_node
+from turms.registry import ClassRegistry
 
 
 class InputsPluginConfig(BaseModel):
     inputtype_bases: List[str] = ["turms.types.object.GraphQLInputObject"]
     skip_underscore: bool = True
-    prepend: str = ""
-    append: str = "Input"
 
 
 def generate_input_annotation(
     type: GraphQLInputType,
     config: GeneratorConfig,
     plugin_config: InputsPluginConfig,
+    registry: ClassRegistry,
     is_optional=True,
 ):
     if isinstance(type, GraphQLScalarType):
         if is_optional:
+            registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
                 slice=ast.Name(
-                    id=get_scalar_equivalent(type.name, config), ctx=ast.Load()
+                    id=registry.get_scalar_equivalent(type.name), ctx=ast.Load()
                 ),
             )
         else:
             return ast.Name(
-                id=get_scalar_equivalent(type.name, config),
+                id=registry.get_scalar_equivalent(type.name),
                 ctx=ast.Load(),
             )
 
     if isinstance(type, GraphQLInputObjectType):
         if is_optional:
+            registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
-                slice=ast.Constant(
-                    value=f"{config.prepend_input}{type.name}{config.append_input}",
-                ),
+                slice=ast.Constant(value=registry.get_inputtype_class(type.name)),
             )
         return ast.Constant(
-            value=f"{config.prepend_input}{type.name}{config.append_input}",
+            value=registry.get_inputtype_class(type.name),
         )
 
     if isinstance(type, GraphQLEnumType):
         if is_optional:
+            registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
                 slice=ast.Constant(
-                    value=f"{config.prepend_enum}{type.name}{config.append_enum}",
+                    value=registry.get_enum_class(type.name),
                 ),
             )
         return ast.Constant(
-            value=f"{config.prepend_enum}{type.name}{config.append_enum}",
+            value=registry.get_enum_class(type.name),
         )
     if isinstance(type, GraphQLNonNull):
         return generate_input_annotation(
-            type.of_type, config, plugin_config, is_optional=False
+            type.of_type, config, plugin_config, registry, is_optional=False
         )
 
     if isinstance(type, GraphQLList):
         if is_optional:
+            registry.register_import("typing.Optional")
+            registry.register_import("typing.List")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
                 slice=ast.Subscript(
                     value=ast.Name("List", ctx=ast.Load()),
                     slice=generate_input_annotation(
-                        type.of_type, config, plugin_config, is_optional=True
+                        type.of_type, config, plugin_config, registry, is_optional=True
                     ),
                     ctx=ast.Load(),
                 ),
             )
 
+        registry.register_import("typing.List")
         return ast.Subscript(
             value=ast.Name("List", ctx=ast.Load()),
             slice=generate_input_annotation(
-                type.of_type, config, plugin_config, is_optional=True
+                type.of_type, config, plugin_config, registry, is_optional=True
             ),
             ctx=ast.Load(),
         )
@@ -106,6 +107,7 @@ def generate_inputs(
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
     plugin_config: InputsPluginConfig,
+    registry: ClassRegistry,
 ):
 
     tree = []
@@ -123,37 +125,45 @@ def generate_inputs(
         if plugin_config.skip_underscore and key.startswith("_"):
             continue
 
-        name = f"{config.prepend_input}{key}{config.append_input}"
-        fields = [ast.Expr(value=ast.Constant(value=type.description))] if type.description else []
+        name = registry.generate_inputtype_classname(key)
+        fields = (
+            [ast.Expr(value=ast.Constant(value=type.description))]
+            if type.description
+            else []
+        )
 
         for value_key, value in type.fields.items():
 
             if isinstance(value.type, GraphQLInputObjectType):
                 self_referential.add(name)
 
-            if keyword.iskeyword(value_key):
+            field_name = registry.generate_node_name(value_key)
 
+            if field_name != value_key:
                 assign = ast.AnnAssign(
-                    target=ast.Name(f"{value_key}_", ctx=ast.Store()),
+                    target=ast.Name(field_name, ctx=ast.Store()),
                     annotation=generate_input_annotation(
-                        value.type, config, plugin_config, is_optional=True
+                        value.type, config, plugin_config, registry, is_optional=True
                     ),
-                    value= ast.Call(
-                            func=ast.Name(id="Field", ctx=ast.Load()),
-                            args=[],
-                            keywords=[ast.keyword(arg="alias", value=ast.Constant(value=value_key))],
-                        ),
-                    simple=1
-                    )
+                    value=ast.Call(
+                        func=ast.Name(id="Field", ctx=ast.Load()),
+                        args=[],
+                        keywords=[
+                            ast.keyword(
+                                arg="alias", value=ast.Constant(value=value_key)
+                            )
+                        ],
+                    ),
+                    simple=1,
+                )
             else:
                 assign = ast.AnnAssign(
                     target=ast.Name(value_key, ctx=ast.Store()),
                     annotation=generate_input_annotation(
-                                value.type, config, plugin_config, is_optional=True
-                            ),
+                        value.type, config, plugin_config, registry, is_optional=True
+                    ),
                     simple=1,
                 )
-
 
             potential_comment = (
                 value.description
@@ -170,7 +180,7 @@ def generate_inputs(
             else:
                 fields += [assign]
 
-        INPUTTYPE_CLASS_MAP[key] = name
+        registry.register_inputtype_class(key, name)
         tree.append(
             ast.ClassDef(
                 name,
@@ -209,26 +219,14 @@ class InputsPlugin(Plugin):
     def __init__(self, config=None, **data):
         self.plugin_config = config or InputsPluginConfig(**data)
 
-    def generate_imports(
-        self, config: GeneratorConfig, client_schema: GraphQLSchema
-    ) -> List[ast.AST]:
-        imports = []
-
-        all_bases = self.plugin_config.inputtype_bases
-
-        for item in all_bases:
-            imports.append(
-                ast.ImportFrom(
-                    module=".".join(item.split(".")[:-1]),
-                    names=[ast.alias(name=item.split(".")[-1])],
-                    level=0,
-                )
-            )
-
-        return imports
-
-    def generate_body(
-        self, client_schema: GraphQLSchema, config: GeneratorConfig
+    def generate_ast(
+        self,
+        client_schema: GraphQLSchema,
+        config: GeneratorConfig,
+        registry: ClassRegistry,
     ) -> List[ast.AST]:
 
-        return generate_inputs(client_schema, config, self.plugin_config)
+        for base in self.plugin_config.inputtype_bases:
+            registry.register_import(base)
+
+        return generate_inputs(client_schema, config, self.plugin_config, registry)

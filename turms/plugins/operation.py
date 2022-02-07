@@ -43,6 +43,7 @@ from graphql.utilities.type_info import TypeInfo, get_field_def
 from pydantic.main import BaseModel
 import re
 from graphql import language, parse, get_introspection_query, validate
+from turms.registry import ClassRegistry
 from turms.utils import (
     NoDocumentsFoundError,
     parse_documents,
@@ -67,13 +68,14 @@ def generate_query(
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
     plugin_config: OperationsPluginConfig,
+    registry: ClassRegistry,
 ):
 
     tree = []
 
     x = get_operation_root_type(client_schema, o)
     query_fields = []
-    name = f"{config.prepend_query}{o.name.value.capitalize()}{config.append_query}"
+    name = registry.generate_query_classname(o.name.value)
 
     for field_node in o.selection_set.selections:
 
@@ -96,6 +98,7 @@ def generate_query(
                     client_schema,
                     config,
                     tree,
+                    registry,
                     parent_name=name,
                 ),
                 simple=1,
@@ -105,7 +108,7 @@ def generate_query(
     query_document = language.print_ast(o)
     z = fragment_searcher.findall(query_document)
 
-    merged_document = replace_iteratively(query_document)
+    merged_document = replace_iteratively(query_document, registry)
 
     query_fields += [
         ast.ClassDef(
@@ -125,6 +128,9 @@ def generate_query(
             ],
         )
     ]
+    for base in plugin_config.query_bases:
+        registry.register_import(base)
+
     tree.append(
         ast.ClassDef(
             name,
@@ -146,15 +152,14 @@ def generate_mutation(
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
     plugin_config: OperationsPluginConfig,
+    registry: ClassRegistry,
 ):
 
     tree = []
 
     x = get_operation_root_type(client_schema, o)
     query_fields = []
-    name = (
-        f"{config.prepend_mutation}{o.name.value.capitalize()}{config.append_mutation}"
-    )
+    name = registry.generate_mutation_classname(o.name.value)
 
     for field_node in o.selection_set.selections:
 
@@ -177,6 +182,7 @@ def generate_mutation(
                     client_schema,
                     config,
                     tree,
+                    registry,
                     parent_name=name,
                 ),
                 simple=1,
@@ -186,7 +192,7 @@ def generate_mutation(
     query_document = language.print_ast(o)
     z = fragment_searcher.findall(query_document)
 
-    merged_document = replace_iteratively(query_document)
+    merged_document = replace_iteratively(query_document, registry)
 
     query_fields += [
         ast.ClassDef(
@@ -206,6 +212,9 @@ def generate_mutation(
             ],
         )
     ]
+    for base in plugin_config.mutation_bases:
+        registry.register_import(base)
+
     tree.append(
         ast.ClassDef(
             name,
@@ -227,13 +236,14 @@ def generate_subscription(
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
     plugin_config: OperationsPluginConfig,
+    registry: ClassRegistry,
 ):
 
     tree = []
 
     x = get_operation_root_type(client_schema, o)
     query_fields = []
-    name = f"{config.prepend_subscription}{o.name.value.capitalize()}{config.append_subscription}"
+    name = registry.generate_subscription_classname(o.name.value)
 
     for field_node in o.selection_set.selections:
 
@@ -255,7 +265,9 @@ def generate_subscription(
                     field_definition.type,
                     client_schema,
                     config,
+                    registry,
                     tree,
+                    registry,
                     parent_name=name,
                 ),
                 simple=1,
@@ -285,12 +297,16 @@ def generate_subscription(
             ],
         )
     ]
+
+    for base in plugin_config.subscription_bases:
+        registry.register_import(base)
+
     tree.append(
         ast.ClassDef(
             name,
             bases=[
                 ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                for base in plugin_config.mutation_bases
+                for base in plugin_config.subscription_bases
             ],
             decorator_list=[],
             keywords=[],
@@ -327,8 +343,11 @@ class OperationsPlugin(Plugin):
 
         return imports
 
-    def generate_body(
-        self, client_schema: GraphQLSchema, config: GeneratorConfig
+    def generate_ast(
+        self,
+        client_schema: GraphQLSchema,
+        config: GeneratorConfig,
+        registry: ClassRegistry,
     ) -> List[ast.AST]:
 
         plugin_tree = []
@@ -349,15 +368,15 @@ class OperationsPlugin(Plugin):
         for operation in operations:
             if operation.operation == OperationType.QUERY:
                 plugin_tree += generate_query(
-                    operation, client_schema, config, self.plugin_config
+                    operation, client_schema, config, self.plugin_config, registry
                 )
             if operation.operation == OperationType.MUTATION:
                 plugin_tree += generate_mutation(
-                    operation, client_schema, config, self.plugin_config
+                    operation, client_schema, config, self.plugin_config, registry
                 )
             if operation.operation == OperationType.SUBSCRIPTION:
                 plugin_tree += generate_subscription(
-                    operation, client_schema, config, self.plugin_config
+                    operation, client_schema, config, self.plugin_config, registry
                 )
 
         return plugin_tree

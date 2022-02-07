@@ -1,15 +1,14 @@
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
-from turms.globals import ENUM_CLASS_MAP, FRAGMENT_CLASS_MAP
 from graphql.language.ast import (
     FieldNode,
     FragmentSpreadNode,
     InlineFragmentNode,
 )
+from turms.registry import ClassRegistry
 from turms.utils import (
     generate_typename_field,
     get_additional_bases_for_type,
-    get_scalar_equivalent,
     parse_documents,
     target_from_node,
 )
@@ -29,12 +28,14 @@ from graphql.type.definition import (
 )
 import keyword
 
+
 def recurse_annotation(
     node: FieldNode,
     type: GraphQLType,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
     subtree: ast.AST,
+    registry: ClassRegistry,
     parent_name="",
     is_optional=True,
 ):
@@ -49,17 +50,18 @@ def recurse_annotation(
             subnode = node.selection_set.selections[0]
             if isinstance(subnode, FragmentSpreadNode):
                 if is_optional:
+                    registry.register_import("typing.Optional")
                     return ast.Subscript(
                         value=ast.Name("Optional", ctx=ast.Load()),
                         slice=ast.Name(
-                            id=FRAGMENT_CLASS_MAP[subnode.name.value],
+                            id=registry.get_fragment_class(subnode.name.value),
                             ctx=ast.Load(),
                         ),
                     )
 
                 else:
                     return ast.Name(
-                        id=FRAGMENT_CLASS_MAP[subnode.name.value],
+                        id=registry.get_fragment_class(subnode.name.value),
                         ctx=ast.Load(),
                     )
 
@@ -68,6 +70,7 @@ def recurse_annotation(
                 ast.Expr(value=ast.Constant(value=type.description))
             )
 
+        registry.register_import("typing.Optional")
         mother_class_fields += [
             ast.AnnAssign(
                 target=ast.Name(id="typename", ctx=ast.Store()),
@@ -99,6 +102,7 @@ def recurse_annotation(
                     client_schema,
                     config,
                     subtree,
+                    registry,
                     parent_name=base_name,
                 )
 
@@ -132,7 +136,8 @@ def recurse_annotation(
                     bases=[
                         ast.Name(id=mother_class_name, ctx=ast.Load()),
                         ast.Name(
-                            id=FRAGMENT_CLASS_MAP[sub_node.name.value], ctx=ast.Load()
+                            id=registry.get_fragment_class(sub_node.name.value),
+                            ctx=ast.Load(),
                         ),
                     ],
                     decorator_list=[],
@@ -168,6 +173,7 @@ def recurse_annotation(
                             client_schema,
                             config,
                             subtree,
+                            registry,
                             parent_name=name,
                         )
 
@@ -199,6 +205,9 @@ def recurse_annotation(
             )
 
             if is_optional:
+                registry.register_import("typing.Optional")
+                registry.register_import("typing.Union")
+
                 return ast.Subscript(
                     value=ast.Name("Optional", ctx=ast.Load()),
                     slice=ast.Subscript(
@@ -207,6 +216,7 @@ def recurse_annotation(
                     ),
                 )
             else:
+                registry.register_import("typing.Union")
                 return ast.Subscript(
                     value=ast.Name("Union", ctx=ast.Load()),
                     slice=slice,
@@ -216,29 +226,30 @@ def recurse_annotation(
 
     if isinstance(type, GraphQLObjectType):
         pick_fields = []
-        additional_bases = get_additional_bases_for_type(type.name, config)
+        additional_bases = get_additional_bases_for_type(type.name, config, registry)
 
         target = target_from_node(node)
         nana = f"{parent_name}{target.capitalize()}"
         if type.description:
             pick_fields.append(ast.Expr(value=ast.Constant(value=type.description)))
-        pick_fields += [generate_typename_field(type.name)]
+        pick_fields += [generate_typename_field(type.name, registry)]
 
         if len(node.selection_set.selections) == 1:
             subnode = node.selection_set.selections[0]
             if isinstance(subnode, FragmentSpreadNode):
                 if is_optional:
+                    registry.register_import("typing.Optional")
                     return ast.Subscript(
                         value=ast.Name("Optional", ctx=ast.Load()),
                         slice=ast.Name(
-                            id=FRAGMENT_CLASS_MAP[subnode.name.value],
+                            id=registry.get_fragment_class(subnode.name.value),
                             ctx=ast.Load(),
                         ),
                     )
 
                 else:
                     return ast.Name(
-                        id=FRAGMENT_CLASS_MAP[subnode.name.value],
+                        id=registry.get_fragment_class(subnode.name.value),
                         ctx=ast.Load(),
                     )
 
@@ -246,7 +257,10 @@ def recurse_annotation(
 
             if isinstance(sub_node, FragmentSpreadNode):
                 additional_bases.append(
-                    ast.Name(id=FRAGMENT_CLASS_MAP[sub_node.name.value], ctx=ast.Load())
+                    ast.Name(
+                        id=registry.get_fragment_class(subnode.name.value),
+                        ctx=ast.Load(),
+                    )
                 )
 
             if isinstance(sub_node, FieldNode):
@@ -259,6 +273,7 @@ def recurse_annotation(
                     client_schema,
                     config,
                     subtree,
+                    registry,
                     parent_name=nana,
                 )
 
@@ -280,6 +295,7 @@ def recurse_annotation(
         subtree.append(cls)
 
         if is_optional:
+            registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
                 slice=ast.Name(
@@ -298,34 +314,36 @@ def recurse_annotation(
         print("Generated Scalar")
 
         if is_optional:
+            registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
                 slice=ast.Name(
-                    id=get_scalar_equivalent(type.name, config),
+                    id=registry.get_scalar_equivalent(type.name),
                     ctx=ast.Load(),
                 ),
             )
 
         else:
             return ast.Name(
-                id=get_scalar_equivalent(type.name, config),
+                id=registry.get_scalar_equivalent(type.name),
                 ctx=ast.Load(),
             )
 
     if isinstance(type, GraphQLEnumType):
 
         if is_optional:
+            registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
                 slice=ast.Name(
-                    id=ENUM_CLASS_MAP[type.name],
+                    id=registry.get_enum_class(type.name),
                     ctx=ast.Load(),
                 ),
             )
 
         else:
             return ast.Name(
-                id=ENUM_CLASS_MAP[type.name],
+                id=registry.get_enum_class(type.name),
                 ctx=ast.Load(),
             )
 
@@ -336,6 +354,7 @@ def recurse_annotation(
             client_schema,
             config,
             subtree,
+            registry,
             parent_name=parent_name,
             is_optional=False,
         )
@@ -343,6 +362,8 @@ def recurse_annotation(
     if isinstance(type, GraphQLList):
 
         if is_optional:
+            registry.register_import("typing.Optional")
+            registry.register_import("typing.List")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
                 slice=ast.Subscript(
@@ -353,12 +374,14 @@ def recurse_annotation(
                         client_schema,
                         config,
                         subtree,
+                        registry,
                         parent_name=parent_name,
                     ),
                 ),
             )
 
         else:
+            registry.register_import("typing.List")
             return ast.Subscript(
                 value=ast.Name("List", ctx=ast.Load()),
                 slice=recurse_annotation(
@@ -367,6 +390,7 @@ def recurse_annotation(
                     client_schema,
                     config,
                     subtree,
+                    registry,
                     parent_name=parent_name,
                 ),
             )
@@ -380,24 +404,29 @@ def type_field_node(
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
     subtree: ast.AST,
+    registry: ClassRegistry,
     parent_name="",
     is_optional=True,
 ):
 
     target = target_from_node(node)
-    if keyword.iskeyword(target):
+    field_name = registry.generate_node_name(target)
+
+    if target != field_name:
+        registry.register_import("pydantic.Field")
         assign = ast.AnnAssign(
-            target=ast.Name(f"{target}_", ctx=ast.Store()),
+            target=ast.Name(field_name, ctx=ast.Store()),
             annotation=recurse_annotation(
                 node,
                 field.type,
                 client_schema,
                 config,
                 subtree,
+                registry,
                 parent_name=parent_name,
-                is_optional=True,
+                is_optional=is_optional,
             ),
-            value= ast.Call(
+            value=ast.Call(
                 func=ast.Name(id="Field", ctx=ast.Load()),
                 args=[],
                 keywords=[ast.keyword(arg="alias", value=ast.Constant(value=target))],
@@ -413,8 +442,9 @@ def type_field_node(
                 client_schema,
                 config,
                 subtree,
+                registry,
                 parent_name=parent_name,
-                is_optional=True,
+                is_optional=is_optional,
             ),
             simple=1,
         )

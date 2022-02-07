@@ -3,11 +3,11 @@ import ast
 from typing import Callable, List, Optional
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
-from turms.globals import FRAGMENT_CLASS_MAP, FRAGMENT_DOCUMENT_MAP
 from turms.parser.recurse import recurse_annotation, type_field_node
 from turms.plugins.base import Plugin
 from pydantic import BaseModel
 from graphql.language.ast import FragmentDefinitionNode
+from turms.registry import ClassRegistry
 from turms.utils import (
     NoDocumentsFoundError,
     generate_typename_field,
@@ -44,14 +44,13 @@ def generate_fragment(
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
     plugin_config: FragmentsPluginConfig,
+    registry: ClassRegistry,
 ):
     tree = []
     fields = []
     type = client_schema.get_type(f.type_condition.name.value)
 
-    name = (
-        f"{config.prepend_fragment}{f.name.value.capitalize()}{config.append_fragment}"
-    )
+    name = registry.generate_fragment_classname(f.name.value)
 
     if isinstance(type, GraphQLInterfaceType):
         mother_class_fields = []
@@ -125,7 +124,8 @@ def generate_fragment(
                     spreaded_name,
                     bases=[
                         ast.Name(
-                            id=FRAGMENT_CLASS_MAP[sub_node.name.value], ctx=ast.Load()
+                            id=registry.get_fragment_classname(sub_node.name.value),
+                            ctx=ast.Load(),
                         ),
                         ast.Name(id=base_fragment_name, ctx=ast.Load()),
                     ],
@@ -185,8 +185,8 @@ def generate_fragment(
 
         union_class_names.append(base_fragment_name)
 
-        FRAGMENT_DOCUMENT_MAP[f.name.value] = language.print_ast(f)
-        FRAGMENT_CLASS_MAP[f.name.value] = name
+        registry.register_fragment_document(f.name.value, language.print_ast(f))
+        registry.register_fragment_class(f.name.value, name)
 
         if len(union_class_names) > 1:
             slice = ast.Tuple(
@@ -208,13 +208,13 @@ def generate_fragment(
 
         return tree
 
-    name = f"{config.prepend_fragment}{f.name.value}{config.append_fragment}"
+    name = registry.generate_fragment_classname(f.name.value)
 
     additional_bases = get_additional_bases_for_type(
-        f.type_condition.name.value, config
+        f.type_condition.name.value, config, registry
     )
 
-    fields += [generate_typename_field(type.name)]
+    fields += [generate_typename_field(type.name, registry)]
 
     for field in f.selection_set.selections:
 
@@ -239,11 +239,12 @@ def generate_fragment(
             client_schema,
             config,
             tree,
+            registry,
             parent_name=name,
         )
 
-    FRAGMENT_DOCUMENT_MAP[f.name.value] = language.print_ast(f)
-    FRAGMENT_CLASS_MAP[f.name.value] = name
+    registry.register_fragment_document(f.name.value, language.print_ast(f))
+    registry.register_fragment_class(f.name.value, name)
     tree.append(
         ast.ClassDef(
             name,
@@ -264,29 +265,17 @@ class FragmentsPlugin(Plugin):
     def __init__(self, config=None, **data):
         self.plugin_config = config or FragmentsPluginConfig(**data)
 
-    def generate_imports(
-        self, config: GeneratorConfig, client_schema: GraphQLSchema
-    ) -> List[ast.AST]:
-        imports = []
-
-        all_bases = {base for base in self.plugin_config.fragment_bases}
-
-        for item in all_bases:
-            imports.append(
-                ast.ImportFrom(
-                    module=".".join(item.split(".")[:-1]),
-                    names=[ast.alias(name=item.split(".")[-1])],
-                    level=0,
-                )
-            )
-
-        return imports
-
-    def generate_body(
-        self, client_schema: GraphQLSchema, config: GeneratorConfig
+    def generate_ast(
+        self,
+        client_schema: GraphQLSchema,
+        config: GeneratorConfig,
+        registry: ClassRegistry,
     ) -> List[ast.AST]:
 
         plugin_tree = []
+
+        for base in self.plugin_config.fragment_bases:
+            registry.register_import(base)
 
         try:
             documents = parse_documents(
@@ -297,13 +286,14 @@ class FragmentsPlugin(Plugin):
             return plugin_tree
 
         definitions = documents.definitions
+
         fragments = [
             node for node in definitions if isinstance(node, FragmentDefinitionNode)
         ]
 
         for fragment in fragments:
             plugin_tree += generate_fragment(
-                fragment, client_schema, config, self.plugin_config
+                fragment, client_schema, config, self.plugin_config, registry
             )
 
         return plugin_tree

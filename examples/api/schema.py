@@ -1,16 +1,13 @@
-from turms.types.object import GraphQLObject
-from turms.types.object import GraphQLObject
-from pydantic.fields import Field
-from typing import Optional, List, Dict, Union, Literal
 from enum import Enum
-from turms.types.object import GraphQLInputObject
-from turms.types.object import GraphQLObject
-from turms.types.operation import GraphQLQuery
-from turms.types.operation import GraphQLMutation
-from turms.types.operation import GraphQLSubscription
+from typing import List, Literal, Optional
+
+from pydantic import Field
+
+from turms.types.object import GraphQLInputObject, GraphQLObject
+from turms.types.operation import GraphQLMutation, GraphQLQuery
 
 
-class users_select_column(str, Enum):
+class Users_select_column(str, Enum):
     '''select columns of table "users"'''
 
     id = "id"
@@ -25,7 +22,7 @@ class users_select_column(str, Enum):
     "column name"
 
 
-class order_by(str, Enum):
+class Order_by(str, Enum):
     """column ordering options"""
 
     asc = "asc"
@@ -42,14 +39,14 @@ class order_by(str, Enum):
     "in the descending order, nulls last"
 
 
-class users_constraint(str, Enum):
+class Users_constraint(str, Enum):
     '''unique or primary key constraints on table "users"'''
 
     users_pkey = "users_pkey"
     "unique or primary key constraint"
 
 
-class users_update_column(str, Enum):
+class Users_update_column(str, Enum):
     '''update columns of table "users"'''
 
     id = "id"
@@ -64,7 +61,7 @@ class users_update_column(str, Enum):
     "column name"
 
 
-class conflict_action(str, Enum):
+class Conflict_action(str, Enum):
     """conflict action"""
 
     ignore = "ignore"
@@ -73,30 +70,30 @@ class conflict_action(str, Enum):
     "update the row with the given values"
 
 
-class users_order_by(GraphQLInputObject):
+class Users_order_by(GraphQLInputObject):
     '''ordering options when selecting data from "users"'''
 
-    id: Optional["order_by"]
-    name: Optional["order_by"]
-    rocket: Optional["order_by"]
-    timestamp: Optional["order_by"]
-    twitter: Optional["order_by"]
+    id: Optional["Order_by"]
+    name: Optional["Order_by"]
+    rocket: Optional["Order_by"]
+    timestamp: Optional["Order_by"]
+    twitter: Optional["Order_by"]
 
 
-class users_bool_exp(GraphQLInputObject):
+class Users_bool_exp(GraphQLInputObject):
     """Boolean expression to filter rows from the table "users". All fields are combined with a logical 'AND'."""
 
-    _and: Optional[List[Optional["users_bool_exp"]]]
-    _not: Optional["users_bool_exp"]
-    _or: Optional[List[Optional["users_bool_exp"]]]
-    id: Optional["uuid_comparison_exp"]
+    _and: Optional[List[Optional["Users_bool_exp"]]]
+    _not: Optional["Users_bool_exp"]
+    _or: Optional[List[Optional["Users_bool_exp"]]]
+    id: Optional["Uuid_comparison_exp"]
     name: Optional["String_comparison_exp"]
     rocket: Optional["String_comparison_exp"]
-    timestamp: Optional["timestamptz_comparison_exp"]
+    timestamp: Optional["Timestamptz_comparison_exp"]
     twitter: Optional["String_comparison_exp"]
 
 
-class uuid_comparison_exp(GraphQLInputObject):
+class Uuid_comparison_exp(GraphQLInputObject):
     """expression to compare columns of type uuid. All fields are combined with logical 'AND'."""
 
     _eq: Optional[str]
@@ -130,7 +127,7 @@ class String_comparison_exp(GraphQLInputObject):
     _similar: Optional[str]
 
 
-class timestamptz_comparison_exp(GraphQLInputObject):
+class Timestamptz_comparison_exp(GraphQLInputObject):
     """expression to compare columns of type timestamptz. All fields are combined with logical 'AND'."""
 
     _eq: Optional[str]
@@ -144,7 +141,7 @@ class timestamptz_comparison_exp(GraphQLInputObject):
     _nin: Optional[List[str]]
 
 
-class CapsulesFind(GraphQLInputObject):
+class Capsulesfind(GraphQLInputObject):
     id: Optional[str]
     landings: Optional[int]
     mission: Optional[str]
@@ -154,7 +151,7 @@ class CapsulesFind(GraphQLInputObject):
     type: Optional[str]
 
 
-class CoresFind(GraphQLInputObject):
+class Coresfind(GraphQLInputObject):
     asds_attempts: Optional[int]
     asds_landings: Optional[int]
     block: Optional[int]
@@ -168,14 +165,14 @@ class CoresFind(GraphQLInputObject):
     water_landing: Optional[bool]
 
 
-class HistoryFind(GraphQLInputObject):
+class Historyfind(GraphQLInputObject):
     end: Optional[str]
     flight_number: Optional[int]
     id: Optional[str]
     start: Optional[str]
 
 
-class LaunchFind(GraphQLInputObject):
+class Launchfind(GraphQLInputObject):
     apoapsis_km: Optional[float]
     block: Optional[int]
     cap_serial: Optional[str]
@@ -238,14 +235,14 @@ class LaunchFind(GraphQLInputObject):
     tentative: Optional[str]
 
 
-class MissionsFind(GraphQLInputObject):
+class Missionsfind(GraphQLInputObject):
     id: Optional[str]
     manufacturer: Optional[str]
     name: Optional[str]
     payload_id: Optional[str]
 
 
-class PayloadsFind(GraphQLInputObject):
+class Payloadsfind(GraphQLInputObject):
     apoapsis_km: Optional[float]
     customer: Optional[str]
     eccentricity: Optional[float]
@@ -269,7 +266,7 @@ class PayloadsFind(GraphQLInputObject):
     semi_major_axis_km: Optional[float]
 
 
-class ShipsFind(GraphQLInputObject):
+class Shipsfind(GraphQLInputObject):
     id: Optional[str]
     name: Optional[str]
     model: Optional[str]
@@ -294,7 +291,7 @@ class ShipsFind(GraphQLInputObject):
     mission: Optional[str]
 
 
-class users_insert_input(GraphQLInputObject):
+class Users_insert_input(GraphQLInputObject):
     '''input type for inserting data into table "users"'''
 
     id: Optional[str]
@@ -304,14 +301,14 @@ class users_insert_input(GraphQLInputObject):
     twitter: Optional[str]
 
 
-class users_on_conflict(GraphQLInputObject):
+class Users_on_conflict(GraphQLInputObject):
     '''on conflict condition type for table "users"'''
 
-    constraint: "users_constraint"
-    update_columns: List["users_update_column"]
+    constraint: "Users_constraint"
+    update_columns: List["Users_update_column"]
 
 
-class users_set_input(GraphQLInputObject):
+class Users_set_input(GraphQLInputObject):
     '''input type for updating data in table "users"'''
 
     id: Optional[str]
@@ -321,108 +318,108 @@ class users_set_input(GraphQLInputObject):
     twitter: Optional[str]
 
 
-class users_aggregate_order_by(GraphQLInputObject):
+class Users_aggregate_order_by(GraphQLInputObject):
     '''order by aggregate values of table "users"'''
 
-    count: Optional["order_by"]
-    max: Optional["users_max_order_by"]
-    min: Optional["users_min_order_by"]
+    count: Optional["Order_by"]
+    max: Optional["Users_max_order_by"]
+    min: Optional["Users_min_order_by"]
 
 
-class users_max_order_by(GraphQLInputObject):
+class Users_max_order_by(GraphQLInputObject):
     '''order by max() on columns of table "users"'''
 
-    name: Optional["order_by"]
-    rocket: Optional["order_by"]
-    timestamp: Optional["order_by"]
-    twitter: Optional["order_by"]
+    name: Optional["Order_by"]
+    rocket: Optional["Order_by"]
+    timestamp: Optional["Order_by"]
+    twitter: Optional["Order_by"]
 
 
-class users_min_order_by(GraphQLInputObject):
+class Users_min_order_by(GraphQLInputObject):
     '''order by min() on columns of table "users"'''
 
-    name: Optional["order_by"]
-    rocket: Optional["order_by"]
-    timestamp: Optional["order_by"]
-    twitter: Optional["order_by"]
+    name: Optional["Order_by"]
+    rocket: Optional["Order_by"]
+    timestamp: Optional["Order_by"]
+    twitter: Optional["Order_by"]
 
 
-class users_arr_rel_insert_input(GraphQLInputObject):
+class Users_arr_rel_insert_input(GraphQLInputObject):
     '''input type for inserting array relation for remote table "users"'''
 
-    data: List["users_insert_input"]
-    on_conflict: Optional["users_on_conflict"]
+    data: List["Users_insert_input"]
+    on_conflict: Optional["Users_on_conflict"]
 
 
-class users_obj_rel_insert_input(GraphQLInputObject):
+class Users_obj_rel_insert_input(GraphQLInputObject):
     '''input type for inserting object relation for remote table "users"'''
 
-    data: "users_insert_input"
-    on_conflict: Optional["users_on_conflict"]
+    data: "Users_insert_input"
+    on_conflict: Optional["Users_on_conflict"]
 
 
-users_bool_exp.update_forward_refs()
-users_arr_rel_insert_input.update_forward_refs()
-users_aggregate_order_by.update_forward_refs()
-users_obj_rel_insert_input.update_forward_refs()
+Users_obj_rel_insert_input.update_forward_refs()
+Users_aggregate_order_by.update_forward_refs()
+Users_arr_rel_insert_input.update_forward_refs()
+Users_bool_exp.update_forward_refs()
 
 
-class UserFragment(GraphQLObject):
+class User(GraphQLObject):
     typename: Optional[Literal["users"]] = Field(alias="__typename")
     id: str
 
 
-class UserQuery(GraphQLQuery):
-    users: List[UserFragment]
+class User(GraphQLQuery):
+    users: List[User]
 
     class Meta:
         domain = "default"
-        document = "fragment User on users {\n  id\n}\n\nquery User {\n  users {\n    ...User\n  }\n}"
+        document = "User\n\nquery User {\n  users {\n    ...User\n  }\n}"
 
 
-class TestqueryQueryCapsulesMissions(GraphQLObject):
+class TestqueryCapsulesMissions(GraphQLObject):
     typename: Optional[Literal["CapsuleMission"]] = Field(alias="__typename")
     flight: Optional[int]
 
 
-class TestqueryQueryCapsules(GraphQLObject):
+class TestqueryCapsules(GraphQLObject):
     typename: Optional[Literal["Capsule"]] = Field(alias="__typename")
     id: Optional[str]
-    missions: Optional[List[Optional[TestqueryQueryCapsulesMissions]]]
+    missions: Optional[List[Optional[TestqueryCapsulesMissions]]]
 
 
-class TestqueryQuery(GraphQLQuery):
-    capsules: Optional[List[Optional[TestqueryQueryCapsules]]]
+class Testquery(GraphQLQuery):
+    capsules: Optional[List[Optional[TestqueryCapsules]]]
 
     class Meta:
         domain = "default"
         document = "query TestQuery {\n  capsules {\n    id\n    missions {\n      flight\n    }\n  }\n}"
 
 
-class TestmutationMutationInsert_usersReturning(GraphQLObject):
+class TestmutationInsert_usersReturning(GraphQLObject):
     '''columns and relationships of "users"'''
 
     typename: Optional[Literal["users"]] = Field(alias="__typename")
     id: str
 
 
-class TestmutationMutationInsert_users(GraphQLObject):
+class TestmutationInsert_users(GraphQLObject):
     '''response of any mutation on the table "users"'''
 
     typename: Optional[Literal["users_mutation_response"]] = Field(alias="__typename")
-    returning: List[TestmutationMutationInsert_usersReturning]
+    returning: List[TestmutationInsert_usersReturning]
     "data of the affected rows by the mutation"
 
 
-class TestmutationMutation(GraphQLMutation):
-    insert_users: Optional[TestmutationMutationInsert_users]
+class Testmutation(GraphQLMutation):
+    insert_users: Optional[TestmutationInsert_users]
 
     class Meta:
         domain = "default"
         document = "mutation TestMutation($id: uuid) {\n  insert_users(objects: {id: $id}) {\n    returning {\n      id\n    }\n  }\n}"
 
 
-async def aUser() -> UserFragment:
+async def aUser() -> User:
     """User
 
     fetch data from the table: "users"
@@ -430,11 +427,11 @@ async def aUser() -> UserFragment:
     Arguments:
 
     Returns:
-        UserFragment: The returned Mutation"""
-    return (await UserQuery.aexecute({})).users
+        User: The returned Mutation"""
+    return (await User.aexecute({})).users
 
 
-def User() -> UserFragment:
+def User() -> User:
     """User
 
     fetch data from the table: "users"
@@ -442,11 +439,11 @@ def User() -> UserFragment:
     Arguments:
 
     Returns:
-        UserFragment: The returned Mutation"""
-    return UserQuery.execute({}).users
+        User: The returned Mutation"""
+    return User.execute({}).users
 
 
-async def aTestQuery() -> List[TestqueryQueryCapsules]:
+async def aTestQuery() -> List[TestqueryCapsules]:
     """TestQuery
 
 
@@ -454,11 +451,11 @@ async def aTestQuery() -> List[TestqueryQueryCapsules]:
     Arguments:
 
     Returns:
-        TestqueryQueryCapsules: The returned Mutation"""
-    return (await TestqueryQuery.aexecute({})).capsules
+        TestqueryCapsules: The returned Mutation"""
+    return (await Testquery.aexecute({})).capsules
 
 
-def TestQuery() -> List[TestqueryQueryCapsules]:
+def TestQuery() -> List[TestqueryCapsules]:
     """TestQuery
 
 
@@ -466,11 +463,11 @@ def TestQuery() -> List[TestqueryQueryCapsules]:
     Arguments:
 
     Returns:
-        TestqueryQueryCapsules: The returned Mutation"""
-    return TestqueryQuery.execute({}).capsules
+        TestqueryCapsules: The returned Mutation"""
+    return Testquery.execute({}).capsules
 
 
-async def aTestMutation(id: str = None) -> TestmutationMutationInsert_users:
+async def aTestMutation(id: str = None) -> TestmutationInsert_users:
     """TestMutation
 
     insert data into the table: "users"
@@ -479,11 +476,11 @@ async def aTestMutation(id: str = None) -> TestmutationMutationInsert_users:
         id (uuid, Optional): uuid
 
     Returns:
-        TestmutationMutationInsert_users: The returned Mutation"""
-    return (await TestmutationMutation.aexecute({"id": id})).insert_users
+        TestmutationInsert_users: The returned Mutation"""
+    return (await Testmutation.aexecute({"id": id})).insert_users
 
 
-def TestMutation(id: str = None) -> TestmutationMutationInsert_users:
+def TestMutation(id: str = None) -> TestmutationInsert_users:
     """TestMutation
 
     insert data into the table: "users"
@@ -492,5 +489,5 @@ def TestMutation(id: str = None) -> TestmutationMutationInsert_users:
         id (uuid, Optional): uuid
 
     Returns:
-        TestmutationMutationInsert_users: The returned Mutation"""
-    return TestmutationMutation.execute({"id": id}).insert_users
+        TestmutationInsert_users: The returned Mutation"""
+    return Testmutation.execute({"id": id}).insert_users

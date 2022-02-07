@@ -5,7 +5,6 @@ from typing import List
 from graphql import FragmentSpreadNode, NamedTypeNode
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
-from turms.globals import FRAGMENT_CLASS_MAP, INPUTTYPE_CLASS_MAP
 from turms.plugins.base import Plugin
 from pydantic import BaseModel
 from graphql.language.ast import OperationDefinitionNode, OperationType
@@ -20,14 +19,14 @@ from graphql.language.ast import (
     OperationDefinitionNode,
     OperationType,
 )
+from turms.registry import ClassRegistry
 from turms.utils import (
     NoDocumentsFoundError,
-    NoScalarEquivalentDefined,
     generate_typename_field,
-    get_scalar_equivalent,
     parse_documents,
     target_from_node,
 )
+from turms.errors import NoScalarEquivalentFound
 import re
 import ast
 
@@ -55,14 +54,16 @@ class OperationsFuncPluginConfig(BaseModel):
     collapse_lonely: bool = True
 
 
-def get_input_type_annotation(input_type: NamedTypeNode, config: GeneratorConfig):
+def get_input_type_annotation(
+    input_type: NamedTypeNode, config: GeneratorConfig, registry: ClassRegistry
+):
 
     if isinstance(input_type, NamedTypeNode):
 
         try:
-            type_name = get_scalar_equivalent(input_type.name.value, config)
-        except NoScalarEquivalentDefined as e:
-            type_name = INPUTTYPE_CLASS_MAP[input_type.name.value]
+            type_name = registry.get_scalar_equivalent(input_type.name.value)
+        except NoScalarEquivalentFound as e:
+            type_name = registry.get_inputtype_class(input_type.name.value)
 
         print(type_name)
         return ast.Name(
@@ -74,7 +75,10 @@ def get_input_type_annotation(input_type: NamedTypeNode, config: GeneratorConfig
 
 
 def generate_query_args(
-    o: OperationDefinitionNode, client_schema: GraphQLSchema, config: GeneratorConfig
+    o: OperationDefinitionNode,
+    client_schema: GraphQLSchema,
+    config: GeneratorConfig,
+    registry: ClassRegistry,
 ):
 
     pos_args = []
@@ -82,20 +86,26 @@ def generate_query_args(
     for v in o.variable_definitions:
         if isinstance(v.type, NonNullTypeNode):
             if isinstance(v.type.type, ListTypeNode):
+                registry.register_import("typingl.List")
                 pos_args.append(
                     ast.arg(
                         arg=v.variable.name.value,
                         annotation=ast.Subscript(
                             value=ast.Name("List", ctx=ast.Load()),
-                            slice=get_input_type_annotation(v.type.type, config),
+                            slice=get_input_type_annotation(
+                                v.type.type, config, registry
+                            ),
                         ),
                     )
                 )
             else:
+                registry.register_import("typing.List")
                 pos_args.append(
                     ast.arg(
                         arg=v.variable.name.value,
-                        annotation=get_input_type_annotation(v.type.type, config),
+                        annotation=get_input_type_annotation(
+                            v.type.type, config, registry
+                        ),
                     )
                 )
 
@@ -105,12 +115,15 @@ def generate_query_args(
     for v in o.variable_definitions:
         if not isinstance(v.type, NonNullTypeNode):
             if isinstance(v.type, ListTypeNode):
+                registry.register_import("typing.List")
                 kw_args.append(
                     ast.arg(
                         arg=v.variable.name.value,
                         annotation=ast.Subscript(
                             value=ast.Name("List", ctx=ast.Load()),
-                            slice=get_input_type_annotation(v.type.type, config),
+                            slice=get_input_type_annotation(
+                                v.type.type, config, registry
+                            ),
                         ),
                     )
                 )
@@ -119,7 +132,7 @@ def generate_query_args(
                 kw_args.append(
                     ast.arg(
                         arg=v.variable.name.value,
-                        annotation=get_input_type_annotation(v.type, config),
+                        annotation=get_input_type_annotation(v.type, config, registry),
                     )
                 )
                 kw_values.append(ast.Constant(value=None))
@@ -157,6 +170,7 @@ def generate_query_doc(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
+    registry: ClassRegistry,
     collapse=False,
 ):
 
@@ -165,13 +179,11 @@ def generate_query_doc(
     o.__annotations__
 
     if o.operation == OperationType.QUERY:
-        o_name = (
-            f"{config.prepend_query}{o.name.value.capitalize()}{config.append_query}"
-        )
+        o_name = registry.generate_query_classname(o.name.value)
     if o.operation == OperationType.MUTATION:
-        o_name = f"{config.prepend_mutation}{o.name.value.capitalize()}{config.append_mutation}"
+        o_name = registry.generate_mutation_classname(o.name.value)
     if o.operation == OperationType.SUBSCRIPTION:
-        o_name = f"{config.prepend_subscription}{o.name.value.capitalize()}{config.append_subscription}"
+        o_name = registry.generate_subscription_classname(o.name.value)
 
     if collapse:
         # Check if was collapsed from fragment
@@ -184,15 +196,15 @@ def generate_query_doc(
         potential_item = o.selection_set.selections[0]
 
         if potential_item.selection_set is None:
-            return_type = get_scalar_equivalent(field_definition.type.name, config)
+            return_type = registry.get_scalar_equivalent(field_definition.type.name)
 
         elif len(potential_item.selection_set.selections) == 1:
             if isinstance(
                 potential_item.selection_set.selections[0], FragmentSpreadNode
             ):
-                return_type = FRAGMENT_CLASS_MAP[
+                return_type = registry.get_fragment_class(
                     potential_item.selection_set.selections[0].name.value
-                ]
+                )
 
     else:
 
@@ -322,17 +334,16 @@ def generate_operation_func(
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
     plugin_config: OperationsFuncPluginConfig,
+    registry: ClassRegistry,
 ):
     tree = []
 
     if o.operation == OperationType.QUERY:
-        o_name = (
-            f"{config.prepend_query}{o.name.value.capitalize()}{config.append_query}"
-        )
+        o_name = registry.generate_query_classname(o.name.value)
     if o.operation == OperationType.MUTATION:
-        o_name = f"{config.prepend_mutation}{o.name.value.capitalize()}{config.append_mutation}"
+        o_name = registry.generate_mutation_classname(o.name.value)
     if o.operation == OperationType.SUBSCRIPTION:
-        o_name = f"{config.prepend_subscription}{o.name.value.capitalize()}{config.append_subscription}"
+        o_name = registry.generate_subscription_classname(o.name.value)
 
     collapse = len(o.selection_set.selections) == 1 and plugin_config.collapse_lonely
 
@@ -352,15 +363,15 @@ def generate_operation_func(
 
         # Check if was collapsed from fragment
         if potential_item.selection_set is None:
-            return_type = get_scalar_equivalent(field_definition.type.name, config)
+            return_type = registry.get_scalar_equivalent(field_definition.type.name)
 
         elif len(potential_item.selection_set.selections) == 1:
             if isinstance(
                 potential_item.selection_set.selections[0], FragmentSpreadNode
             ):
-                return_type = FRAGMENT_CLASS_MAP[
+                return_type = registry.get_fragment_class(
                     potential_item.selection_set.selections[0].name.value
-                ]
+                )
         else:
             return_type = (
                 f"{o_name}{o.selection_set.selections[0].name.value.capitalize()}"
@@ -376,13 +387,13 @@ def generate_operation_func(
     else:
         returns = ast.Name(id=return_type, ctx=ast.Load())
 
-    doc = generate_query_doc(o, client_schema, config, collapse=collapse)
+    doc = generate_query_doc(o, client_schema, config, registry, collapse=collapse)
 
     if plugin_config.generate_async:
         tree.append(
             ast.AsyncFunctionDef(
                 name=f"{plugin_config.prepend_async}{o.name.value}",
-                args=generate_query_args(o, client_schema, config),
+                args=generate_query_args(o, client_schema, config, registry),
                 body=[
                     doc,
                     ast.Return(
@@ -400,7 +411,7 @@ def generate_operation_func(
         tree.append(
             ast.FunctionDef(
                 name=f"{plugin_config.prepend_sync}{o.name.value}",
-                args=generate_query_args(o, client_schema, config),
+                args=generate_query_args(o, client_schema, config, registry),
                 body=[
                     doc,
                     ast.Return(
@@ -421,8 +432,11 @@ class OperationsFuncPlugin(Plugin):
     def __init__(self, config=None, **data):
         self.plugin_config = config or OperationsFuncPluginConfig(**data)
 
-    def generate_body(
-        self, client_schema: GraphQLSchema, config: GeneratorConfig
+    def generate_ast(
+        self,
+        client_schema: GraphQLSchema,
+        config: GeneratorConfig,
+        registry: ClassRegistry,
     ) -> List[ast.AST]:
 
         plugin_tree = []
@@ -442,7 +456,7 @@ class OperationsFuncPlugin(Plugin):
 
         for operation in operations:
             plugin_tree += generate_operation_func(
-                operation, client_schema, config, self.plugin_config
+                operation, client_schema, config, self.plugin_config, registry
             )
 
         return plugin_tree

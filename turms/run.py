@@ -3,9 +3,10 @@ from graphql.language.parser import parse
 from pydantic import AnyHttpUrl, NoneIsNotAllowedError
 from turms.config import GeneratorConfig, GraphQLConfig
 from turms.helpers import import_string
-from turms.parser.imports import generate_imports
 from turms.processor.base import Processor
 from turms.processor.black import BlackProcessor
+from turms.registry import ClassRegistry
+from turms.stylers import Styler
 from turms.utils import build_schema
 from turms.plugins.base import Plugin
 from turms.compat.funcs import unparse
@@ -19,9 +20,8 @@ import glob
 
 plugins: List[Plugin] = []
 
-processors: List[Processor] = [
-    BlackProcessor(),
-]
+processors: List[Processor] = []
+stylers: List[Styler] = []
 
 
 class GenerationError(Exception):
@@ -73,6 +73,8 @@ def gen(filepath: str, project=None):
             **turms_config, documents=project["documents"], domain=config.domain
         )
         plugins = []
+        stylers = []
+        processors = []
 
         if "plugins" in turms_config:
             plugin_configs = turms_config["plugins"]
@@ -82,7 +84,13 @@ def gen(filepath: str, project=None):
                 plugins.append(plugin_class(**plugin_config))
                 print(f"Using Plugin {plugin_class}")
 
-        processors = []
+        if "stylers" in turms_config:
+            plugin_configs = turms_config["stylers"]
+            for plugin_config in plugin_configs:
+                assert "type" in plugin_config, "A styler must at least specify type"
+                styler_class = import_string(plugin_config["type"])
+                stylers.append(styler_class(**plugin_config))
+                print(f"Using Styler {styler_class}")
 
         if "processors" in turms_config:
             proc_configs = turms_config["processors"]
@@ -95,6 +103,7 @@ def gen(filepath: str, project=None):
         generated_ast = generate_ast(
             gen_config,
             plugins=plugins,
+            stylers=stylers,
             processors=processors,
             introspection_query=introspection,
             dsl=dsl,
@@ -120,6 +129,7 @@ def generate_ast(
     introspection_query: Dict[str, str] = None,
     dsl: any = None,
     plugins=plugins,
+    stylers=stylers,
     processors=processors,
 ):
     if introspection_query is not None:
@@ -130,19 +140,14 @@ def generate_ast(
         raise GenerationError("Either introspection_query or dsl must be provided")
 
     global_tree = []
-
-    global_tree += generate_imports(client_schema, config)
-
-    for plugin in plugins:
-        try:
-            global_tree += plugin.generate_imports(client_schema, config)
-        except Exception as e:
-            raise GenerationError(f"Plugin Imports: {plugin} failed!") from e
+    registry = ClassRegistry(config, stylers)
 
     for plugin in plugins:
         try:
-            global_tree += plugin.generate_body(client_schema, config)
+            global_tree += plugin.generate_ast(client_schema, config, registry)
         except Exception as e:
             raise GenerationError(f"Plugin Body:{plugin} failed!") from e
+
+    global_tree = registry.generate_imports() + global_tree
 
     return global_tree

@@ -22,7 +22,7 @@ class GraphQLObject(BaseModel):
             },
         )
 
-    async def shrink(self):
+    async def ashrink(self):
         """WIll be called by the ward"""
         assert (
             self.id
@@ -47,6 +47,14 @@ class GraphQLInputObject(BaseModel):
                 "by_alias": by_alias,
             },
         )
+
+    async def ashrink(self):
+        """WIll be called by the ward"""
+        return self.dict()
+
+    def shrink(self):
+        """WIll be called by the ward"""
+        return self.dict()
 
     async def to_variable(self):
         """WIll be called by the ward"""
