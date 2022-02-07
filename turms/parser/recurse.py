@@ -107,7 +107,7 @@ def recurse_annotation(
                 )
 
         mother_class_name = f"{base_name}Base"
-        additional_bases = get_additional_bases_for_type(type.name, config)
+        additional_bases = get_additional_bases_for_type(type.name, config, registry)
 
         mother_class = ast.ClassDef(
             mother_class_name,
@@ -153,7 +153,9 @@ def recurse_annotation(
                 inline_fragment_fields = []
 
                 inline_fragment_fields += [
-                    generate_typename_field(sub_node.type_condition.name.value)
+                    generate_typename_field(
+                        sub_node.type_condition.name.value, registry
+                    )
                 ]
 
                 for sub_sub_node in sub_node.selection_set.selections:
@@ -178,7 +180,7 @@ def recurse_annotation(
                         )
 
                 additional_bases = get_additional_bases_for_type(
-                    sub_node.type_condition.name.value, config
+                    sub_node.type_condition.name.value, config, registry
                 )
                 cls = ast.ClassDef(
                     name,

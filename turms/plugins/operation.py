@@ -265,7 +265,6 @@ def generate_subscription(
                     field_definition.type,
                     client_schema,
                     config,
-                    registry,
                     tree,
                     registry,
                     parent_name=name,
@@ -277,7 +276,7 @@ def generate_subscription(
     query_document = language.print_ast(o)
     z = fragment_searcher.findall(query_document)
 
-    merged_document = replace_iteratively(query_document)
+    merged_document = replace_iteratively(query_document, registry)
 
     query_fields += [
         ast.ClassDef(

@@ -93,10 +93,11 @@ def generate_fragment(
                     client_schema,
                     config,
                     tree,
+                    registry,
                     parent_name=base_fragment_name,
                 )
 
-        additional_bases = get_additional_bases_for_type(type.name, config)
+        additional_bases = get_additional_bases_for_type(type.name, config, registry)
 
         mother_class = ast.ClassDef(
             base_fragment_name,
@@ -124,7 +125,7 @@ def generate_fragment(
                     spreaded_name,
                     bases=[
                         ast.Name(
-                            id=registry.get_fragment_classname(sub_node.name.value),
+                            id=registry.get_fragment_class(sub_node.name.value),
                             ctx=ast.Load(),
                         ),
                         ast.Name(id=base_fragment_name, ctx=ast.Load()),

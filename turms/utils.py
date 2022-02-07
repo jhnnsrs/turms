@@ -106,7 +106,8 @@ def replace_iteratively(
     else:
         try:
             level_down_pattern = "\n\n".join(
-                [registry.get_fragment_class(key) for key in new_fragments] + [pattern]
+                [registry.get_fragment_document(key) for key in new_fragments]
+                + [pattern]
             )
             return replace_iteratively(
                 level_down_pattern, registry, taken=new_fragments + taken

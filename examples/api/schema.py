@@ -1,10 +1,8 @@
+from turms.types.operation import GraphQLMutation, GraphQLQuery
+from turms.types.object import GraphQLInputObject, GraphQLObject
 from enum import Enum
 from typing import List, Literal, Optional
-
 from pydantic import Field
-
-from turms.types.object import GraphQLInputObject, GraphQLObject
-from turms.types.operation import GraphQLMutation, GraphQLQuery
 
 
 class Users_select_column(str, Enum):
@@ -358,10 +356,10 @@ class Users_obj_rel_insert_input(GraphQLInputObject):
     on_conflict: Optional["Users_on_conflict"]
 
 
-Users_obj_rel_insert_input.update_forward_refs()
-Users_aggregate_order_by.update_forward_refs()
-Users_arr_rel_insert_input.update_forward_refs()
 Users_bool_exp.update_forward_refs()
+Users_arr_rel_insert_input.update_forward_refs()
+Users_aggregate_order_by.update_forward_refs()
+Users_obj_rel_insert_input.update_forward_refs()
 
 
 class User(GraphQLObject):
