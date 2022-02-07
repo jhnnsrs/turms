@@ -18,7 +18,7 @@ class TestClass:
     number: int
     """
 
-    x = parse(instring)
+    x = ast.parse(instring)
     unparse(x)
 
 
