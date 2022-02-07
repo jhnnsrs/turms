@@ -1,14 +1,9 @@
 import ast
 from distutils.command.config import config
 from typing import List
-
-from docstring_parser import Style
-from turms import stylers
-
 from turms.config import GeneratorConfig
 from keyword import iskeyword
 from turms.errors import NoScalarEquivalentFound
-
 from turms.stylers.base import Styler
 
 SCALAR_DEFAULTS = {
