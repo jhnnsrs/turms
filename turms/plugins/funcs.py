@@ -71,6 +71,13 @@ def get_input_type_annotation(
             ctx=ast.Load(),
         )
 
+    elif isinstance(input_type, ListTypeNode):
+        registry.register_import("typingl.List")
+        return ast.Subscript(
+            value=ast.Name(id="List", ctx=ast.Load()),
+            slice=get_input_type_annotation(input_type.type, config, registry),
+        )
+
     raise NotImplementedError()
 
 
@@ -85,57 +92,25 @@ def generate_query_args(
 
     for v in o.variable_definitions:
         if isinstance(v.type, NonNullTypeNode):
-            if isinstance(v.type.type, ListTypeNode):
-                registry.register_import("typingl.List")
-                pos_args.append(
-                    ast.arg(
-                        arg=v.variable.name.value,
-                        annotation=ast.Subscript(
-                            value=ast.Name("List", ctx=ast.Load()),
-                            slice=get_input_type_annotation(
-                                v.type.type, config, registry
-                            ),
-                        ),
-                    )
+            pos_args.append(
+                ast.arg(
+                    arg=v.variable.name.value,
+                    annotation=get_input_type_annotation(v.type.type, config, registry),
                 )
-            else:
-                registry.register_import("typing.List")
-                pos_args.append(
-                    ast.arg(
-                        arg=v.variable.name.value,
-                        annotation=get_input_type_annotation(
-                            v.type.type, config, registry
-                        ),
-                    )
-                )
+            )
 
     kw_args = []
     kw_values = []
 
     for v in o.variable_definitions:
         if not isinstance(v.type, NonNullTypeNode):
-            if isinstance(v.type, ListTypeNode):
-                registry.register_import("typing.List")
-                kw_args.append(
-                    ast.arg(
-                        arg=v.variable.name.value,
-                        annotation=ast.Subscript(
-                            value=ast.Name("List", ctx=ast.Load()),
-                            slice=get_input_type_annotation(
-                                v.type.type, config, registry
-                            ),
-                        ),
-                    )
+            kw_args.append(
+                ast.arg(
+                    arg=v.variable.name.value,
+                    annotation=get_input_type_annotation(v.type, config, registry),
                 )
-                kw_values.append(ast.Constant(value=None))
-            else:
-                kw_args.append(
-                    ast.arg(
-                        arg=v.variable.name.value,
-                        annotation=get_input_type_annotation(v.type, config, registry),
-                    )
-                )
-                kw_values.append(ast.Constant(value=None))
+            )
+            kw_values.append(ast.Constant(value=None))
 
     return ast.arguments(
         args=pos_args + kw_args,
