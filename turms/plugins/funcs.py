@@ -72,7 +72,7 @@ def get_input_type_annotation(
         )
 
     elif isinstance(input_type, ListTypeNode):
-        registry.register_import("typingl.List")
+        registry.register_import("typing.List")
         return ast.Subscript(
             value=ast.Name(id="List", ctx=ast.Load()),
             slice=get_input_type_annotation(input_type.type, config, registry),
