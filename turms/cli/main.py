@@ -45,7 +45,7 @@ def main(script: TurmsOptions, project=None):
     app_directory = os.getcwd()
 
     if script == TurmsOptions.INIT:
-        console.log(f"Creating graphql.config.yaml in {app_directory}")
+        console.print(f"Creating graphql.config.yaml in {app_directory}")
         with open(os.path.join(app_directory, "graphql.config.yaml"), "w") as f:
             f.write(default_settings)
 

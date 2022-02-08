@@ -1,20 +1,12 @@
-from asyncio.tasks import sleep
-from importlib import reload, import_module
 import asyncio
-from arkitekt.actors.registry import get_current_actor_registry, register
-from arkitekt.agents.script import ScriptAgent
-import fakts
-from fakts.fakts import Fakts
 import asyncio
 import sys
 import time
-import logging
 from rich.console import Console
 from watchdog.observers import Observer
 from watchdog.events import (
     FileModifiedEvent,
     FileSystemEventHandler,
-    LoggingEventHandler,
 )
 import os
 import subprocess
@@ -26,6 +18,9 @@ import yaml
 
 from turms.config import GraphQLConfig
 from turms.run import gen
+
+
+console = Console()
 
 
 class QueueHandler(FileSystemEventHandler):
@@ -40,16 +35,15 @@ class QueueHandler(FileSystemEventHandler):
 
 def watcher(path, queue, event: threading.Event):
     try:
-        print(f"Wathcing path {path}")
+        console.print(f"Watching path {path}")
         event_handler = QueueHandler(sync_q=queue)
         observer = Observer()
         observer.schedule(event_handler, path, recursive=True)
         observer.start()
 
-        while not event.is_set():
-            time.sleep(1)
-
-        print("Cancelled because threading event is set")
+        with console.status("Watching"):
+            while not event.is_set():
+                time.sleep(1)
     except:
         print("Watcher failed")
 
@@ -62,7 +56,7 @@ async def buffered_queue(queue, timeout=4):
             nana = await queue.get()
             queue.task_done()
             if isinstance(nana, FileModifiedEvent):
-                print("modified file")
+                console.print("modified file")
                 if nana.src_path.lower().endswith((".graphql")):
                     buffer.append(nana)
 
@@ -75,20 +69,24 @@ async def buffered_queue(queue, timeout=4):
 
 
 class Host:
-    def __init__(
-        self,
-        path=None,
-        config_path=None,
-    ) -> None:
+    def __init__(self, path=None, config_path=None, project=None) -> None:
         self.config_path = config_path
         self.watch_path = os.path.join(
-            os.getcwd(), "/".join(path.split("*")[0].split("/")[:-1])
+            os.getcwd(),
+            "/".join(
+                path.split("*")[0].split("/")[:-1]
+            ),  # should get root path even if using glob
         )
         self.console = Console()
+        self.project = project
 
     async def restart(self):
-        print("Restarting Generation")
-        gen(self.config_path)
+        console.print("Restarting Generation")
+        try:
+            gen(self.config_path, project=self.project)
+        except Exception as e:
+            console.print("Generation Failed")
+            console.print_exception()
 
     async def run(self):
         jqueue = janus.Queue()
@@ -118,10 +116,10 @@ def watch(filepath, project=None):
 
     assert "projects" in yaml_dict, "Right now only projects is supported"
 
-    project = project or yaml_dict["projects"].items()[0][1]
+    project = project or list(yaml_dict["projects"].items())[0][0]
 
     config = GraphQLConfig(**yaml_dict["projects"][project], domain=project)
-    print(config)
+    console.print(f"Running filewatcher for project: {project}")
 
-    host = Host(path=config.documents, config_path=filepath)
+    host = Host(path=config.documents, config_path=filepath, project=project)
     asyncio.run(host.run())
