@@ -502,6 +502,9 @@ def generate_operation_func(
     doc = generate_query_doc(o, client_schema, config, registry, collapse=collapse)
 
     if plugin_config.generate_async:
+        if o.operation == OperationType.SUBSCRIPTION:
+            registry.register_import("typing.AsyncIterator")
+
         tree.append(
             ast.AsyncFunctionDef(
                 name=f"{plugin_config.prepend_async}{o.name.value}",
@@ -515,11 +518,18 @@ def generate_operation_func(
                     ),
                 ],
                 decorator_list=[],
-                returns=returns,
+                returns=returns
+                if o.operation != OperationType.SUBSCRIPTION
+                else ast.Subscript(
+                    value=ast.Name(id="AsyncIterator", ctx=ast.Load()), slice=returns
+                ),
             )
         )
 
     if plugin_config.generate_sync:
+        if o.operation == OperationType.SUBSCRIPTION:
+            registry.register_import("typing.Iterator")
+
         tree.append(
             ast.FunctionDef(
                 name=f"{plugin_config.prepend_sync}{o.name.value}",
@@ -533,7 +543,11 @@ def generate_operation_func(
                     ),
                 ],
                 decorator_list=[],
-                returns=returns,
+                returns=returns
+                if o.operation != OperationType.SUBSCRIPTION
+                else ast.Subscript(
+                    value=ast.Name(id="Iterator", ctx=ast.Load()), slice=returns
+                ),
             )
         )
 

@@ -99,7 +99,7 @@ def replace_iteratively(
     registry,
     taken=[],
 ):
-    z = fragment_searcher.findall(pattern)
+    z = set(fragment_searcher.findall(pattern))  # only set is important
     new_fragments = [new_f for new_f in z if new_f not in taken and new_f != ""]
     if not new_fragments:
         return pattern

@@ -61,7 +61,7 @@ def generate_fragment(
                 ast.Expr(value=ast.Constant(value=type.description))
             )
 
-        mother_class_fields += [
+        """ mother_class_fields += [
             ast.AnnAssign(
                 target=ast.Name(id="typename", ctx=ast.Store()),
                 annotation=ast.Subscript(
@@ -78,6 +78,7 @@ def generate_fragment(
                 simple=1,
             )
         ]
+        """
 
         for sub_node in f.selection_set.selections:
 
