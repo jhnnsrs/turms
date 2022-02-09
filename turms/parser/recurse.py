@@ -7,6 +7,7 @@ from graphql.language.ast import (
 )
 from turms.registry import ClassRegistry
 from turms.utils import (
+    generate_config_class,
     generate_typename_field,
     get_additional_bases_for_type,
     parse_documents,
@@ -109,6 +110,8 @@ def recurse_annotation(
         mother_class_name = f"{base_name}Base"
         additional_bases = get_additional_bases_for_type(type.name, config, registry)
 
+        body = mother_class_fields if mother_class_fields else [ast.Pass()]
+
         mother_class = ast.ClassDef(
             mother_class_name,
             bases=[
@@ -118,7 +121,7 @@ def recurse_annotation(
             + additional_bases,  # Todo: fill with base
             decorator_list=[],
             keywords=[],
-            body=mother_class_fields if mother_class_fields else [ast.Pass()],
+            body=body + generate_config_class(config),
         )
 
         subtree.append(mother_class)
@@ -142,7 +145,7 @@ def recurse_annotation(
                     ],
                     decorator_list=[],
                     keywords=[],
-                    body=[ast.Pass()],
+                    body=[ast.Pass()] + generate_config_class(config),
                 )
 
                 subtree.append(cls)
@@ -190,7 +193,7 @@ def recurse_annotation(
                     ],
                     decorator_list=[],
                     keywords=[],
-                    body=inline_fragment_fields,
+                    body=inline_fragment_fields + generate_config_class(config),
                 )
 
                 subtree.append(cls)
@@ -282,6 +285,8 @@ def recurse_annotation(
             if isinstance(sub_node, InlineFragmentNode):
                 raise NotImplementedError()
 
+        body = pick_fields if pick_fields else [ast.Pass()]
+
         cls = ast.ClassDef(
             nana,
             bases=additional_bases
@@ -291,7 +296,7 @@ def recurse_annotation(
             ],
             decorator_list=[],
             keywords=[],
-            body=pick_fields if pick_fields else [ast.Pass()],
+            body=body + generate_config_class(config),
         )
 
         subtree.append(cls)

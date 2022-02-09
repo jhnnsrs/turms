@@ -1,7 +1,7 @@
 import glob
 import re
 from typing import Dict, List
-from turms.config import GeneratorConfig
+from turms.config import GeneratorConfig, GraphQLConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.language.ast import DocumentNode, FieldNode
 from graphql.error.graphql_error import GraphQLError
@@ -60,6 +60,32 @@ def generate_typename_field(typename, registry: ClassRegistry):
         ),
         simple=1,
     )
+
+
+def generate_config_class(config: GeneratorConfig):
+
+    config_fields = []
+
+    if config.freeze:
+        config_fields.append(
+            ast.Assign(
+                targets=[ast.Name(id="frozen", ctx=ast.Store())],
+                value=ast.Constant(value=True),
+            )
+        )
+
+    if len(config_fields) > 0:
+        return [
+            ast.ClassDef(
+                name="Config",
+                bases=[],
+                keywords=[],
+                body=config_fields,
+                decorator_list=[],
+            )
+        ]
+    else:
+        return []
 
 
 def parse_documents(

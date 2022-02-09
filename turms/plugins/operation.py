@@ -46,6 +46,7 @@ from graphql import language, parse, get_introspection_query, validate
 from turms.registry import ClassRegistry
 from turms.utils import (
     NoDocumentsFoundError,
+    generate_config_class,
     parse_documents,
     replace_iteratively,
 )
@@ -57,9 +58,9 @@ fragment_searcher = re.compile(r"\.\.\.(?P<fragment>[a-zA-Z]*)")
 
 
 class OperationsPluginConfig(BaseModel):
-    query_bases: List[str] = ["turms.types.operation.GraphQLQuery"]
-    mutation_bases: List[str] = ["turms.types.operation.GraphQLMutation"]
-    subscription_bases: List[str] = ["turms.types.operation.GraphQLSubscription"]
+    query_bases: List[str] = ["pydantic.BaseModel"]
+    mutation_bases: List[str] = ["pydantic.BaseModel"]
+    subscription_bases: List[str] = ["pydantic.BaseModel"]
     operations_glob: Optional[str]
 
 
@@ -140,7 +141,7 @@ def generate_query(
             ],
             decorator_list=[],
             keywords=[],
-            body=query_fields,
+            body=query_fields + generate_config_class(config),
         )
     )
 
@@ -224,7 +225,7 @@ def generate_mutation(
             ],
             decorator_list=[],
             keywords=[],
-            body=query_fields,
+            body=query_fields + generate_config_class(config),
         )
     )
 
@@ -309,7 +310,7 @@ def generate_subscription(
             ],
             decorator_list=[],
             keywords=[],
-            body=query_fields,
+            body=query_fields + generate_config_class(config),
         )
     )
 

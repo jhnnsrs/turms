@@ -10,6 +10,7 @@ from graphql.language.ast import FragmentDefinitionNode
 from turms.registry import ClassRegistry
 from turms.utils import (
     NoDocumentsFoundError,
+    generate_config_class,
     generate_typename_field,
     get_additional_bases_for_type,
     parse_documents,
@@ -179,7 +180,7 @@ def generate_fragment(
                     ],
                     decorator_list=[],
                     keywords=[],
-                    body=inline_fragment_fields,
+                    body=inline_fragment_fields + generate_config_class(config),
                 )
 
                 tree.append(cls)
@@ -257,7 +258,7 @@ def generate_fragment(
             ],
             decorator_list=[],
             keywords=[],
-            body=fields,
+            body=fields + generate_config_class(config),
         )
     )
     return tree

@@ -12,7 +12,7 @@ class GeneratorConfig(BaseModel):
     interface_bases: List[str] = ["turms.types.object.GraphQLObject"]
 
     scalar_definitions = {}
-
+    freeze: bool = False
     additional_bases = {}
     extensions: Dict = {}
 

@@ -16,6 +16,7 @@ import yaml
 import json
 import os
 from urllib import request
+from urllib.error import URLError
 import glob
 
 plugins: List[Plugin] = []
@@ -44,8 +45,13 @@ def gen(filepath: str, project=None):
             req.add_header("Content-Type", "application/json")
             req.add_header("Accept", "application/json")
 
-            resp = request.urlopen(req)
-            x = json.loads(resp.read().decode("utf-8"))
+            try:
+                resp = request.urlopen(req)
+                x = json.loads(resp.read().decode("utf-8"))
+            except Exception as e:
+                raise GenerationError(
+                    f"Failed to fetch schema from {config.schema_url}"
+                ) from e
             introspection = x["data"]
             dsl = None
         else:
