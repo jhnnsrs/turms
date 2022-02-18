@@ -77,6 +77,31 @@ class OperationsFuncPluginConfig(BaseModel):
     definitions: List[FunctionDefinition] = []
 
 
+def camel_to_snake(name):
+    name = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
+    return re.sub("([a-z0-9])([A-Z])", r"\1_\2", name).lower()
+
+
+def generate_async_func_name(
+    o: OperationDefinitionNode,
+    plugin_config: OperationsFuncPluginConfig,
+    config: GeneratorConfig,
+    registry: ClassRegistry,
+):
+
+    return f"{plugin_config.prepend_async}{camel_to_snake(o.name.value)}"
+
+
+def generate_sync_func_name(
+    o: OperationDefinitionNode,
+    plugin_config: OperationsFuncPluginConfig,
+    config: GeneratorConfig,
+    registry: ClassRegistry,
+):
+
+    return f"{plugin_config.prepend_sync}{camel_to_snake(o.name.value)}"
+
+
 def get_input_type_annotation(
     input_type: NamedTypeNode, config: GeneratorConfig, registry: ClassRegistry
 ):
@@ -696,7 +721,7 @@ def generate_operation_func(
 
         tree.append(
             ast.AsyncFunctionDef(
-                name=f"{plugin_config.prepend_async}{o.name.value}",
+                name=generate_async_func_name(o, plugin_config, config, registry),
                 args=generate_query_args(
                     definition,
                     o,
@@ -743,7 +768,7 @@ def generate_operation_func(
 
         tree.append(
             ast.FunctionDef(
-                name=f"{plugin_config.prepend_sync}{o.name.value}",
+                name=generate_sync_func_name(o, plugin_config, config, registry),
                 args=generate_query_args(
                     definition,
                     o,

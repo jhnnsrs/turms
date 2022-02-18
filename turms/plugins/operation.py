@@ -58,10 +58,82 @@ fragment_searcher = re.compile(r"\.\.\.(?P<fragment>[a-zA-Z]*)")
 
 
 class OperationsPluginConfig(BaseModel):
-    query_bases: List[str] = ["pydantic.BaseModel"]
-    mutation_bases: List[str] = ["pydantic.BaseModel"]
-    subscription_bases: List[str] = ["pydantic.BaseModel"]
+    query_bases: List[str] = None
+    mutation_bases: List[str] = None
+    subscription_bases: List[str] = None
     operations_glob: Optional[str]
+
+
+def get_query_bases(
+    config: GeneratorConfig,
+    plugin_config: OperationsPluginConfig,
+    registry: ClassRegistry,
+):
+
+    if plugin_config.query_bases:
+        for base in plugin_config.query_bases:
+            registry.register_import(base)
+
+        return [
+            ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+            for base in plugin_config.query_bases
+        ]
+    else:
+        for base in config.object_bases:
+            registry.register_import(base)
+
+            return [
+                ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+                for base in config.object_bases
+            ]
+
+
+def get_mutation_bases(
+    config: GeneratorConfig,
+    plugin_config: OperationsPluginConfig,
+    registry: ClassRegistry,
+):
+
+    if plugin_config.mutation_bases:
+        for base in plugin_config.mutation_bases:
+            registry.register_import(base)
+
+        return [
+            ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+            for base in plugin_config.mutation_bases
+        ]
+    else:
+        for base in config.object_bases:
+            registry.register_import(base)
+
+            return [
+                ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+                for base in config.object_bases
+            ]
+
+
+def get_subscription_bases(
+    config: GeneratorConfig,
+    plugin_config: OperationsPluginConfig,
+    registry: ClassRegistry,
+):
+
+    if plugin_config.subscription_bases:
+        for base in plugin_config.subscription_bases:
+            registry.register_import(base)
+
+        return [
+            ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+            for base in plugin_config.subscription_bases
+        ]
+    else:
+        for base in config.object_bases:
+            registry.register_import(base)
+
+            return [
+                ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+                for base in config.object_bases
+            ]
 
 
 def generate_query(
@@ -129,16 +201,11 @@ def generate_query(
             ],
         )
     ]
-    for base in plugin_config.query_bases:
-        registry.register_import(base)
 
     tree.append(
         ast.ClassDef(
             name,
-            bases=[
-                ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                for base in plugin_config.query_bases
-            ],
+            bases=get_query_bases(config, plugin_config, registry),
             decorator_list=[],
             keywords=[],
             body=query_fields + generate_config_class(config),
@@ -213,16 +280,11 @@ def generate_mutation(
             ],
         )
     ]
-    for base in plugin_config.mutation_bases:
-        registry.register_import(base)
 
     tree.append(
         ast.ClassDef(
             name,
-            bases=[
-                ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                for base in plugin_config.mutation_bases
-            ],
+            bases=get_mutation_bases(config, plugin_config, registry),
             decorator_list=[],
             keywords=[],
             body=query_fields + generate_config_class(config),
@@ -298,16 +360,10 @@ def generate_subscription(
         )
     ]
 
-    for base in plugin_config.subscription_bases:
-        registry.register_import(base)
-
     tree.append(
         ast.ClassDef(
             name,
-            bases=[
-                ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                for base in plugin_config.subscription_bases
-            ],
+            bases=get_subscription_bases(config, plugin_config, registry),
             decorator_list=[],
             keywords=[],
             body=query_fields + generate_config_class(config),

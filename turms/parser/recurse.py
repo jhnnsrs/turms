@@ -10,6 +10,7 @@ from turms.utils import (
     generate_config_class,
     generate_typename_field,
     get_additional_bases_for_type,
+    get_interface_bases,
     parse_documents,
     target_from_node,
 )
@@ -72,6 +73,7 @@ def recurse_annotation(
             )
 
         registry.register_import("typing.Optional")
+        """
         mother_class_fields += [
             ast.AnnAssign(
                 target=ast.Name(id="typename", ctx=ast.Store()),
@@ -89,6 +91,7 @@ def recurse_annotation(
                 simple=1,
             )
         ]
+        """
 
         for sub_node in node.selection_set.selections:
 
@@ -114,10 +117,7 @@ def recurse_annotation(
 
         mother_class = ast.ClassDef(
             mother_class_name,
-            bases=[
-                ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                for base in config.interface_bases
-            ]
+            bases=get_interface_bases(config, registry)
             + additional_bases,  # Todo: fill with base
             decorator_list=[],
             keywords=[],
@@ -318,7 +318,6 @@ def recurse_annotation(
             )
 
     if isinstance(type, GraphQLScalarType):
-        print("Generated Scalar")
 
         if is_optional:
             registry.register_import("typing.Optional")

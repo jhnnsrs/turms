@@ -157,3 +157,23 @@ def get_additional_bases_for_type(
             for base in config.additional_bases[typename]
         ]
     return []
+
+
+def get_interface_bases(config: GeneratorConfig, registry: ClassRegistry):
+
+    if config.interface_bases:
+        for base in config.interface_bases:
+            registry.register_import(base)
+
+        return [
+            ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+            for base in config.interface_bases
+        ]
+    else:
+        for base in config.object_bases:
+            registry.register_import(base)
+
+        return [
+            ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+            for base in config.object_bases
+        ]

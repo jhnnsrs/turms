@@ -9,7 +9,7 @@ class GeneratorConfig(BaseModel):
     documents: Optional[str]
 
     object_bases: List[str] = ["turms.types.object.GraphQLObject"]
-    interface_bases: List[str] = ["turms.types.object.GraphQLObject"]
+    interface_bases: Optional[List[str]] = None
 
     scalar_definitions = {}
     freeze: bool = False

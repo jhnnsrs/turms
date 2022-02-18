@@ -22,7 +22,7 @@ from turms.registry import ClassRegistry
 
 
 class InputsPluginConfig(BaseModel):
-    inputtype_bases: List[str] = ["turms.types.object.GraphQLInputObject"]
+    inputtype_bases: List[str] = ["pydantic.BaseModel"]
     skip_underscore: bool = True
 
 
