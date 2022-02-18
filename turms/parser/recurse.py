@@ -29,6 +29,7 @@ from graphql.type.definition import (
     is_list_type,
 )
 import keyword
+from turms.cli.console import console
 
 
 def recurse_annotation(
@@ -460,6 +461,11 @@ def type_field_node(
         if not field.deprecation_reason
         else f"DEPRECATED {field.deprecation_reason}: : {field.description} "
     )
+
+    if field.deprecation_reason:
+        registry.warn(
+            f"Field {node.name.value} on {parent_name} is deprecated: {field.deprecation_reason}"
+        )
 
     if potential_comment:
         return [assign, ast.Expr(value=ast.Constant(value=potential_comment))]

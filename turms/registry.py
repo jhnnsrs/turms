@@ -5,6 +5,7 @@ from turms.config import GeneratorConfig
 from keyword import iskeyword
 from turms.errors import NoScalarEquivalentFound
 from turms.stylers.base import Styler
+from turms.cli.console import console
 
 SCALAR_DEFAULTS = {
     "ID": "str",
@@ -190,3 +191,6 @@ class ClassRegistry(object):
             )
 
         return scalar_type.split(".")[-1]
+
+    def warn(self, message):
+        console.print("[r]" + message)
