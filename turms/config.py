@@ -9,15 +9,16 @@ class GeneratorConfig(BaseModel):
     documents: Optional[str]
 
     object_bases: List[str] = ["turms.types.object.GraphQLObject"]
-    interface_bases: List[str] = ["turms.types.object.GraphQLObject"]
+    interface_bases: Optional[List[str]] = None
 
     scalar_definitions = {}
-
+    freeze: bool = False
     additional_bases = {}
     extensions: Dict = {}
 
 
 class GraphQLConfig(BaseModel):
     schema_url: Optional[Union[AnyHttpUrl, str]] = Field(alias="schema")
+    bearer_token: Optional[str] = None
     documents: Optional[str]
     domain: str = "default"

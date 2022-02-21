@@ -7,13 +7,14 @@ from graphql.language.ast import (
 )
 from turms.registry import ClassRegistry
 from turms.utils import (
+    generate_config_class,
     generate_typename_field,
     get_additional_bases_for_type,
+    get_interface_bases,
     parse_documents,
     target_from_node,
 )
 import ast
-
 from graphql.type.definition import (
     GraphQLEnumType,
     GraphQLField,
@@ -71,6 +72,7 @@ def recurse_annotation(
             )
 
         registry.register_import("typing.Optional")
+        """
         mother_class_fields += [
             ast.AnnAssign(
                 target=ast.Name(id="typename", ctx=ast.Store()),
@@ -88,6 +90,7 @@ def recurse_annotation(
                 simple=1,
             )
         ]
+        """
 
         for sub_node in node.selection_set.selections:
 
@@ -109,16 +112,15 @@ def recurse_annotation(
         mother_class_name = f"{base_name}Base"
         additional_bases = get_additional_bases_for_type(type.name, config, registry)
 
+        body = mother_class_fields if mother_class_fields else [ast.Pass()]
+
         mother_class = ast.ClassDef(
             mother_class_name,
-            bases=[
-                ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                for base in config.interface_bases
-            ]
+            bases=get_interface_bases(config, registry)
             + additional_bases,  # Todo: fill with base
             decorator_list=[],
             keywords=[],
-            body=mother_class_fields if mother_class_fields else [ast.Pass()],
+            body=body + generate_config_class(config),
         )
 
         subtree.append(mother_class)
@@ -142,7 +144,7 @@ def recurse_annotation(
                     ],
                     decorator_list=[],
                     keywords=[],
-                    body=[ast.Pass()],
+                    body=[ast.Pass()] + generate_config_class(config),
                 )
 
                 subtree.append(cls)
@@ -190,7 +192,7 @@ def recurse_annotation(
                     ],
                     decorator_list=[],
                     keywords=[],
-                    body=inline_fragment_fields,
+                    body=inline_fragment_fields + generate_config_class(config),
                 )
 
                 subtree.append(cls)
@@ -282,6 +284,8 @@ def recurse_annotation(
             if isinstance(sub_node, InlineFragmentNode):
                 raise NotImplementedError()
 
+        body = pick_fields if pick_fields else [ast.Pass()]
+
         cls = ast.ClassDef(
             nana,
             bases=additional_bases
@@ -291,7 +295,7 @@ def recurse_annotation(
             ],
             decorator_list=[],
             keywords=[],
-            body=pick_fields if pick_fields else [ast.Pass()],
+            body=body + generate_config_class(config),
         )
 
         subtree.append(cls)
@@ -313,7 +317,6 @@ def recurse_annotation(
             )
 
     if isinstance(type, GraphQLScalarType):
-        print("Generated Scalar")
 
         if is_optional:
             registry.register_import("typing.Optional")
@@ -456,6 +459,11 @@ def type_field_node(
         if not field.deprecation_reason
         else f"DEPRECATED {field.deprecation_reason}: : {field.description} "
     )
+
+    if field.deprecation_reason:
+        registry.warn(
+            f"Field {node.name.value} on {parent_name} is deprecated: {field.deprecation_reason}"
+        )
 
     if potential_comment:
         return [assign, ast.Expr(value=ast.Constant(value=potential_comment))]

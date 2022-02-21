@@ -1,9 +1,8 @@
 import argparse
 from enum import Enum
 import os
-from rich.console import Console
-
 from turms.run import gen
+from turms.compat.console import get_console
 
 directory = os.getcwd()
 
@@ -40,12 +39,11 @@ projects:
 
 
 def main(script: TurmsOptions, project=None):
-    console = Console()
 
     app_directory = os.getcwd()
 
     if script == TurmsOptions.INIT:
-        console.print(f"Creating graphql.config.yaml in {app_directory}")
+        get_console().print(f"Creating graphql.config.yaml in {app_directory}")
         with open(os.path.join(app_directory, "graphql.config.yaml"), "w") as f:
             f.write(default_settings)
 
@@ -63,8 +61,10 @@ def entrypoint():
     parser.add_argument("script", type=TurmsOptions, help="The Script Type")
     parser.add_argument("project", type=str, help="The Path", nargs="?", default=None)
     args = parser.parse_args()
-
-    main(script=args.script, project=args.project)
+    try:
+        main(script=args.script, project=args.project)
+    except Exception as e:
+        get_console().print_exception()
 
 
 if __name__ == "__main__":

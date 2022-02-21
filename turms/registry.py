@@ -5,6 +5,8 @@ from turms.config import GeneratorConfig
 from keyword import iskeyword
 from turms.errors import NoScalarEquivalentFound
 from turms.stylers.base import Styler
+from turms.compat.console import get_console
+
 
 SCALAR_DEFAULTS = {
     "ID": "str",
@@ -26,6 +28,7 @@ class ClassRegistry(object):
         self.enum_class_map = {}
         self.inputtype_class_map = {}
         self.fragment_class_map = {}
+        self.console = get_console()
 
     def generate_type_name_field(self, typename):
         return ast.AnnAssign(
@@ -121,7 +124,6 @@ class ClassRegistry(object):
             )
 
         for top_level_name, sub_level_names in top_level.items():
-            print(top_level_name)
             imports.append(
                 ast.ImportFrom(
                     module=top_level_name,
@@ -190,3 +192,6 @@ class ClassRegistry(object):
             )
 
         return scalar_type.split(".")[-1]
+
+    def warn(self, message):
+        self.console.print("[r]" + message)

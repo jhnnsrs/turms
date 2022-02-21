@@ -10,8 +10,10 @@ from graphql.language.ast import FragmentDefinitionNode
 from turms.registry import ClassRegistry
 from turms.utils import (
     NoDocumentsFoundError,
+    generate_config_class,
     generate_typename_field,
     get_additional_bases_for_type,
+    get_interface_bases,
     parse_documents,
 )
 import re
@@ -35,8 +37,32 @@ logger = logging.getLogger(__name__)
 
 
 class FragmentsPluginConfig(BaseModel):
-    fragment_bases: List[str] = ["turms.types.object.GraphQLObject"]
+    fragment_bases: List[str] = None
     fragments_glob: Optional[str]
+
+
+def get_fragment_bases(
+    config: GeneratorConfig,
+    pluginConfig: FragmentsPluginConfig,
+    registry: ClassRegistry,
+):
+    if pluginConfig.fragment_bases:
+        for base in pluginConfig.fragment_bases:
+            registry.register_import(base)
+
+        return [
+            ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+            for base in pluginConfig.fragment_bases
+        ]
+
+    else:
+        for base in config.object_bases:
+            registry.register_import(base)
+
+        return [
+            ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+            for base in config.object_bases
+        ]
 
 
 def generate_fragment(
@@ -61,25 +87,6 @@ def generate_fragment(
                 ast.Expr(value=ast.Constant(value=type.description))
             )
 
-        """ mother_class_fields += [
-            ast.AnnAssign(
-                target=ast.Name(id="typename", ctx=ast.Store()),
-                annotation=ast.Subscript(
-                    value=ast.Name(id="Optional", ctx=ast.Load()),
-                    slice=ast.Name("str", ctx=ast.Load()),
-                ),
-                value=ast.Call(
-                    func=ast.Name(id="Field", ctx=ast.Load()),
-                    args=[],
-                    keywords=[
-                        ast.keyword(arg="alias", value=ast.Constant(value="__typename"))
-                    ],
-                ),
-                simple=1,
-            )
-        ]
-        """
-
         for sub_node in f.selection_set.selections:
 
             if isinstance(sub_node, FieldNode):
@@ -102,10 +109,7 @@ def generate_fragment(
 
         mother_class = ast.ClassDef(
             base_fragment_name,
-            bases=[
-                ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                for base in config.interface_bases
-            ]
+            bases=get_interface_bases(config, registry)
             + additional_bases,  # Todo: fill with base
             decorator_list=[],
             keywords=[],
@@ -179,7 +183,7 @@ def generate_fragment(
                     ],
                     decorator_list=[],
                     keywords=[],
-                    body=inline_fragment_fields,
+                    body=inline_fragment_fields + generate_config_class(config),
                 )
 
                 tree.append(cls)
@@ -220,6 +224,9 @@ def generate_fragment(
 
     for field in f.selection_set.selections:
 
+        if field.name.value == "__typename":
+            continue
+
         if isinstance(field, FragmentDefinitionNode):
             continue
 
@@ -251,13 +258,10 @@ def generate_fragment(
         ast.ClassDef(
             name,
             bases=additional_bases
-            + [
-                ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                for base in plugin_config.fragment_bases
-            ],
+            + get_fragment_bases(config, plugin_config, registry),
             decorator_list=[],
             keywords=[],
-            body=fields,
+            body=fields + generate_config_class(config),
         )
     )
     return tree
@@ -275,9 +279,6 @@ class FragmentsPlugin(Plugin):
     ) -> List[ast.AST]:
 
         plugin_tree = []
-
-        for base in self.plugin_config.fragment_bases:
-            registry.register_import(base)
 
         try:
             documents = parse_documents(

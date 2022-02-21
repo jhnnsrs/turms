@@ -1,0 +1,76 @@
+{
+  "items": [
+    {
+      "items": [
+        "reference/__init__/__init__"
+      ],
+      "label": "__init__",
+      "type": "category"
+    },
+    {
+      "items": [
+        "reference/cli/__init__",
+        "reference/cli/gen",
+        "reference/cli/main",
+        "reference/cli/watch"
+      ],
+      "label": "cli",
+      "type": "category"
+    },
+    {
+      "items": [
+        "reference/plugins/__init__",
+        "reference/plugins/base",
+        "reference/plugins/enums",
+        "reference/plugins/fragments",
+        "reference/plugins/funcs",
+        "reference/plugins/inputs",
+        "reference/plugins/operation"
+      ],
+      "label": "plugins",
+      "type": "category"
+    },
+    {
+      "items": [
+        "reference/processor/__init__",
+        "reference/processor/base",
+        "reference/processor/black",
+        "reference/processor/isort"
+      ],
+      "label": "processor",
+      "type": "category"
+    },
+    {
+      "items": [
+        "reference/stylers/__init__",
+        "reference/stylers/appender",
+        "reference/stylers/base",
+        "reference/stylers/capitalize",
+        "reference/stylers/snake"
+      ],
+      "label": "stylers",
+      "type": "category"
+    },
+    {
+      "items": [
+        "reference/types/__init__",
+        "reference/types/object",
+        "reference/types/operation",
+        "reference/types/scalar",
+        "reference/types/utils"
+      ],
+      "label": "types",
+      "type": "category"
+    },
+    "reference/config",
+    "reference/console",
+    "reference/errors",
+    "reference/globals",
+    "reference/helpers",
+    "reference/registry",
+    "reference/run",
+    "reference/utils"
+  ],
+  "label": "Reference",
+  "type": "category"
+}
