@@ -113,7 +113,6 @@ def get_input_type_annotation(
         except NoScalarEquivalentFound as e:
             type_name = registry.get_inputtype_class(input_type.name.value)
 
-        print(type_name)
         return ast.Name(
             id=type_name,
             ctx=ast.Load(),
@@ -824,7 +823,6 @@ class OperationsFuncPlugin(Plugin):
     ) -> List[ast.AST]:
 
         plugin_tree = []
-        print(self.plugin_config)
 
         try:
             documents = parse_documents(
@@ -842,7 +840,6 @@ class OperationsFuncPlugin(Plugin):
 
         for operation in operations:
             for definition in get_definitions_for_onode(operation, self.plugin_config):
-                print("Generating operation:", definition.type, operation)
                 plugin_tree += generate_operation_func(
                     definition,
                     operation,

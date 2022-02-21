@@ -15,7 +15,6 @@ from turms.utils import (
     target_from_node,
 )
 import ast
-
 from graphql.type.definition import (
     GraphQLEnumType,
     GraphQLField,
@@ -29,7 +28,6 @@ from graphql.type.definition import (
     is_list_type,
 )
 import keyword
-from turms.cli.console import console
 
 
 def recurse_annotation(

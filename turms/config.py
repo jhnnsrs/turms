@@ -19,5 +19,6 @@ class GeneratorConfig(BaseModel):
 
 class GraphQLConfig(BaseModel):
     schema_url: Optional[Union[AnyHttpUrl, str]] = Field(alias="schema")
+    bearer_token: Optional[str] = None
     documents: Optional[str]
     domain: str = "default"

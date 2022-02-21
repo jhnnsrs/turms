@@ -21,3 +21,6 @@ class Plugin:
         registry: ClassRegistry,
     ) -> List[ast.AST]:
         raise NotImplementedError("Plugin must overrwrite this")
+
+    def __str__(self) -> str:
+        return self.__class__.__name__
