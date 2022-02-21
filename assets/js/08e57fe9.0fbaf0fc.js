@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkwebsite=self.webpackChunkwebsite||[]).push([[2383],{18313:function(t){t.exports=JSON.parse('{"/turms/blog/tags/rath":{"allTagsPath":"/turms/blog/tags","slug":"/turms/blog/tags/rath","name":"rath","count":1,"permalink":"/turms/blog/tags/rath"}}')}}]);
