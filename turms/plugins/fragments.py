@@ -189,7 +189,8 @@ def generate_fragment(
                 tree.append(cls)
                 union_class_names.append(inline_name)
 
-        union_class_names.append(base_fragment_name)
+        if not config.allways_resolve_interfaces:
+            union_class_names.append(base_fragment_name)
 
         registry.register_fragment_document(f.name.value, language.print_ast(f))
         registry.register_fragment_class(f.name.value, name)

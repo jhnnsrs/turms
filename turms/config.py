@@ -10,6 +10,7 @@ class GeneratorConfig(BaseModel):
 
     object_bases: List[str] = ["turms.types.object.GraphQLObject"]
     interface_bases: Optional[List[str]] = None
+    allways_resolve_interfaces: bool = True
 
     scalar_definitions = {}
     freeze: bool = False
