@@ -20,9 +20,24 @@ IDE.
 pip install turms
 ```
 
-## Configuration
+turms has no dependencies to itself (besides pydantic) in its generated code, so its recommended to install
+turms as a development dependency.
 
-Turms relies on and complies with [graphql-config](https://www.graphql-config.com/docs/user/user-introduction)
+```bash
+poetry add -D turms
+```
+
+:::tip
+As of now turms only supports python 3.9 and higher (3.7 and 3.8 are in the making)
+:::
+
+### Configuration
+
+Turms relies on and complies with [graphql-config](https://www.graphql-config.com/docs/user/user-introduction) and searches
+your current working dir for the graphql-config file, it currently supports the following formats:
+
+- [x] graphql.config.yaml
+- [ ] .graphqlrc.yaml
 
 ```yaml
 projects:
@@ -49,3 +64,44 @@ projects:
           timestamptz: str
           Date: str
 ```
+
+By default turms requires the projects tree structure, to support multiple schemas within a same project.
+
+:::tip
+Each plugin as its own scope of configuration, that you can consult
+::::
+
+## Generation
+
+```bash
+turms gen
+```
+
+Will generate python code according to the schema and your documents.
+
+### Generation Flow
+
+Turms generates code with the help of plugins, stylers and processors:
+
+```mermaid
+flowchart LR;
+    id0(Documents)-->|gql&schema|id1(Plugin)
+    id0(Documents)-->|gql&schema|id2(Plugin)
+    id0(Documents)-->|gql&schema|id3(Plugin)
+    id1(Plugin)-->|python.AST|id50(Appender)
+    id2(Plugin)-->|python.AST|id50(Appender)
+    id3(Plugin)-->|python.AST|id50(Appender)
+    id50(Appender)-->|str|id61(Processor)
+    id50(Appender)-->|str|id62(Processor)
+    id61(Processor)-->id100(generated.py)
+    id62(Processor)-->id100(generated.py)
+```
+
+Turms loads or introspects your schema, parses your configuration and loads the
+plugins sequentially, causing them to generate their part of the python AST,
+concats these together and unparsers this to a codestring that can then be processed
+by tools like black or isort, and are then written to file.
+
+If you wish to enforce a specific naming style (like snakecasing, pascal case gql)
+you can do so by specifying stylers. Plugins will then try to resolve a field or classname
+according to this style.
