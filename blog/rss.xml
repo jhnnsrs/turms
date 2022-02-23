@@ -2,14 +2,14 @@
 <rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/">
     <channel>
         <title>Turms Blog</title>
-        <link>https://jhnnsrs.github.io/turms/turms/blog</link>
+        <link>https://jhnnsrs.github.io/turms/blog</link>
         <description>Turms Blog</description>
         <lastBuildDate>Sun, 01 Aug 2021 00:00:00 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <item>
             <title><![CDATA[Looking For Contributors]]></title>
-            <link>https://jhnnsrs.github.io/turms/turms/blog/mdx-blog-post</link>
+            <link>https://jhnnsrs.github.io/turms/blog/mdx-blog-post</link>
             <guid>mdx-blog-post</guid>
             <pubDate>Sun, 01 Aug 2021 00:00:00 GMT</pubDate>
             <description><![CDATA[Looking For Contributors!]]></description>
