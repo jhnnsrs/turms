@@ -3,58 +3,30 @@ sidebar_position: 1
 sidebar_label: "Plugins"
 ---
 
-# Design
+# Plugins
 
-Rath is structured around links and their orchestration
+Plugins are the heart of turms. They are generating the actual
+python AST (Abstract Syntax Tree), that will be used for code generation.
 
 ```mermaid
 flowchart LR;
-    id0(Query)-->|Request|id1(Rath Client)
-    id1(Rath Client)-->|Operation|id2(Continuation Link)
-    id2(Continuation Link)-->|Operation|id3(Terminating Link)
+id0(Documents)-->|gql&schema|id1(Plugin)
+id0(Documents)-->|gql&schema|id2(Plugin)
+id0(Documents)-->|gql&schema|id3(Plugin)
+id1(Plugin)-->|python.AST|id50(Appender)
+id2(Plugin)-->|python.AST|id50(Appender)
+id3(Plugin)-->|python.AST|id50(Appender)
+id50(Appender)-->|str|id61(Processor)
+id50(Appender)-->|str|id62(Processor)
+id61(Processor)-->id100(generated.py)
+id62(Processor)-->id100(generated.py)
+
 ```
 
-### Terminating Links
+They closely work with stylers to ensure your favourite code style gets respected.
 
-Terminating Links make network requests to the underlying graphql
-endpoint.
+## Generation
 
-### Continuation Links
-
-Continuation Links take requests in form of operations and
-alter the request or introduce logic before a underlying request to
-the endpoint.
-
-As an example an Auth link
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Rath
-    participant AuthLink
-    participant TerminationLink
-    Rath->>AuthLink: Operation
-    AuthLink->>AuthLink: Get Token
-    AuthLink-->>TerminationLink: Operation + Token
-    TerminationLink -->> AuthLink: Result
-    AuthLink -->> Rath: Result
-```
-
-The authlink can then on further store the auth token and append it to
-the operation.
-They can also handle complex failures
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Rath
-    participant AuthLink
-    participant TerminationLink
-    Rath->>AuthLink: Operation
-    AuthLink-->>TerminationLink: Operation + Token
-    TerminationLink--XAuthLink: Error
-    AuthLink->>AuthLink: Refech Token
-    AuthLink-->>TerminationLink: Operation + Refreshed Token
-    TerminationLink -->> AuthLink: Result
-    AuthLink -->> Rath: Result
-```
+Plugins are called sequentially and the output will be appended to the global ast.Tree,
+Plugins can also register imports and register references to their generated code for
+following plugins to find (check ClassRegistry)

@@ -8,7 +8,7 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 const config = {
   title: 'Turms',
   tagline: 'GraphQL Codegen for and by python',
-  url: 'https://jhnnsrs.github.io/turms',
+  url: 'https://jhnnsrs.github.io/',
   baseUrl: '/turms/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',

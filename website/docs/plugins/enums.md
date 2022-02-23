@@ -5,7 +5,24 @@ sidebar_label: "Enums"
 
 # Enums
 
-Enums generates python enums from graphql enums
+Enums generates python enums from Graphql Enums
+
+### Default Configuration
+
+```yaml
+project:
+  default:
+    schema: ...
+    extensions:
+      turms:
+        plugins:
+          - type: turms.plugins.enums.EnumsPlugin
+            skip_underscore: True
+            prepend: ""
+            append: ""
+```
+
+#### Code Example
 
 ```python
 class Order_by(str, Enum):
