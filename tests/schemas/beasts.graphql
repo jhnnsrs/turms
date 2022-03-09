@@ -1,0 +1,37 @@
+type Beast {
+  "ID of beast (taken from binomial initial)"
+  id: ID
+  "number of legs beast has"
+  legs: Int
+  "a beast's name in Latin"
+  binomial: String
+  "a beast's name to you and I"
+  commonName: String
+  "taxonomy grouping"
+  taxClass: String
+  "a beast's prey"
+  eats: [Beast]
+  "a beast's predators"
+  isEatenBy: [Beast]
+}
+
+type Query {
+  beasts: [Beast]
+  beast(id: ID!): Beast
+  calledBy(commonName: String!): [Beast]
+}
+
+type Mutation {
+  createBeast(
+    id: ID!
+    legs: Int!
+    binomial: String!
+    commonName: String!
+    taxClass: String!
+    eats: [ID]
+  ): Beast
+}
+
+type Subscription {
+  watchBeast(id: ID!): Beast
+}

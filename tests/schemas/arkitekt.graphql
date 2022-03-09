@@ -1,0 +1,1117 @@
+schema {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}
+
+type Agent {
+  id: ID!
+  installedAt: DateTime!
+  name: String!
+  identifier: String!
+  unique: String!
+  status: AgentStatus!
+  registry: Registry
+  boundProvisions: [Provision!]!
+}
+
+type AgentEvent {
+  created: Agent
+  deleted: ID
+  updated: Agent
+}
+
+enum AgentStatus {
+  ACTIVE
+  DISCONNECTED
+  VANILLA
+}
+
+enum AgentStatusInput {
+  ACTIVE
+  DISCONNECTED
+  VANILLA
+}
+
+scalar Any
+
+type AppRepository implements Repository {
+  id: ID
+  installedAt: DateTime!
+  type: RepositoryType!
+  name: String @deprecated(reason: "Will be replaced in the future")
+  unique: String!
+  app: LokApp
+  nodes(active: Boolean): [Node]
+}
+
+interface ArgPort {
+  key: String
+  label: String
+  description: String
+  required: Boolean
+  widget: Widget
+}
+
+input ArgPortInput {
+  key: String
+  type: String
+  typename: String
+  description: String
+  label: String
+  identifier: String
+  widget: WidgetInput
+  bound: BoundTypeInput
+  child: ArgPortInput
+  transpile: String
+  options: GenericScalar
+}
+
+type Assignation {
+  id: ID!
+  reservation: Reservation
+  extensions: GenericScalar
+  context: GenericScalar
+  args: [Any]
+  provision: Provision
+  waiter: Waiter
+  kwargs: GenericScalar
+  returns: GenericScalar
+  status: AssignationStatus!
+  statusmessage: String!
+  callback: String
+  progress: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  reference: String!
+  creator: LokUser
+  app: LokApp
+  parent: Assignation
+  children: [Assignation!]!
+  log(level: LogLevelInput, createdAt: String, o: String): [AssignationLog]
+}
+
+type AssignationEvent {
+  log: AssignationLogEvent
+}
+
+type AssignationLog {
+  id: ID!
+  createdAt: DateTime!
+  assignation: Assignation!
+  message: String
+  level: AssignationLogLevel!
+}
+
+type AssignationLogEvent {
+  message: String
+  level: String
+}
+
+enum AssignationLogLevel {
+  CRITICAL
+  INFO
+  DEBUG
+  ERROR
+  WARN
+  YIELD
+  CANCEL
+  RETURN
+  DONE
+  EVENT
+}
+
+enum AssignationStatus {
+  PENDING
+  ACKNOWLEDGED
+  RETURNED
+  DENIED
+  ASSIGNED
+  PROGRESS
+  RECEIVED
+  ERROR
+  CRITICAL
+  CANCEL
+  CANCELING
+  CANCELLED
+  YIELD
+  DONE
+}
+
+enum AssignationStatusInput {
+  PENDING
+  ACKNOWLEDGED
+  RETURNED
+  DENIED
+  ASSIGNED
+  PROGRESS
+  RECEIVED
+  ERROR
+  CRITICAL
+  CANCEL
+  CANCELING
+  CANCELLED
+  YIELD
+  DONE
+}
+
+type AssignationsEvent {
+  ended: ID
+  update: Assignation
+  create: Assignation
+}
+
+type BoolArgPort implements ArgPort {
+  key: String
+  label: String
+  description: String
+  required: Boolean
+  widget: Widget
+}
+
+type BoolKwargPort implements KwargPort {
+  key: String
+  label: String
+  description: String
+  required: Boolean
+  widget: Widget
+  defaultBool: Boolean
+}
+
+type BoolReturnPort implements ReturnPort {
+  key: String
+  label: String
+  description: String
+  widget: Widget
+}
+
+type BoolWidget implements Widget {
+  type: String
+  dependencies: [String]
+}
+
+enum BoundTypeInput {
+  AGENT
+  REGISTRY
+  APP
+  GLOBAL
+}
+
+scalar Callback
+
+type CreateMirrorReturn {
+  created: Boolean
+  repo: MirrorRepository
+}
+
+scalar DateTime
+
+input DefinitionInput {
+  description: String
+  name: String!
+  args: [ArgPortInput]
+  kwargs: [KwargPortInput]
+  returns: [ReturnPortInput]
+  interfaces: [String]
+  type: NodeTypeInput = function
+  interface: String!
+  package: String
+}
+
+type DeleteMirrorReturn {
+  id: String
+}
+
+type DeleteNodeReturn {
+  id: String
+}
+
+type DictArgPort implements ArgPort {
+  key: String
+  label: String
+  description: String
+  required: Boolean
+  widget: Widget
+  child: ArgPort
+}
+
+type DictKwargPort implements KwargPort {
+  key: String
+  label: String
+  description: String
+  required: Boolean
+  widget: Widget
+  defaultDict: GenericScalar
+  child: KwargPort
+}
+
+type DictReturnPort implements ReturnPort {
+  key: String
+  label: String
+  description: String
+  widget: Widget
+  child: ReturnPort
+}
+
+type EnumArgPort implements ArgPort {
+  key: String
+  label: String
+  description: String
+  required: Boolean
+  widget: Widget
+  options: GenericScalar
+}
+
+type EnumKwargPort implements KwargPort {
+  key: String
+  label: String
+  description: String
+  required: Boolean
+  widget: Widget
+  defaultOption: GenericScalar
+  options: GenericScalar
+}
+
+type EnumReturnPort implements ReturnPort {
+  key: String
+  label: String
+  description: String
+  widget: Widget
+  options: GenericScalar
+}
+
+scalar GenericScalar
+
+type IntArgPort implements ArgPort {
+  key: String
+  label: String
+  description: String
+  required: Boolean
+  widget: Widget
+}
+
+type IntKwargPort implements KwargPort {
+  key: String
+  label: String
+  description: String
+  required: Boolean
+  widget: Widget
+  defaultInt: Int
+}
+
+type IntReturnPort implements ReturnPort {
+  key: String
+  label: String
+  description: String
+  widget: Widget
+}
+
+type IntWidget implements Widget {
+  type: String
+  dependencies: [String]
+  query: String
+}
+
+interface KwargPort {
+  key: String
+  label: String
+  description: String
+  required: Boolean
+  widget: Widget
+}
+
+input KwargPortInput {
+  key: String
+  type: String
+  typename: String
+  description: String
+  label: String
+  defaultDict: GenericScalar
+  defaultOption: GenericScalar
+  defaultInt: Int
+  defaultBool: Boolean
+  defaultFloat: Float
+  defaultID: ID
+  defaultString: String
+  defaultList: [GenericScalar]
+  identifier: String
+  widget: WidgetInput
+  bound: BoundTypeInput
+  child: KwargPortInput
+  transpile: String
+  options: GenericScalar
+}
+
+type LinkWidget implements Widget {
+  type: String
+  dependencies: [String]
+  linkbuilder: String
+}
+
+type ListArgPort implements ArgPort {
+  key: String
+  label: String
+  description: String
+  required: Boolean
+  widget: Widget
+  child: ArgPort
+}
+
+type ListKwargPort implements KwargPort {
+  key: String
+  label: String
+  description: String
+  required: Boolean
+  widget: Widget
+  defaultList: [GenericScalar]
+  child: KwargPort
+}
+
+type ListReturnPort implements ReturnPort {
+  key: String
+  label: String
+  description: String
+  widget: Widget
+  child: ReturnPort
+}
+
+enum LogLevelInput {
+  CRITICAL
+  INFO
+  DEBUG
+  ERROR
+  WARN
+  YIELD
+  CANCEL
+  RETURN
+  DONE
+  EVENT
+}
+
+type LokApp {
+  id: ID!
+  clientId: String!
+  name: String!
+  grantType: LokAppGrantType!
+  registrySet: [Registry!]!
+  apprepositorySet: [AppRepository!]!
+  provisionSet: [Provision!]!
+  reservationSet: [Reservation!]!
+  assignationSet: [Assignation!]!
+}
+
+enum LokAppGrantType {
+  CLIENT_CREDENTIALS
+  IMPLICIT
+  AUTHORIZATION_CODE
+  PASSWORD
+  SESSION
+}
+
+type LokUser {
+  id: ID!
+  password: String!
+  lastLogin: DateTime
+  isSuperuser: Boolean!
+  username: String!
+  firstName: String!
+  lastName: String!
+  isStaff: Boolean!
+  isActive: Boolean!
+  dateJoined: DateTime!
+  email: String!
+  roles: GenericScalar
+  registrySet: [Registry!]!
+  templateSet: [Template!]!
+  provisionSet: [Provision!]!
+  reservationSet: [Reservation!]!
+  assignationSet: [Assignation!]!
+}
+
+type MirrorRepository implements Repository {
+  id: ID
+  installedAt: DateTime!
+  type: RepositoryType!
+  name: String @deprecated(reason: "Will be replaced in the future")
+  unique: String!
+  url: String
+  updatedAt: DateTime!
+  nodes(active: Boolean): [Node]
+}
+
+type Mutation {
+  createNode(
+    args: [ArgPortInput]
+    description: String
+    interface: String!
+    interfaces: [String]
+    kwargs: [KwargPortInput]
+    name: String!
+    package: String
+    returns: [ReturnPortInput]
+    type: NodeTypeInput = function
+  ): Node
+  define(definition: DefinitionInput!): Node
+  deleteNode(id: ID!): DeleteNodeReturn
+  negotiate(version: String): Transcript
+  host(extenders: [String], identifier: String!): Structure
+  resetRepository: ResetRepositoryReturn
+  createTemplate(
+    extensions: [String]
+    node: ID!
+    params: GenericScalar
+    policy: GenericScalar
+    version: String
+  ): Template
+  reserve(
+    appGroup: ID = "main"
+    callbacks: [Callback]
+    creator: ID
+    node: ID
+    params: ReserveParamsInput
+    persist: Boolean = true
+    reference: String
+    template: ID
+    title: String
+  ): Reservation
+  unreserve(id: ID!): Reservation
+  assign(
+    args: [GenericScalar]!
+    cached: Boolean
+    kwargs: GenericScalar
+    log: Boolean
+    mother: ID
+    reference: String
+    reservation: ID!
+  ): Assignation
+  unassign(assignation: ID, reference: String): Assignation
+  provide(
+    node: ID
+    params: GenericScalar
+    reference: String
+    template: ID
+  ): Provision
+  unprovide(provision: String, reference: String): Unprovide
+  ack(assignation: String!): Assignation
+  createMirror(name: String!, url: String!): CreateMirrorReturn
+  deleteMirror(id: ID!): DeleteMirrorReturn
+  updateMirror(id: ID!): UpdateMirrorReturn
+  resetAgents: ResetAgentsReturn
+  resetProvisions(exclude: [ProvisionStatusInput]): ResetProvisionsReturn
+  resetReservations(exclude: [ReservationStatusInput]): ResetReservationsReturn
+  resetAssignations(exclude: [AssignationStatusInput]): ResetAssignationsReturn
+  resetNodes(exclude: [ID]): ResetNodesReturn
+}
+
+type Node {
+  id: ID!
+  pure: Boolean!
+  type: NodeType!
+  repository: Repository
+  interfaces: [String]
+  name: String!
+  package: String!
+  interface: String!
+  description: String!
+  image: String
+  args: [ArgPort]
+  kwargs: [KwargPort]
+  returns: [ReturnPort]
+  templates(
+    node: ID
+    package: String
+    interface: String
+    provided: Boolean
+    providable: Boolean
+  ): [Template]
+  reservations: [Reservation!]!
+}
+
+type NodeEvent {
+  created: Node
+  deleted: ID
+  updated: Node
+}
+
+enum NodeType {
+  GENERATOR
+  FUNCTION
+}
+
+enum NodeTypeInput {
+  GENERATOR
+  FUNCTION
+}
+
+type PointSettings {
+  type: String
+}
+
+enum PostmanProtocol {
+  WEBSOCKET
+  KAFKA
+  RABBITMQ
+}
+
+type PostmanSettings {
+  type: PostmanProtocol
+  kwargs: GenericScalar
+}
+
+type Provision {
+  id: ID!
+  unique: UUID!
+  mode: ProvisionMode!
+  reference: String!
+  reservation: Reservation
+  bound: Agent
+  provision: Provision
+  title: String
+  template: Template
+  params: ProvisionParams
+  extensions: GenericScalar
+  context: GenericScalar
+  access: ProvisionAccess!
+  status: ProvisionStatus!
+  statusmessage: String!
+  callback: String
+  progress: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  creator: LokUser
+  app: LokApp
+  log(level: LogLevelInput, createdAt: String, o: String): [ProvisionLog]
+  createdProvisions: [Provision!]!
+  reservations: [Reservation!]!
+  causedReservations: [Reservation!]!
+  assignations(status: [AssignationStatusInput]): [Assignation]
+}
+
+enum ProvisionAccess {
+  EXCLUSIVE
+  EVERYONE
+}
+
+type ProvisionEvent {
+  log: ProvisionLogEvent
+}
+
+type ProvisionLog {
+  id: ID!
+  createdAt: DateTime!
+  provision: Provision!
+  message: String
+  level: ProvisionLogLevel!
+}
+
+type ProvisionLogEvent {
+  message: String
+  level: String
+}
+
+enum ProvisionLogLevel {
+  CRITICAL
+  INFO
+  DEBUG
+  ERROR
+  WARN
+  YIELD
+  CANCEL
+  RETURN
+  DONE
+  EVENT
+}
+
+enum ProvisionMode {
+  DEBUG
+  PRODUCTION
+}
+
+type ProvisionParams {
+  autoUnprovide: Boolean
+}
+
+enum ProvisionStatus {
+  PENDING
+  BOUND
+  PROVIDING
+  ACTIVE
+  INACTIVE
+  CANCELING
+  LOST
+  RECONNECTING
+  DENIED
+  ERROR
+  CRITICAL
+  ENDED
+  CANCELLED
+}
+
+enum ProvisionStatusInput {
+  PENDING
+  BOUND
+  PROVIDING
+  ACTIVE
+  INACTIVE
+  CANCELING
+  DISCONNECTED
+  RECONNECTING
+  DENIED
+  ERROR
+  CRITICAL
+  ENDED
+  CANCELLED
+}
+
+type ProvisionsEvent {
+  ended: ID
+  update: Provision
+  create: Provision
+}
+
+scalar QString
+
+type Query {
+  hello: String
+  void: String
+  node(
+    q: QString
+    id: ID
+    package: String
+    interface: String
+    template: ID
+  ): Node
+  nodes(
+    repository: ID
+    name: String
+    search: String
+    type: NodeTypeInput
+    argTypes: [String]
+  ): [Node]
+  template(id: ID): Template
+  templates(
+    node: ID
+    package: String
+    interface: String
+    provided: Boolean
+    providable: Boolean
+  ): [Template]
+  agent(id: ID): Agent
+  agents(app: String, status: [AgentStatusInput]): [Agent]
+  structure(id: ID, identifier: String): Structure
+  structures: [Structure]
+  reservation(reference: ID!): Reservation
+  reservations: [Reservation]
+  myReservations(
+    exclude: [ReservationStatusInput]
+    filter: [ReservationStatusInput]
+  ): [Reservation]
+  waitlist(
+    exclude: [ReservationStatusInput]
+    filter: [ReservationStatusInput]
+    appGroup: ID = "main"
+  ): [Reservation]
+  assignation(reference: ID!): Assignation
+  myAssignations(
+    exclude: [AssignationStatusInput]
+    filter: [AssignationStatusInput]
+  ): [Assignation]
+  todolist(
+    exclude: [AssignationStatusInput]
+    filter: [AssignationStatusInput]
+    appGroup: ID = "main"
+  ): [Assignation]
+  provision(reference: ID!): Provision
+  provisions: [Provision]
+  myProvisions(
+    exclude: [ProvisionStatusInput]
+    filter: [ProvisionStatusInput]
+  ): [Provision]
+  repository(id: ID): Repository
+  repositories: [Repository]
+}
+
+type QueryWidget implements Widget {
+  type: String
+  dependencies: [String]
+  query: String
+}
+
+type Registry {
+  id: ID!
+  app: LokApp
+  user: LokUser
+  unique: String!
+  name: String @deprecated(reason: "Will be replaced in the future")
+  agents: [Agent!]!
+  waiters: [Waiter!]!
+  templates: [Template!]!
+}
+
+interface Repository {
+  id: ID
+  nodes(active: Boolean): [Node]
+  name: String @deprecated(reason: "Will be replaced in the future")
+}
+
+enum RepositoryType {
+  APP
+  MIRROR
+}
+
+type Reservation {
+  id: ID!
+  channel: String!
+  node: Node
+  title: String
+  template: Template
+  provisions: [Provision!]!
+  params: ReserveParams
+  extensions: GenericScalar
+  context: GenericScalar
+  status: ReservationStatus!
+  statusmessage: String!
+  callback: String
+  progress: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  waiter: Waiter
+  app: LokApp
+  parent: Reservation
+  creator: LokUser
+  reference: String!
+  causingProvision: Provision
+  log(level: LogLevelInput, createdAt: String, o: String): [ReservationLog]
+  createdProvisions: [Provision!]!
+  children: [Reservation!]!
+  assignations: [Assignation!]!
+}
+
+type ReservationEvent {
+  log: ReservationLogEvent
+}
+
+type ReservationLog {
+  id: ID!
+  createdAt: DateTime!
+  reservation: Reservation!
+  message: String
+  level: ReservationLogLevel!
+}
+
+type ReservationLogEvent {
+  message: String
+  level: String
+}
+
+enum ReservationLogLevel {
+  CRITICAL
+  INFO
+  DEBUG
+  ERROR
+  WARN
+  YIELD
+  CANCEL
+  RETURN
+  DONE
+  EVENT
+}
+
+enum ReservationStatus {
+  ROUTING
+  PROVIDING
+  WAITING
+  REROUTING
+  DISCONNECTED
+  DISCONNECT
+  CANCELING
+  ACTIVE
+  ERROR
+  ENDED
+  CANCELLED
+  CRITICAL
+}
+
+enum ReservationStatusInput {
+  ROUTING
+  PROVIDING
+  WAITING
+  REROUTING
+  DISCONNECTED
+  DISCONNECT
+  CANCELING
+  ACTIVE
+  ERROR
+  ENDED
+  CANCELLED
+  CRITICAL
+}
+
+type ReservationsEvent {
+  update: Reservation
+  delete: ID
+  create: Reservation
+}
+
+type ReserveParams {
+  registries: [ID]
+  agents: [ID]
+  templates: [ID]
+  desiredInstances: Int
+  autoProvide: Boolean
+  autoUnprovide: Boolean
+  minimalInstances: Int
+}
+
+input ReserveParamsInput {
+  autoProvide: Boolean
+  autoUnprovide: Boolean
+  registries: [ID]
+  agents: [ID]
+  templates: [ID]
+  desiredInstances: Int
+  minimalInstances: Int
+}
+
+type ResetAgentsReturn {
+  ok: Boolean
+}
+
+type ResetAssignationsReturn {
+  ok: Boolean
+}
+
+type ResetNodesReturn {
+  ok: Boolean
+}
+
+type ResetProvisionsReturn {
+  ok: Boolean
+}
+
+type ResetRepositoryReturn {
+  ok: Boolean
+}
+
+type ResetReservationsReturn {
+  ok: Boolean
+}
+
+interface ReturnPort {
+  key: String
+  label: String
+  description: String
+  widget: Widget
+}
+
+input ReturnPortInput {
+  key: String
+  type: String
+  typename: String
+  description: String
+  bound: BoundTypeInput
+  label: String
+  identifier: String
+  child: ReturnPortInput
+  transpile: String
+}
+
+type SearchWidget implements Widget {
+  type: String
+  dependencies: [String]
+  query: String
+}
+
+type SliderWidget implements Widget {
+  type: String
+  dependencies: [String]
+  min: Int
+  max: Int
+}
+
+type StringArgPort implements ArgPort {
+  key: String
+  label: String
+  description: String
+  required: Boolean
+  widget: Widget
+  default: String
+}
+
+type StringKwargPort implements KwargPort {
+  key: String
+  label: String
+  description: String
+  required: Boolean
+  widget: Widget
+  defaultString: String
+}
+
+type StringReturnPort implements ReturnPort {
+  key: String
+  label: String
+  description: String
+  widget: Widget
+}
+
+type StringWidget implements Widget {
+  type: String
+  dependencies: [String]
+  placeholder: String
+}
+
+type Structure {
+  id: ID!
+  repository: Repository
+  extenders: GenericScalar
+  identifier: String!
+  bound: StructureBound!
+}
+
+type StructureArgPort implements ArgPort {
+  key: String
+  label: String
+  description: String
+  required: Boolean
+  widget: Widget
+  identifier: String
+  bound: String
+}
+
+enum StructureBound {
+  AGENT
+  REGISTRY
+  APP
+  GLOBAL
+}
+
+type StructureKwargPort implements KwargPort {
+  key: String
+  label: String
+  description: String
+  required: Boolean
+  widget: Widget
+  defaultID: ID
+  identifier: String
+  bound: String
+}
+
+type StructureReturnPort implements ReturnPort {
+  key: String
+  label: String
+  description: String
+  widget: Widget
+  identifier: String
+  bound: String
+}
+
+type Subscription {
+  assignationEvent(level: String, reference: ID!): AssignationEvent
+  myAssignationsEvent(level: String): AssignationsEvent
+  reservationEvent(level: String, reference: ID!): ReservationEvent
+  myReservationsEvent(level: String): ReservationsEvent
+  reservations(identifier: ID!): ReservationsEvent
+  provisionEvent(level: String, reference: ID!): ProvisionEvent
+  myProvisionsEvent(level: String): ProvisionsEvent
+  agentsEvent(level: String): AgentEvent
+  nodesEvent(level: String): NodeEvent
+  nodeEvent(id: ID!): Node
+  waiter(level: String): WaiterEvent
+  todos(identifier: ID!): TodoEvent
+}
+
+type Template {
+  id: ID!
+  node: Node!
+  registry: Registry!
+  name: String!
+  extensions: [String]
+  policy: GenericScalar
+  params: TemplateParams
+  creator: LokUser
+  version: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  provisions(status: [ProvisionStatusInput]): [Provision]
+  reservations: [Reservation!]!
+}
+
+type TemplateParams {
+  maximumInstances: Int
+}
+
+type TodoEvent {
+  update: Assignation
+  delete: ID
+  create: Assignation
+}
+
+type Transcript {
+  wards: [WardSettings]
+  extensions: GenericScalar
+  point: PointSettings
+  postman: PostmanSettings
+  timestamp: DateTime
+  structures: [Structure]
+}
+
+scalar UUID
+
+type Unprovide {
+  reference: String
+}
+
+type UpdateMirrorReturn {
+  id: String
+}
+
+type Waiter {
+  id: ID!
+  installedAt: DateTime!
+  name: String!
+  identifier: String!
+  unique: String!
+  status: WaiterStatus!
+  registry: Registry
+  reservations: [Reservation!]!
+  assignations: [Assignation!]!
+}
+
+type WaiterEvent {
+  created: Waiter
+  deleted: ID
+  updated: Waiter
+}
+
+enum WaiterStatus {
+  ACTIVE
+  DISCONNECTED
+  VANILLA
+}
+
+type WardSettings {
+  type: WardTypes
+  needsNegotiation: Boolean
+  host: String
+  port: Int
+  distinct: String
+}
+
+enum WardTypes {
+  GRAPHQL
+  REST
+}
+
+interface Widget {
+  type: String
+  dependencies: [String]
+}
+
+input WidgetInput {
+  typename: String!
+  query: String
+  dependencies: [String]
+  max: Int
+  min: Int
+  placeholder: String
+}

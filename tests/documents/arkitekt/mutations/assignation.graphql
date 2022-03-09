@@ -1,0 +1,15 @@
+mutation assign(
+  $reservation: ID!
+  $args: [GenericScalar]!
+  $kwargs: GenericScalar
+) {
+  assign(reservation: $reservation, args: $args, kwargs: $kwargs) {
+    ...Assignation
+  }
+}
+
+mutation unassign($assignation: ID!) {
+  unassign(assignation: $assignation) {
+    ...Assignation
+  }
+}

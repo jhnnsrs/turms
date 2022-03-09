@@ -1,0 +1,10 @@
+query get_agent($id: ID!) {
+  agent(id: $id) {
+    registry {
+      id
+      name
+    }
+    name
+    identifier
+  }
+}

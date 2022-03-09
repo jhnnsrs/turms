@@ -4,8 +4,8 @@ from typing import Callable, List, Optional
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from turms.parser.recurse import recurse_annotation, type_field_node
-from turms.plugins.base import Plugin
-from pydantic import BaseModel
+from turms.plugins.base import Plugin, PluginConfig
+from pydantic import BaseModel, BaseSettings
 from graphql.language.ast import FragmentDefinitionNode
 from turms.registry import ClassRegistry
 from turms.utils import (
@@ -36,7 +36,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class FragmentsPluginConfig(BaseModel):
+class FragmentsPluginConfig(PluginConfig):
     fragment_bases: List[str] = None
     fragments_glob: Optional[str]
 
@@ -189,7 +189,7 @@ def generate_fragment(
                 tree.append(cls)
                 union_class_names.append(inline_name)
 
-        if not config.allways_resolve_interfaces:
+        if not config.always_resolve_interfaces:
             union_class_names.append(base_fragment_name)
 
         registry.register_fragment_document(f.name.value, language.print_ast(f))

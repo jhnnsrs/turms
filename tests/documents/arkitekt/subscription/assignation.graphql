@@ -1,0 +1,11 @@
+subscription todos($identifier: ID!) {
+  todos(identifier: $identifier) {
+    create {
+      ...Assignation
+    }
+    update {
+      ...Assignation
+    }
+    delete
+  }
+}

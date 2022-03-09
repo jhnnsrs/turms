@@ -12,13 +12,6 @@ class IsortProcessor(Processor):
         self.plugin_config = config or IsortProcessorConfig(**data)
 
     def run(self, gen_file: str):
-        try:
-            import isort
+        import isort
 
-            return isort.code(gen_file)
-        except Exception as e:
-            get_console().log(
-                "Wasn't able to use the Blackprocessor. Please Make sure to install black."
-            )
-
-        return gen_file
+        return isort.code(gen_file)

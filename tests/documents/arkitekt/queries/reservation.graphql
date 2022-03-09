@@ -1,0 +1,37 @@
+query get_reservation($reference: ID!) {
+  reservation(reference: $reference) {
+    id
+    template {
+      id
+      registry {
+        app {
+          id
+          name
+        }
+        user {
+          id
+          email
+        }
+      }
+    }
+    provisions {
+      id
+      status
+    }
+    title
+    status
+    id
+    reference
+    node {
+      id
+      type
+      name
+    }
+  }
+}
+
+query waitlist($appGroup: ID) {
+  waitlist(appGroup: $appGroup) {
+    ...Reservation
+  }
+}

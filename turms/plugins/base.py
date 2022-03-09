@@ -1,9 +1,16 @@
 from abc import abstractmethod
 import ast
-from typing import List
+from optparse import Option
+from typing import List, Optional
+
+from pydantic import BaseSettings
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from turms.registry import ClassRegistry
+
+
+class PluginConfig(BaseSettings):
+    type: Optional[str]
 
 
 class Plugin:

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "turms"
-version = "0.1.52-alpha.0"
+version = "0.1.54"
 description = "graphql-codegen powered by pydantic"
 authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
 license = "CC BY-NC 3.0"
@@ -12,8 +12,8 @@ python = "^3.9"
 rich = "^11.0.0"
 graphql-core = "^3.2.0"
 pydantic = "^1.9.0"
-PyYAML = "^6.0"
-black = { version = "^21.12b0", optional = true }
+PyYAML = ">=5.3.0"
+black = { version = "^22.1.0", optional = true }
 watchdog = {version = "^2.1.6", optional = true}
 astunparse = {version = "^1.6.3",python = ">=3.7,<3.9"}
 isort = { version ="^5.10.1", optional = true }

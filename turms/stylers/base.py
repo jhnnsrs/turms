@@ -55,3 +55,6 @@ class BaseStyler(Styler):
 
     def style_input_name(self, name: str) -> str:
         return name
+
+    def style_subscription_name(self, name: str) -> str:
+        return name
