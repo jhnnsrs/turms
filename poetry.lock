@@ -64,7 +64,7 @@ name = "black"
 version = "22.1.0"
 description = "The uncompromising code formatter."
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6.2"
 
 [package.dependencies]
@@ -97,7 +97,7 @@ name = "click"
 version = "8.0.4"
 description = "Composable command line interface toolkit"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
@@ -193,7 +193,7 @@ name = "isort"
 version = "5.10.1"
 description = "A Python utility / library to sort Python imports."
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6.1,<4.0"
 
 [package.extras]
@@ -215,7 +215,7 @@ name = "mypy-extensions"
 version = "0.4.3"
 description = "Experimental type system extensions for programs checked with the mypy typechecker."
 category = "main"
-optional = true
+optional = false
 python-versions = "*"
 
 [[package]]
@@ -234,7 +234,7 @@ name = "pathspec"
 version = "0.9.0"
 description = "Utility library for gitignore style pattern matching of file paths."
 category = "main"
-optional = true
+optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7"
 
 [[package]]
@@ -478,7 +478,7 @@ watch = ["watchdog"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "7368bd0701441780655739e48a2f547572f642699bd2af157605e324c0724d43"
+content-hash = "c393962cbcb9495a8b90c06c0596f8e661db224ab83db49d0a7f8c9661906045"
 
 [metadata.files]
 aiohttp = [

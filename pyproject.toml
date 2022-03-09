@@ -23,6 +23,8 @@ pytest = "^6.2.5"
 pytest-aiohttp = "^0.3.0"
 pytest-cov = "^3.0.0"
 tox = "^3.24.5"
+isort = "^5.10.1"
+black = "^22.1.0"
 
 
 [tool.poetry.extras]
