@@ -96,7 +96,6 @@ def gen(filepath: str, project=None):
                 schema,
                 plugins=plugins,
                 stylers=stylers,
-                processors=processors,
             )
 
             md = ast.Module(body=generated_ast, type_ignores=[])
