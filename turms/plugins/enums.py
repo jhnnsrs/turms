@@ -1,11 +1,11 @@
-from turms.plugins.base import Plugin
+from turms.plugins.base import Plugin, PluginConfig
 from abc import abstractmethod
 import ast
 from typing import List, Optional
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from turms.plugins.base import Plugin
-from pydantic import BaseModel
+from pydantic import BaseModel, BaseSettings
 from graphql.type.definition import (
     GraphQLEnumType,
 )
@@ -18,7 +18,7 @@ class EnumsPluginsError(Exception):
     pass
 
 
-class EnumsPluginConfig(BaseModel):
+class EnumsPluginConfig(PluginConfig):
     skip_underscore: bool = True
     prepend: str = ""
     append: str = ""

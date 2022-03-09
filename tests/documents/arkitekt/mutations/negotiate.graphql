@@ -1,0 +1,5 @@
+mutation negotiate {
+  negotiate {
+    ...Transcript
+  }
+}

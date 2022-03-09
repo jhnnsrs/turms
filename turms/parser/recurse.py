@@ -210,7 +210,7 @@ def recurse_annotation(
                 subtree.append(cls)
                 union_class_names.append(name)
 
-        if not config.allways_resolve_interfaces:
+        if not config.always_resolve_interfaces:
             union_class_names.append(mother_class_name)
 
         if len(union_class_names) > 1:

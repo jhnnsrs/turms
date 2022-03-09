@@ -1,9 +1,13 @@
-from graphql import get_introspection_query, parse, build_ast_schema
+from graphql import GraphQLSchema, get_introspection_query, parse, build_ast_schema
 from graphql.language.parser import parse
 from pydantic import AnyHttpUrl, NoneIsNotAllowedError
 from rich import get_console
 from turms.config import GeneratorConfig, GraphQLConfig
-from turms.helpers import import_string
+from turms.helpers import (
+    build_schema_from_glob,
+    build_schema_from_introspect_url,
+    import_string,
+)
 from turms.processor.base import Processor
 from turms.processor.black import BlackProcessor
 from turms.registry import ClassRegistry
@@ -19,15 +23,12 @@ import os
 from urllib import request
 from urllib.error import URLError
 import glob
+from .errors import GenerationError
 
 plugins: List[Plugin] = []
 
 processors: List[Processor] = []
 stylers: List[Styler] = []
-
-
-class GenerationError(Exception):
-    pass
 
 
 def gen(filepath: str, project=None):
@@ -45,40 +46,11 @@ def gen(filepath: str, project=None):
             config = GraphQLConfig(**project, domain=key)
 
             if isinstance(config.schema_url, AnyHttpUrl):
-                jdata = json.dumps({"query": get_introspection_query()}).encode("utf-8")
-                req = request.Request(config.schema_url, data=jdata)
-                req.add_header("Content-Type", "application/json")
-                req.add_header("Accept", "application/json")
-                if config.bearer_token:
-                    req.add_header("Authorization", f"Bearer {config.bearer_token}")
-
-                try:
-                    resp = request.urlopen(req)
-                    x = json.loads(resp.read().decode("utf-8"))
-                except Exception as e:
-                    raise GenerationError(
-                        f"Failed to fetch schema from {config.schema_url}"
-                    )
-                introspection = x["data"]
-                dsl = None
-            else:
-                schema_glob = glob.glob(config.schema_url, recursive=True)
-                dsl_string = ""
-                introspection_string = ""
-                for file in schema_glob:
-                    with open(file, "r") as f:
-                        if file.endswith(".graphql"):
-                            dsl_string += f.read()
-                        elif file.endswith(".json"):
-                            # not really necessary as json files are generally not splitable
-                            introspection_string += f.read
-
-                dsl = parse(dsl_string) if dsl_string != "" else None
-                introspection = (
-                    json.loads(introspection_string)
-                    if introspection_string != ""
-                    else None
+                schema = build_schema_from_introspect_url(
+                    config.schema_url, config.bearer_token
                 )
+            else:
+                schema = build_schema_from_glob(config.schema_url)
 
             turms_config = project["extensions"]["turms"]
 
@@ -121,11 +93,9 @@ def gen(filepath: str, project=None):
 
             generated_ast = generate_ast(
                 gen_config,
+                schema,
                 plugins=plugins,
                 stylers=stylers,
-                processors=processors,
-                introspection_query=introspection,
-                dsl=dsl,
             )
 
             md = ast.Module(body=generated_ast, type_ignores=[])
@@ -153,25 +123,17 @@ def gen(filepath: str, project=None):
 
 def generate_ast(
     config: GeneratorConfig,
-    introspection_query: Dict[str, str] = None,
-    dsl: any = None,
+    schema: GraphQLSchema,
     plugins=plugins,
     stylers=stylers,
-    processors=processors,
 ):
-    if introspection_query is not None:
-        client_schema = build_schema(introspection_query)
-    elif dsl is not None:
-        client_schema = build_ast_schema(dsl)
-    else:
-        raise GenerationError("Either introspection_query or dsl must be provided")
 
     global_tree = []
     registry = ClassRegistry(config, stylers)
 
     for plugin in plugins:
         try:
-            global_tree += plugin.generate_ast(client_schema, config, registry)
+            global_tree += plugin.generate_ast(schema, config, registry)
         except Exception as e:
             raise GenerationError(f"Plugin:{plugin} failed!") from e
 

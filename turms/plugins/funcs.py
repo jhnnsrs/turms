@@ -1,14 +1,14 @@
 from __future__ import annotations
 from abc import abstractmethod
 import ast
-from typing import List, Literal
+from typing import Any, List, Literal
 from attr import Attribute
 
 from graphql import FragmentSpreadNode, NamedTypeNode
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
-from turms.plugins.base import Plugin
-from pydantic import BaseModel
+from turms.plugins.base import Plugin, PluginConfig
+from pydantic import BaseModel, BaseSettings
 from graphql.language.ast import OperationDefinitionNode, OperationType
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
@@ -50,7 +50,7 @@ class Kwarg(BaseModel):
     key: str
     type: str
     description: str = "Specify that in turms.plugin.funcs.OperationsFuncPlugin"
-    default: str = None
+    default: Any = None
 
 
 class Arg(BaseModel):
@@ -67,7 +67,7 @@ class FunctionDefinition(BaseModel):
     use: str
 
 
-class OperationsFuncPluginConfig(BaseModel):
+class OperationsFuncPluginConfig(PluginConfig):
     funcs_glob: Optional[str]
     prepend_sync: str = ""
     prepend_async: str = "a"

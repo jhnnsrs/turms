@@ -7,13 +7,13 @@ from graphql import (
     GraphQLScalarType,
     GraphQLWrappingType,
 )
-from turms.plugins.base import Plugin
+from turms.plugins.base import Plugin, PluginConfig
 import ast
 from typing import List, Optional
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from turms.plugins.base import Plugin
-from pydantic import BaseModel
+from pydantic import BaseModel, BaseSettings
 from graphql.type.definition import (
     GraphQLEnumType,
 )
@@ -21,7 +21,7 @@ import keyword
 from turms.registry import ClassRegistry
 
 
-class InputsPluginConfig(BaseModel):
+class InputsPluginConfig(PluginConfig):
     inputtype_bases: List[str] = ["pydantic.BaseModel"]
     skip_underscore: bool = True
 

@@ -1,0 +1,34 @@
+query get_provision($reference: ID!) {
+  provision(reference: $reference) {
+    template {
+      id
+      node {
+        name
+      }
+      registry {
+        app {
+          name
+        }
+      }
+      extensions
+    }
+    bound {
+      registry {
+        id
+        name
+      }
+      name
+      identifier
+    }
+    reservations {
+      id
+      reference
+      creator {
+        username
+      }
+      app {
+        name
+      }
+    }
+  }
+}

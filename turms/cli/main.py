@@ -2,7 +2,8 @@ import argparse
 from enum import Enum
 import os
 from turms.run import gen
-from turms.compat.console import get_console
+from rich import get_console
+
 
 directory = os.getcwd()
 

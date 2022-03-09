@@ -25,6 +25,12 @@
     "titleBar.activeBackground": "#254812",
     "titleBar.activeForeground": "#F6FCF3"
   },
+
+  "files.exclude": {
+    "**/venv": true,
+    "**/__pycache__": true,
+    "**/.pytest_cache": true
+  },
   "python.testing.pytestArgs": [
     "tests"
   ],

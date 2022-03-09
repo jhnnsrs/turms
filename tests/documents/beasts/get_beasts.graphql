@@ -1,0 +1,10 @@
+fragment Beast on Beast {
+  commonName
+  taxClass
+}
+
+query get_beasts {
+  beasts {
+    ...Beast
+  }
+}

@@ -1,0 +1,17 @@
+query find(
+  $id: ID
+  $package: String
+  $interface: String
+  $template: ID
+  $q: QString
+) {
+  node(
+    id: $id
+    package: $package
+    interface: $interface
+    template: $template
+    q: $q
+  ) {
+    ...Node
+  }
+}

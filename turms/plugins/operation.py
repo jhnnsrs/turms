@@ -5,8 +5,8 @@ from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.language.ast import OperationDefinitionNode, OperationType
 from turms.parser.recurse import recurse_annotation
-from turms.plugins.base import Plugin
-from pydantic import BaseModel
+from turms.plugins.base import Plugin, PluginConfig
+from pydantic import BaseModel, BaseSettings
 from graphql.error.graphql_error import GraphQLError
 from graphql.error.syntax_error import GraphQLSyntaxError
 from graphql.language.ast import (
@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 fragment_searcher = re.compile(r"\.\.\.(?P<fragment>[a-zA-Z]*)")
 
 
-class OperationsPluginConfig(BaseModel):
+class OperationsPluginConfig(PluginConfig):
     query_bases: List[str] = None
     mutation_bases: List[str] = None
     subscription_bases: List[str] = None

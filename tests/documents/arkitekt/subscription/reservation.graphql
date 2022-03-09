@@ -1,0 +1,11 @@
+subscription waiter($identifier: ID!) {
+  reservations(identifier: $identifier) {
+    create {
+      ...Reservation
+    }
+    update {
+      ...Reservation
+    }
+    delete
+  }
+}

@@ -1,0 +1,27 @@
+mutation reserve(
+  $node: ID
+  $template: ID
+  $params: ReserveParamsInput
+  $title: String
+  $callbacks: [Callback]
+  $creator: ID
+  $appGroup: ID
+) {
+  reserve(
+    node: $node
+    template: $template
+    params: $params
+    title: $title
+    callbacks: $callbacks
+    creator: $creator
+    appGroup: $appGroup
+  ) {
+    ...Reservation
+  }
+}
+
+mutation unreserve($id: ID!) {
+  unreserve(id: $id) {
+    ...Reservation
+  }
+}

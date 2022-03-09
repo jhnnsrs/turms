@@ -1,0 +1,5 @@
+mutation reset_repository {
+  resetRepository {
+    ok
+  }
+}

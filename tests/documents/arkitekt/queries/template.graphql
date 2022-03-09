@@ -1,0 +1,5 @@
+query get_template($id: ID!) {
+  template(id: $id) {
+    ...Template
+  }
+}

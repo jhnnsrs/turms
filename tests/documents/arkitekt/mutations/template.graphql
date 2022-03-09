@@ -1,0 +1,15 @@
+mutation create_template(
+  $node: ID!
+  $params: GenericScalar
+  $extensions: [String]
+  $version: String
+) {
+  createTemplate(
+    node: $node
+    params: $params
+    extensions: $extensions
+    version: $version
+  ) {
+    ...Template
+  }
+}

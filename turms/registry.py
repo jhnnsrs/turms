@@ -5,7 +5,7 @@ from turms.config import GeneratorConfig
 from keyword import iskeyword
 from turms.errors import NoScalarEquivalentFound
 from turms.stylers.base import Styler
-from turms.compat.console import get_console
+from rich import get_console
 
 
 SCALAR_DEFAULTS = {
@@ -111,6 +111,9 @@ class ClassRegistry(object):
         return typename
 
     def register_import(self, name):
+        if name in ("bool", "str", "int", "float", "dict", "list", "tuple"):
+            return
+
         assert "." in name, "Please only register imports with a top level package"
         self._imports.add(name)
 

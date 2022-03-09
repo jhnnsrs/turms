@@ -1,15 +1,34 @@
 import ast
+
+import pytest
 from turms.config import GeneratorConfig
 from turms.run import gen, generate_ast
 from turms.compat.funcs import unparse
 from graphql.language import parse
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
+from turms.plugins.fragments import FragmentsPlugin
+from turms.plugins.operation import OperationsPlugin
 from turms.stylers.snake import SnakeNodeName
+from turms.stylers.capitalize import Capitalizer
+from turms.helpers import build_schema_from_glob
+from turms.processor.black import BlackProcessor
+from turms.processor.isort import IsortProcessor
 
 
-def test_config():
-    assert 1 == 1, "Test pytest"
+@pytest.fixture()
+def hello_world_schema():
+    return build_schema_from_glob("tests/schemas/helloworld.graphql")
+
+
+@pytest.fixture()
+def beast_schema():
+    return build_schema_from_glob("tests/schemas/beasts.graphql")
+
+
+@pytest.fixture()
+def arkitekt_schema():
+    return build_schema_from_glob("tests/schemas/arkitekt.graphql")
 
 
 def test_unparse():
@@ -23,30 +42,11 @@ class TestClass:
     unparse(x)
 
 
-def test_small():
-    schema = parse(
-        """type Query {
-        hello(orderBy: HelloWorldOrder! = ASC, filter: HelloWorldFilter,
-            first: Int, last: Int, before: String, after: String): [World!]!
-        }
+def test_small(hello_world_schema):
 
-        enum HelloWorldOrder {
-        ASC
-        DESC
-        }
-
-        input HelloWorldFilter {
-        search: String!
-        }
-
-        type World {
-        message: String!
-        }
-    """
-    )
     config = GeneratorConfig()
     generated_ast = generate_ast(
-        config, dsl=schema, plugins=[EnumsPlugin(), InputsPlugin()]
+        config, hello_world_schema, plugins=[EnumsPlugin(), InputsPlugin()]
     )
 
     md = ast.Module(body=generated_ast, type_ignores=[])
@@ -55,30 +55,11 @@ def test_small():
     assert "class HelloWorldOrder(str, Enum):" in generated, "EnumPlugin not working"
 
 
-def test_small():
-    schema = parse(
-        """type Query {
-        hello(orderBy: HelloWorldOrder! = ASC, filter: HelloWorldFilter,
-            first: Int, last: Int, before: String, after: String): [World!]!
-        }
+def test_small(hello_world_schema):
 
-        enum HelloWorldOrder {
-        ASC
-        DESC
-        }
-
-        input HelloWorldFilter {
-        searchMassimo: String!
-        }
-
-        type World {
-        message: String!
-        }
-    """
-    )
     config = GeneratorConfig()
     generated_ast = generate_ast(
-        config, dsl=schema, plugins=[EnumsPlugin(), InputsPlugin()]
+        config, hello_world_schema, plugins=[EnumsPlugin(), InputsPlugin()]
     )
 
     md = ast.Module(body=generated_ast, type_ignores=[])
@@ -87,31 +68,11 @@ def test_small():
     assert "class HelloWorldOrder(str, Enum):" in generated, "EnumPlugin not working"
 
 
-def test_snake_case_styler():
-    schema = parse(
-        """type Query {
-        hello(orderBy: HelloWorldOrder! = ASC, filter: HelloWorldFilter,
-            first: Int, last: Int, before: String, after: String): [World!]!
-        }
-
-        enum HelloWorldOrder {
-        ASC
-        DESC
-        }
-
-        input HelloWorldFilter {
-        searchMassimo: String!
-        }
-
-        type World {
-        message: String!
-        }
-    """
-    )
+def test_snake_case_styler(hello_world_schema):
     config = GeneratorConfig()
     generated_ast = generate_ast(
         config,
-        dsl=schema,
+        hello_world_schema,
         stylers=[SnakeNodeName()],
         plugins=[EnumsPlugin(), InputsPlugin()],
     )
@@ -123,3 +84,103 @@ def test_snake_case_styler():
     assert (
         """search_massimo: str = Field(alias='searchMassimo')""" in generated
     ), "Automated Field aliasing not working"
+
+
+def test_beast_styler(beast_schema):
+    config = GeneratorConfig()
+    generated_ast = generate_ast(
+        config,
+        beast_schema,
+        stylers=[SnakeNodeName()],
+        plugins=[EnumsPlugin(), InputsPlugin()],
+    )
+
+    md = ast.Module(body=generated_ast, type_ignores=[])
+    generated = unparse(ast.fix_missing_locations(md))
+    assert "from enum import Enum" in generated, "EnumPlugin not working"
+
+
+def test_beast_operations(beast_schema):
+    config = GeneratorConfig(documents="tests/documents/beasts/*.graphql")
+    generated_ast = generate_ast(
+        config,
+        beast_schema,
+        stylers=[Capitalizer()],
+        plugins=[EnumsPlugin(), InputsPlugin(), FragmentsPlugin(), OperationsPlugin()],
+    )
+
+    md = ast.Module(body=generated_ast, type_ignores=[])
+    generated = unparse(ast.fix_missing_locations(md))
+    print(generated)
+    assert "from enum import Enum" in generated, "EnumPlugin not working"
+    assert "class Get_beasts(BaseModel):" in generated, "OpertiationsPlugin not working"
+
+
+def test_beast_operations(beast_schema):
+    config = GeneratorConfig(documents="tests/documents/beasts/*.graphql")
+    generated_ast = generate_ast(
+        config,
+        beast_schema,
+        stylers=[Capitalizer(), SnakeNodeName()],
+        plugins=[EnumsPlugin(), InputsPlugin(), FragmentsPlugin(), OperationsPlugin()],
+    )
+
+    md = ast.Module(body=generated_ast, type_ignores=[])
+    generated = unparse(ast.fix_missing_locations(md))
+    print(generated)
+    assert "from enum import Enum" in generated, "EnumPlugin not working"
+    assert "class Get_beasts(BaseModel):" in generated, "OpertiationsPlugin not working"
+    assert "common_name: Optional[str]" in generated, "SnakeNodeName not working"
+
+
+def test_arkitekt_operations(arkitekt_schema):
+    config = GeneratorConfig(
+        documents="tests/documents/arkitekt/**/*.graphql",
+        scalar_definitions={
+            "uuid": "str",
+            "Callback": "str",
+            "Any": "typing.Any",
+            "QString": "str",
+        },
+    )
+    generated_ast = generate_ast(
+        config,
+        arkitekt_schema,
+        stylers=[Capitalizer(), SnakeNodeName()],
+        plugins=[EnumsPlugin(), InputsPlugin(), FragmentsPlugin(), OperationsPlugin()],
+    )
+
+    md = ast.Module(body=generated_ast, type_ignores=[])
+    generated = unparse(ast.fix_missing_locations(md))
+    print(generated)
+    assert "from enum import Enum" in generated, "EnumPlugin not working"
+    assert (
+        "class Create_template(BaseModel):" in generated
+    ), "OperationsPlugin not working"
+
+
+def test_black_complex(arkitekt_schema):
+    config = GeneratorConfig(
+        documents="tests/documents/arkitekt/**/*.graphql",
+        scalar_definitions={
+            "uuid": "str",
+            "Callback": "str",
+            "Any": "typing.Any",
+            "QString": "str",
+        },
+    )
+    generated_ast = generate_ast(
+        config,
+        arkitekt_schema,
+        stylers=[Capitalizer(), SnakeNodeName()],
+        plugins=[EnumsPlugin(), InputsPlugin(), FragmentsPlugin(), OperationsPlugin()],
+    )
+
+    md = ast.Module(body=generated_ast, type_ignores=[])
+    generated = unparse(ast.fix_missing_locations(md))
+
+    for processor in [
+        IsortProcessor(),
+        BlackProcessor(),
+    ]:
+        generated = processor.run(generated)

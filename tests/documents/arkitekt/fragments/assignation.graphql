@@ -1,0 +1,11 @@
+fragment Assignation on Assignation {
+  args
+  kwargs
+  id
+  parent {
+    id
+  }
+  id
+  status
+  statusmessage
+}
