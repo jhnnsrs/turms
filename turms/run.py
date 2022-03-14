@@ -12,6 +12,7 @@ from turms.processor.base import Processor
 from turms.processor.black import BlackProcessor
 from turms.registry import ClassRegistry
 from turms.stylers import Styler
+from turms.stylers.default import DefaultStyler
 from turms.utils import build_schema
 from turms.plugins.base import Plugin
 from turms.compat.funcs import unparse
@@ -57,6 +58,7 @@ def gen(filepath: str, project=None):
             gen_config = GeneratorConfig(
                 **turms_config, documents=project["documents"], domain=config.domain
             )
+
             plugins = []
             stylers = []
             processors = []
@@ -80,6 +82,9 @@ def gen(filepath: str, project=None):
                     styler_class = import_string(plugin_config["type"])
                     stylers.append(styler_class(**plugin_config))
                     get_console().print(f"Using Styler {styler_class}")
+
+            else:
+                stylers.append(DefaultStyler())
 
             if "processors" in turms_config:
                 proc_configs = turms_config["processors"]

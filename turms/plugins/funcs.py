@@ -116,15 +116,27 @@ def generate_sync_func_name(
 
 
 def get_input_type_annotation(
-    input_type: NamedTypeNode, config: GeneratorConfig, registry: ClassRegistry
+    input_type: NamedTypeNode,
+    config: GeneratorConfig,
+    registry: ClassRegistry,
+    optional=True,
 ):
 
     if isinstance(input_type, NamedTypeNode):
-
         try:
             type_name = registry.get_scalar_equivalent(input_type.name.value)
         except NoScalarEquivalentFound as e:
             type_name = registry.get_inputtype_class(input_type.name.value)
+
+        if optional:
+            registry.register_import("typing.Optional")
+            return ast.Subscript(
+                value=ast.Name(id="Optional", ctx=ast.Load()),
+                slice=ast.Name(
+                    id=type_name,
+                    ctx=ast.Load(),
+                ),
+            )
 
         return ast.Name(
             id=type_name,
@@ -133,16 +145,24 @@ def get_input_type_annotation(
 
     elif isinstance(input_type, ListTypeNode):
         registry.register_import("typing.List")
+
+        if optional:
+            registry.register_import("typing.Optional")
+            return ast.Subscript(
+                value=ast.Name(id="Optional", ctx=ast.Load()),
+                slice=ast.Subscript(
+                    value=ast.Name(id="List", ctx=ast.Load()),
+                    slice=get_input_type_annotation(input_type.type, config, registry),
+                ),
+            )
         return ast.Subscript(
             value=ast.Name(id="List", ctx=ast.Load()),
             slice=get_input_type_annotation(input_type.type, config, registry),
         )
 
     elif isinstance(input_type, NonNullTypeNode):
-        registry.register_import("typing.Optioanl")
-        return ast.Subscript(
-            value=ast.Name(id="Optional", ctx=ast.Load()),
-            slice=get_input_type_annotation(input_type.type, config, registry),
+        return get_input_type_annotation(
+            input_type.type, config, registry, optional=False
         )
 
     raise NotImplementedError()
@@ -333,14 +353,22 @@ def recurse_variable_annotation(
 
     if isinstance(v.type, NamedTypeNode):
         try:
-            return registry.get_scalar_equivalent(v.type.name.value)
+            x = registry.get_scalar_equivalent(v.type.name.value)
         except NoScalarEquivalentFound as e:
-            return registry.get_inputtype_class(v.type.name.value)
+            x = registry.get_inputtype_class(v.type.name.value)
+        if optional:
+            return "Optional[" + x + "]"
+        else:
+            return x
 
     elif isinstance(v.type, NonNullTypeNode):
-        return "Optional[" + recurse_variable_annotation(v.type, registry) + "]"
+        return recurse_variable_annotation(v.type, registry, optional=False)
 
     elif isinstance(v.type, ListTypeNode):
+        if optional:
+            return (
+                "Optional[List[" + recurse_variable_annotation(v.type, registry) + "]]"
+            )
         return "List[" + recurse_variable_annotation(v.type, registry) + "]"
 
     raise NotImplementedError()
