@@ -25,6 +25,9 @@ class InputsPluginConfig(PluginConfig):
     inputtype_bases: List[str] = ["pydantic.BaseModel"]
     skip_underscore: bool = True
 
+    class Config:
+        env_prefix = "TURMS_PLUGINS_INPUTS_"
+
 
 def generate_input_annotation(
     type: GraphQLInputType,

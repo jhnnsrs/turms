@@ -18,6 +18,7 @@ class GeneratorConfig(BaseSettings):
     extensions: Dict = {}
 
     class Config:
+        env_prefix = "TURMS_"
         extra = "allow"
 
 
@@ -28,4 +29,5 @@ class GraphQLConfig(BaseSettings):
     domain: str = "default"
 
     class Config:
+        env_prefix = "TURMS_GRAPHQL_"
         extra = "allow"

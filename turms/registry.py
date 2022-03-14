@@ -65,6 +65,15 @@ class ClassRegistry(object):
 
         return node_name
 
+    def generate_parameter_name(self, node_name: str):
+        for styler in self.stylers:
+            node_name = styler.style_parameter_name(node_name)
+
+        if iskeyword(node_name):
+            return node_name + "_"
+
+        return node_name
+
     def generate_fragment_classname(self, typename: str):
         for styler in self.stylers:
             typename = styler.style_fragment_name(typename)

@@ -1,0 +1,5 @@
+mutation createBeast($nested: [[String!]!], $nonOptionalParameter: String!) {
+  createBeast(nested: $nested, nonOptionalParameter: $nonOptionalParameter) {
+    binomial
+  }
+}

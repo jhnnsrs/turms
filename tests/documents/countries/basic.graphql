@@ -1,0 +1,7 @@
+# Write your query or mutation here
+query Countries {
+  countries {
+    phone
+    capital
+  }
+}

@@ -40,6 +40,9 @@ class FragmentsPluginConfig(PluginConfig):
     fragment_bases: List[str] = None
     fragments_glob: Optional[str]
 
+    class Config:
+        env_prefix = "TURMS_PLUGINS_FRAGMENTS_"
+
 
 def get_fragment_bases(
     config: GeneratorConfig,
@@ -75,7 +78,6 @@ def generate_fragment(
     tree = []
     fields = []
     type = client_schema.get_type(f.type_condition.name.value)
-
     name = registry.generate_fragment_classname(f.name.value)
 
     if isinstance(type, GraphQLInterfaceType):
@@ -236,12 +238,6 @@ def generate_fragment(
 
         field_definition = get_field_def(client_schema, type, field)
         assert field_definition, "Couldn't find field definition"
-
-        target = (
-            field.alias.value
-            if hasattr(field, "alias") and field.alias
-            else field.name.value
-        )
 
         fields += type_field_node(
             field,

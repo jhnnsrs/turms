@@ -1,0 +1,41 @@
+type Beast {
+  "ID of beast (taken from binomial initial)"
+  id: ID
+  "number of legs beast has"
+  legs: Int
+  "a beast's name in Latin"
+  binomial: String
+  "a beast's name to you and I"
+  commonName: String
+  "taxonomy grouping"
+  taxClass: String
+  "a beast's prey"
+  eats: [Beast]
+  "a beast's predators"
+  isEatenBy: [Beast]
+}
+
+type Query {
+  beasts: [Beast]
+  beast(id: ID!): Beast
+  calledBy(commonName: String!): [Beast]
+}
+
+type Mutation {
+  "Genrates a best which is nice"
+  createBeast(
+    nested: [[String!]!]
+    optional_parameter: String
+    nonOptionalParameter: String!
+  ): Beast
+
+  createIntBeast(
+    nested: [[String!]!]
+    optional_parameter: String
+    nonOptionalParameter: Int!
+  ): Beast
+}
+
+type Subscription {
+  watchBeast(id: ID!): Beast
+}
