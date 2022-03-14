@@ -1,0 +1,17 @@
+mutation createBeast(
+  $nested: [[String!]!]
+  $nonOptionalParameter: String! = "999"
+) {
+  createBeast(nested: $nested, nonOptionalParameter: $nonOptionalParameter) {
+    binomial
+  }
+}
+
+mutation createIntBeast(
+  $nested: [[String!]!]
+  $nonOptionalParameter: Int! = 999
+) {
+  createIntBeast(nested: $nested, nonOptionalParameter: $nonOptionalParameter) {
+    binomial
+  }
+}

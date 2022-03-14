@@ -4,7 +4,7 @@ from typing import List, Optional
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.language.ast import OperationDefinitionNode, OperationType
-from turms.parser.recurse import recurse_annotation
+from turms.parser.recurse import recurse_annotation, type_field_node
 from turms.plugins.base import Plugin, PluginConfig
 from pydantic import BaseModel, BaseSettings
 from graphql.error.graphql_error import GraphQLError
@@ -139,7 +139,7 @@ def get_subscription_bases(
             ]
 
 
-def generate_query(
+def generate_operation(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
@@ -149,9 +149,18 @@ def generate_query(
 
     tree = []
 
+    if o.operation == OperationType.MUTATION:
+        class_name = registry.generate_mutation_classname(o.name.value)
+        extra_bases = get_mutation_bases(config, plugin_config, registry)
+    if o.operation == OperationType.SUBSCRIPTION:
+        class_name = registry.generate_subscription_classname(o.name.value)
+        extra_bases = get_subscription_bases(config, plugin_config, registry)
+    if o.operation == OperationType.QUERY:
+        class_name = registry.generate_query_classname(o.name.value)
+        extra_bases = get_query_bases(config, plugin_config, registry)
+
     x = get_operation_root_type(client_schema, o)
-    query_fields = []
-    name = registry.generate_query_classname(o.name.value)
+    operation_fields = []
 
     for field_node in o.selection_set.selections:
 
@@ -159,26 +168,16 @@ def generate_query(
         field_definition = get_field_def(client_schema, x, field_node)
         assert field_definition, "Couldn't find field definition"
 
-        target = (
-            field_node.alias.value
-            if hasattr(field_node, "alias") and field_node.alias
-            else field_node.name.value
-        )
-
-        query_fields += [
-            ast.AnnAssign(
-                target=ast.Name(target, ctx=ast.Store()),
-                annotation=recurse_annotation(
-                    field_node,
-                    field_definition.type,
-                    client_schema,
-                    config,
-                    tree,
-                    registry,
-                    parent_name=name,
-                ),
-                simple=1,
-            )
+        operation_fields += [
+            type_field_node(
+                field_node,
+                field_definition,
+                client_schema,
+                config,
+                tree,
+                registry,
+                parent_name=class_name,
+            ),
         ]
 
     query_document = language.print_ast(o)
@@ -186,7 +185,7 @@ def generate_query(
 
     merged_document = replace_iteratively(query_document, registry)
 
-    query_fields += [
+    operation_fields += [
         ast.ClassDef(
             "Meta",
             bases=[],
@@ -207,169 +206,11 @@ def generate_query(
 
     tree.append(
         ast.ClassDef(
-            name,
-            bases=get_query_bases(config, plugin_config, registry),
+            class_name,
+            bases=extra_bases,
             decorator_list=[],
             keywords=[],
-            body=query_fields + generate_config_class(config),
-        )
-    )
-
-    return tree
-
-
-def generate_mutation(
-    o: OperationDefinitionNode,
-    client_schema: GraphQLSchema,
-    config: GeneratorConfig,
-    plugin_config: OperationsPluginConfig,
-    registry: ClassRegistry,
-):
-
-    tree = []
-
-    x = get_operation_root_type(client_schema, o)
-    query_fields = []
-    name = registry.generate_mutation_classname(o.name.value)
-
-    for field_node in o.selection_set.selections:
-
-        field_node: FieldNode = field_node
-        field_definition = get_field_def(client_schema, x, field_node)
-        assert field_definition, "Couldn't find field definition"
-
-        target = (
-            field_node.alias.value
-            if hasattr(field_node, "alias") and field_node.alias
-            else field_node.name.value
-        )
-
-        query_fields += [
-            ast.AnnAssign(
-                target=ast.Name(target, ctx=ast.Store()),
-                annotation=recurse_annotation(
-                    field_node,
-                    field_definition.type,
-                    client_schema,
-                    config,
-                    tree,
-                    registry,
-                    parent_name=name,
-                ),
-                simple=1,
-            )
-        ]
-
-    query_document = language.print_ast(o)
-    z = fragment_searcher.findall(query_document)
-
-    merged_document = replace_iteratively(query_document, registry)
-
-    query_fields += [
-        ast.ClassDef(
-            "Meta",
-            bases=[],
-            decorator_list=[],
-            keywords=[],
-            body=[
-                ast.Assign(
-                    targets=[ast.Name(id="domain", ctx=ast.Store())],
-                    value=ast.Constant(value=str(config.domain)),
-                ),
-                ast.Assign(
-                    targets=[ast.Name(id="document", ctx=ast.Store())],
-                    value=ast.Constant(value=merged_document),
-                ),
-            ],
-        )
-    ]
-
-    tree.append(
-        ast.ClassDef(
-            name,
-            bases=get_mutation_bases(config, plugin_config, registry),
-            decorator_list=[],
-            keywords=[],
-            body=query_fields + generate_config_class(config),
-        )
-    )
-
-    return tree
-
-
-def generate_subscription(
-    o: OperationDefinitionNode,
-    client_schema: GraphQLSchema,
-    config: GeneratorConfig,
-    plugin_config: OperationsPluginConfig,
-    registry: ClassRegistry,
-):
-
-    tree = []
-
-    x = get_operation_root_type(client_schema, o)
-    query_fields = []
-    name = registry.generate_subscription_classname(o.name.value)
-
-    for field_node in o.selection_set.selections:
-
-        field_node: FieldNode = field_node
-        field_definition = get_field_def(client_schema, x, field_node)
-        assert field_definition, "Couldn't find field definition"
-
-        target = (
-            field_node.alias.value
-            if hasattr(field_node, "alias") and field_node.alias
-            else field_node.name.value
-        )
-
-        query_fields += [
-            ast.AnnAssign(
-                target=ast.Name(target, ctx=ast.Store()),
-                annotation=recurse_annotation(
-                    field_node,
-                    field_definition.type,
-                    client_schema,
-                    config,
-                    tree,
-                    registry,
-                    parent_name=name,
-                ),
-                simple=1,
-            )
-        ]
-
-    query_document = language.print_ast(o)
-    z = fragment_searcher.findall(query_document)
-
-    merged_document = replace_iteratively(query_document, registry)
-
-    query_fields += [
-        ast.ClassDef(
-            "Meta",
-            bases=[],
-            decorator_list=[],
-            keywords=[],
-            body=[
-                ast.Assign(
-                    targets=[ast.Name(id="domain", ctx=ast.Store())],
-                    value=ast.Constant(value=str(config.domain)),
-                ),
-                ast.Assign(
-                    targets=[ast.Name(id="document", ctx=ast.Store())],
-                    value=ast.Constant(value=merged_document),
-                ),
-            ],
-        )
-    ]
-
-    tree.append(
-        ast.ClassDef(
-            name,
-            bases=get_subscription_bases(config, plugin_config, registry),
-            decorator_list=[],
-            keywords=[],
-            body=query_fields + generate_config_class(config),
+            body=operation_fields + generate_config_class(config),
         )
     )
 
@@ -379,28 +220,6 @@ def generate_subscription(
 class OperationsPlugin(Plugin):
     def __init__(self, config=None, **data):
         self.plugin_config = config or OperationsPluginConfig(**data)
-
-    def generate_imports(
-        self, config: GeneratorConfig, client_schema: GraphQLSchema
-    ) -> List[ast.AST]:
-        imports = []
-
-        all_bases = (
-            self.plugin_config.query_bases
-            + self.plugin_config.mutation_bases
-            + self.plugin_config.subscription_bases
-        )
-
-        for item in all_bases:
-            imports.append(
-                ast.ImportFrom(
-                    module=".".join(item.split(".")[:-1]),
-                    names=[ast.alias(name=item.split(".")[-1])],
-                    level=0,
-                )
-            )
-
-        return imports
 
     def generate_ast(
         self,
@@ -425,17 +244,8 @@ class OperationsPlugin(Plugin):
         ]
 
         for operation in operations:
-            if operation.operation == OperationType.QUERY:
-                plugin_tree += generate_query(
-                    operation, client_schema, config, self.plugin_config, registry
-                )
-            if operation.operation == OperationType.MUTATION:
-                plugin_tree += generate_mutation(
-                    operation, client_schema, config, self.plugin_config, registry
-                )
-            if operation.operation == OperationType.SUBSCRIPTION:
-                plugin_tree += generate_subscription(
-                    operation, client_schema, config, self.plugin_config, registry
-                )
+            plugin_tree += generate_operation(
+                operation, client_schema, config, self.plugin_config, registry
+            )
 
         return plugin_tree

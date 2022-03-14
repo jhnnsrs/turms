@@ -10,3 +10,6 @@ def camel_to_snake(name):
 class SnakeNodeName(BaseStyler):
     def style_node_name(self, name: str) -> str:
         return camel_to_snake(name)
+
+    def style_parameter_name(self, name: str) -> str:
+        return camel_to_snake(name)

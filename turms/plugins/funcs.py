@@ -4,7 +4,17 @@ import ast
 from typing import Any, List, Literal
 from attr import Attribute
 
-from graphql import FragmentSpreadNode, NamedTypeNode
+from graphql import (
+    BooleanValueNode,
+    FloatValueNode,
+    FragmentSpreadNode,
+    IntValueNode,
+    NamedTypeNode,
+    NullValueNode,
+    StringValueNode,
+    ValueNode,
+    VariableDefinitionNode,
+)
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from turms.plugins.base import Plugin, PluginConfig
@@ -128,6 +138,13 @@ def get_input_type_annotation(
             slice=get_input_type_annotation(input_type.type, config, registry),
         )
 
+    elif isinstance(input_type, NonNullTypeNode):
+        registry.register_import("typing.Optioanl")
+        return ast.Subscript(
+            value=ast.Name(id="Optional", ctx=ast.Load()),
+            slice=get_input_type_annotation(input_type.type, config, registry),
+        )
+
     raise NotImplementedError()
 
 
@@ -186,6 +203,21 @@ def get_extra_kwargs_for_onode(
     return kwargs + definition.extra_kwargs
 
 
+def parse_value_node(x: ValueNode):
+    if isinstance(x, IntValueNode):
+        return int(x.value)
+    elif isinstance(x, FloatValueNode):
+        return float(x.value)
+    elif isinstance(x, StringValueNode):
+        return x.value
+    elif isinstance(x, BooleanValueNode):
+        return x.value == "true"
+    elif isinstance(x, NullValueNode):
+        return None
+    else:
+        raise NotImplementedError(f"cannot parse {x}")
+
+
 def get_definitions_for_onode(
     o: OperationDefinitionNode,
     plugin_config: OperationsFuncPluginConfig,
@@ -224,10 +256,10 @@ def generate_query_args(
         )
 
     for v in o.variable_definitions:
-        if isinstance(v.type, NonNullTypeNode):
+        if isinstance(v.type, NonNullTypeNode) and not v.default_value:
             pos_args.append(
                 ast.arg(
-                    arg=v.variable.name.value,
+                    arg=registry.generate_parameter_name(v.variable.name.value),
                     annotation=get_input_type_annotation(v.type.type, config, registry),
                 )
             )
@@ -236,14 +268,18 @@ def generate_query_args(
     kw_values = []
 
     for v in o.variable_definitions:
-        if not isinstance(v.type, NonNullTypeNode):
+        if not isinstance(v.type, NonNullTypeNode) or v.default_value:
             kw_args.append(
                 ast.arg(
-                    arg=v.variable.name.value,
+                    arg=registry.generate_parameter_name(v.variable.name.value),
                     annotation=get_input_type_annotation(v.type, config, registry),
                 )
             )
-            kw_values.append(ast.Constant(value=None))
+            kw_values.append(
+                ast.Constant(
+                    value=parse_value_node(v.default_value) if v.default_value else None
+                )
+            )
 
     extra_kwargs = get_extra_kwargs_for_onode(definition, plugin_config)
 
@@ -269,22 +305,19 @@ def generate_query_args(
     )
 
 
-def generate_query_dict(
-    o: OperationDefinitionNode,
-):
+def generate_query_dict(o: OperationDefinitionNode, registry: ClassRegistry):
 
     keys = []
     values = []
 
     for v in o.variable_definitions:
-        if isinstance(v.type, NonNullTypeNode):
-            keys.append(ast.Constant(value=v.variable.name.value))
-            values.append(ast.Name(id=v.variable.name.value, ctx=ast.Load()))
-
-    for v in o.variable_definitions:
-        if not isinstance(v.type, NonNullTypeNode):
-            keys.append(ast.Constant(value=v.variable.name.value))
-            values.append(ast.Name(id=v.variable.name.value, ctx=ast.Load()))
+        keys.append(ast.Constant(value=v.variable.name.value))
+        values.append(
+            ast.Name(
+                id=registry.generate_parameter_name(v.variable.name.value),
+                ctx=ast.Load(),
+            )
+        )
 
     return ast.Dict(keys=keys, values=values)
 
@@ -292,6 +325,25 @@ def generate_query_dict(
 def generate_document_arg(o_name):
 
     return ast.Name(id=o_name, ctx=ast.Load())
+
+
+def recurse_variable_annotation(
+    v: VariableDefinitionNode, registry: ClassRegistry, optional=True
+):
+
+    if isinstance(v.type, NamedTypeNode):
+        try:
+            return registry.get_scalar_equivalent(v.type.name.value)
+        except NoScalarEquivalentFound as e:
+            return registry.get_inputtype_class(v.type.name.value)
+
+    elif isinstance(v.type, NonNullTypeNode):
+        return "Optional[" + recurse_variable_annotation(v.type, registry) + "]"
+
+    elif isinstance(v.type, ListTypeNode):
+        return "List[" + recurse_variable_annotation(v.type, registry) + "]"
+
+    raise NotImplementedError()
 
 
 def generate_query_doc(
@@ -372,25 +424,21 @@ def generate_query_doc(
         description += f"    {arg.key} ({arg.type}): {arg.description}\n"
 
     for v in o.variable_definitions:
-        if isinstance(v.type, NonNullTypeNode):
-            if isinstance(v.type.type, ListTypeNode):
-                description += f"    {v.variable.name.value} (List[{v.type.type.type.name.value}]): {v.type.type.type.name.value}\n"
-            else:
-                description += f"    {v.variable.name.value} ({v.type.type.name.value}): {v.type.type.name.value}\n"
+        if isinstance(v.type, NonNullTypeNode) and not v.default_value:
+            description += f"    {registry.generate_parameter_name(v.variable.name.value)} ({recurse_variable_annotation(v, registry)}): {v.variable.name.value}\n"
 
     for v in o.variable_definitions:
-        if not isinstance(v.type, NonNullTypeNode):
-            if isinstance(v.type, ListTypeNode):
-                description += f"    {v.variable.name.value} (List[{v.type.type.name.value}], Optional): {v.type.type.name.value}\n"
-            else:
-                description += f"    {v.variable.name.value} ({v.type.name.value}, Optional): {v.type.name.value}\n"
+        if not isinstance(v.type, NonNullTypeNode) or v.default_value:
+            description += f"    {registry.generate_parameter_name(v.variable.name.value)} ({recurse_variable_annotation(v, registry)}, optional): {v.variable.name.value}. {'' if not v.default_value else  'Defaults to ' + str(v.default_value.value)}\n"
 
     extra_kwargs = get_extra_kwargs_for_onode(definition, plugin_config)
     for kwarg in extra_kwargs:
-        description += f"    {kwarg.key} ({kwarg.type}): {kwarg.description}\n"
+        description += (
+            f"    {kwarg.key} ({kwarg.type}, optional): {kwarg.description}\n"
+        )
 
     description += "\nReturns:\n"
-    description += f"    {return_type}: The returned Mutation\n"
+    description += f"    {return_type}"
 
     return ast.Expr(value=ast.Constant(value=description))
 
@@ -422,9 +470,7 @@ def genereate_async_call(
                     )
                     + [
                         generate_document_arg(o_name),
-                        generate_query_dict(
-                            o,
-                        ),
+                        generate_query_dict(o, registry),
                     ],
                 )
             )
@@ -447,13 +493,13 @@ def genereate_async_call(
                         )
                         + [
                             generate_document_arg(o_name),
-                            generate_query_dict(
-                                o,
-                            ),
+                            generate_query_dict(o, registry),
                         ],
                     )
                 ),
-                attr=o.selection_set.selections[0].name.value,
+                attr=registry.generate_node_name(
+                    o.selection_set.selections[0].name.value
+                ),
                 ctx=ast.Load(),
             )
         )
@@ -483,9 +529,7 @@ def genereate_sync_call(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o_name),
-                    generate_query_dict(
-                        o,
-                    ),
+                    generate_query_dict(o, registry),
                 ],
             )
         )
@@ -505,12 +549,12 @@ def genereate_sync_call(
                     )
                     + [
                         generate_document_arg(o_name),
-                        generate_query_dict(
-                            o,
-                        ),
+                        generate_query_dict(o, registry),
                     ],
                 ),
-                attr=o.selection_set.selections[0].name.value,
+                attr=registry.generate_node_name(
+                    o.selection_set.selections[0].name.value
+                ),
                 ctx=ast.Load(),
             )
         )
@@ -541,9 +585,7 @@ def genereate_async_iterator(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o_name),
-                    generate_query_dict(
-                        o,
-                    ),
+                    generate_query_dict(o, registry),
                 ],
             ),
             body=[
@@ -565,9 +607,7 @@ def genereate_async_iterator(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o_name),
-                    generate_query_dict(
-                        o,
-                    ),
+                    generate_query_dict(o, registry),
                 ],
             ),
             body=[
@@ -576,7 +616,9 @@ def genereate_async_iterator(
                         value=ast.Attribute(
                             value=ast.Name(id="event", ctx=ast.Load()),
                             ctx=ast.Load(),
-                            attr=o.selection_set.selections[0].name.value,
+                            attr=registry.generate_node_name(
+                                o.selection_set.selections[0].name.value
+                            ),
                         )
                     )
                 ),
@@ -610,9 +652,7 @@ def genereate_sync_iterator(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o_name),
-                    generate_query_dict(
-                        o,
-                    ),
+                    generate_query_dict(o, registry),
                 ],
             ),
             body=[
@@ -634,9 +674,7 @@ def genereate_sync_iterator(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o_name),
-                    generate_query_dict(
-                        o,
-                    ),
+                    generate_query_dict(o, registry),
                 ],
             ),
             body=[
@@ -645,7 +683,9 @@ def genereate_sync_iterator(
                         value=ast.Attribute(
                             value=ast.Name(id="event", ctx=ast.Load()),
                             ctx=ast.Load(),
-                            attr=o.selection_set.selections[0].name.value,
+                            attr=registry.generate_node_name(
+                                o.selection_set.selections[0].name.value
+                            ),
                         )
                     )
                 ),

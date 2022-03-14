@@ -1,7 +1,7 @@
 projects:
   default:
-    schema: http://api.spacex.land/graphql/
-    documents: graphql/**.graphql
+    schema: tests/schemas/nested_inputs.graphql
+    documents: tests/documents/inputs_default/*.graphql
     extensions:
       turms:
         out_dir: examples/api
@@ -14,6 +14,26 @@ projects:
           - type: turms.plugins.fragments.FragmentsPlugin
           - type: turms.plugins.operation.OperationsPlugin
           - type: turms.plugins.funcs.OperationsFuncPlugin
+            global_kwargs:
+              - type: arkitekt.rath.ArkitektRath
+                key: rath
+                description: "The arkitekt rath client"
+            definitions:
+              - type: subscription
+                is_async: True
+                use: arkitekt.funcs.asubscribe
+              - type: query
+                is_async: True
+                use: arkitekt.funcs.aexecute
+              - type: mutation
+                is_async: True
+                use: arkitekt.funcs.aexecute
+              - type: subscription
+                use: arkitekt.funcs.subscribe
+              - type: query
+                use: arkitekt.funcs.execute
+              - type: mutation
+                use: arkitekt.funcs.execute
         processors:
           - type: turms.processor.black.BlackProcessor
           - type: turms.processor.isort.IsortProcessor
