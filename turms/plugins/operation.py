@@ -148,6 +148,7 @@ def generate_operation(
 ):
 
     tree = []
+    assert o.name.value, "Operation names are required"
 
     if o.operation == OperationType.MUTATION:
         class_name = registry.generate_mutation_classname(o.name.value)

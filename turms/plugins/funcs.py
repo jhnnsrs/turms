@@ -8,6 +8,7 @@ from graphql import (
     BooleanValueNode,
     FloatValueNode,
     FragmentSpreadNode,
+    GraphQLNonNull,
     IntValueNode,
     NamedTypeNode,
     NullValueNode,
@@ -416,7 +417,6 @@ def generate_query_doc(
                 )
 
     else:
-
         return_type = f"{o_name}"
 
     header = f"{o.name.value} \n\n"
@@ -747,6 +747,7 @@ def generate_operation_func(
         else o_name
     )
 
+    print(return_type)
     if collapse:
         x = get_operation_root_type(client_schema, o)
         field_definition = get_field_def(
@@ -771,13 +772,28 @@ def generate_operation_func(
                 f"{o_name}{o.selection_set.selections[0].name.value.capitalize()}"
             )
 
-        if isinstance(field_definition.type, GraphQLList):
-            returns = ast.Subscript(
-                value=ast.Name(id="List", ctx=ast.Load()),
-                slice=ast.Name(id=return_type, ctx=ast.Load()),
-            )
+        if isinstance(field_definition.type, GraphQLNonNull):
+            if isinstance(field_definition.type.of_type, GraphQLList):
+                returns = ast.Subscript(
+                    value=ast.Name(id="List", ctx=ast.Load()),
+                    slice=ast.Name(id=return_type, ctx=ast.Load()),
+                )
+            else:
+                returns = ast.Name(id=return_type, ctx=ast.Load())
         else:
-            returns = ast.Name(id=return_type, ctx=ast.Load())
+            if isinstance(field_definition.type, GraphQLList):
+                returns = ast.Subscript(
+                    value=ast.Name("Optional", ctx=ast.Load()),
+                    slice=ast.Subscript(
+                        value=ast.Name(id="List", ctx=ast.Load()),
+                        slice=ast.Name(id=return_type, ctx=ast.Load()),
+                    ),
+                )
+            else:
+                returns = ast.Subscript(
+                    value=ast.Name("Optional", ctx=ast.Load()),
+                    slice=ast.Name(id=return_type, ctx=ast.Load()),
+                )
     else:
         returns = ast.Name(id=return_type, ctx=ast.Load())
 
