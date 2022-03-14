@@ -63,6 +63,9 @@ class OperationsPluginConfig(PluginConfig):
     subscription_bases: List[str] = None
     operations_glob: Optional[str]
 
+    class Config:
+        env_prefix = "TURMS_PLUGINS_OPERATIONS_"
+
 
 def get_query_bases(
     config: GeneratorConfig,

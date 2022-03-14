@@ -23,6 +23,9 @@ class EnumsPluginConfig(PluginConfig):
     prepend: str = ""
     append: str = ""
 
+    class Config:
+        env_prefix = "TURMS_PLUGINS_ENUMS_"
+
 
 def generate_enums(
     client_schema: GraphQLSchema,

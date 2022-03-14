@@ -76,6 +76,9 @@ class OperationsFuncPluginConfig(PluginConfig):
     global_kwargs: List[Kwarg] = []
     definitions: List[FunctionDefinition] = []
 
+    class Config:
+        env_prefix = "TURMS_PLUGINS_FUNCS_"
+
 
 def camel_to_snake(name):
     name = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)

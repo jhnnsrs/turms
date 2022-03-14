@@ -40,6 +40,9 @@ class FragmentsPluginConfig(PluginConfig):
     fragment_bases: List[str] = None
     fragments_glob: Optional[str]
 
+    class Config:
+        env_prefix = "TURMS_PLUGINS_FRAGMENTS_"
+
 
 def get_fragment_bases(
     config: GeneratorConfig,
