@@ -44,8 +44,8 @@ def watcher(path, queue, event: threading.Event):
         with console.status("Watching"):
             while not event.is_set():
                 time.sleep(1)
-    except:
-        print("Watcher failed")
+    except Exception as e:
+        console.print(f"Error: {e}")
 
 
 async def buffered_queue(queue, timeout=4):

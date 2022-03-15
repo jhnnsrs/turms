@@ -23,9 +23,6 @@ projects:
     extensions:
       turms:
         out_dir: examples/api
-        stylers:
-          - type: turms.styler.capitalize.Capitalizer
-          - type: turms.styler.appender.Appender
         plugins:
           - type: turms.plugins.enums.EnumsPlugin
           - type: turms.plugins.inputs.InputsPlugin

@@ -747,7 +747,6 @@ def generate_operation_func(
         else o_name
     )
 
-    print(return_type)
     if collapse:
         x = get_operation_root_type(client_schema, o)
         field_definition = get_field_def(
