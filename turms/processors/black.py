@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from rich import get_console
 from turms.processors.base import Processor, ProcessorConfig
 
@@ -9,9 +9,7 @@ class BlackProcessorConfig(ProcessorConfig):
 
 
 class BlackProcessor(Processor):
-    def __init__(self, config=None, **data):
-
-        self.plugin_config = config or BlackProcessorConfig(**data)
+    config: BlackProcessorConfig = Field(default_factory=BlackProcessorConfig)
 
     def run(self, gen_file: str):
         from black import format_str, FileMode

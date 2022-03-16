@@ -12,20 +12,17 @@ class ParserConfig(BaseSettings):
         extra = "allow"
 
 
-class Parser:
+class Parser(BaseModel):
     """Base Paser Class
 
     Raises:
         NotImplementedError: [description]
     """
 
-    plugin_config: ParserConfig
+    config: ParserConfig
 
     def parse_ast(
         self,
         asts: List[ast.AST],
     ) -> List[ast.AST]:
         raise NotImplementedError("Plugin must overrwrite this")
-
-    def __str__(self) -> str:
-        return self.__class__.__name__

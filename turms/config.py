@@ -12,6 +12,7 @@ class GeneratorConfig(BaseSettings):
     out_dir: str = "api"
     generated_name: str = "schema.py"
     documents: Optional[str]
+    verbose: bool = False
 
     object_bases: List[str] = ["pydantic.BaseModel"]
     interface_bases: Optional[List[str]] = None
@@ -46,7 +47,7 @@ class Extensions(BaseModel):
 
 
 class GraphQLConfig(BaseSettings):  # TODO: Rename to graphql project
-    schema_url: Optional[Union[AnyHttpUrl, str]] = Field(alias="schema")
+    schema_url: Optional[Union[AnyHttpUrl, str]] = Field(alias="schema", env="schema")
     bearer_token: Optional[str] = None
     documents: Optional[str]
     domain: str = "default"

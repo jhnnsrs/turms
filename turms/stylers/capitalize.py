@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from turms.stylers.base import BaseStyler
 
 
@@ -13,9 +13,7 @@ class CapitalizeSylerConfig(BaseModel):
 
 
 class CapitalizeStyler(BaseStyler):
-    def __init__(self, config: CapitalizeSylerConfig = None, **kwargs) -> None:
-        self.config = config or CapitalizeSylerConfig(**kwargs)
-        super().__init__()
+    config: CapitalizeSylerConfig = Field(default_factory=CapitalizeSylerConfig)
 
     def style_fragment_name(self, typename):
         return typename[0].upper() + typename[1:]

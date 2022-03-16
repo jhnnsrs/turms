@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import Optional
 
-from pydantic import BaseSettings
+from pydantic import BaseModel, BaseSettings
 
 
 class ProcessorConfig(BaseSettings):
@@ -11,10 +11,9 @@ class ProcessorConfig(BaseSettings):
         extra = "allow"
 
 
-class Processor:
+class Processor(BaseModel):
+    config: ProcessorConfig
+
     @abstractmethod
     def run(gen_file: str):
         return gen_file
-
-    def __str__(self) -> str:
-        return self.__class__.__name__

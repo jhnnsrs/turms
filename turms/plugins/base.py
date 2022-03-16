@@ -3,7 +3,7 @@ import ast
 from optparse import Option
 from typing import List, Optional
 
-from pydantic import BaseSettings
+from pydantic import BaseModel, BaseSettings
 from graphql.utilities.build_client_schema import GraphQLSchema
 
 
@@ -14,12 +14,14 @@ class PluginConfig(BaseSettings):
         extra = "allow"
 
 
-class Plugin:
+class Plugin(BaseModel):
     """Base Plugin Class
 
     Raises:
         NotImplementedError: [description]
     """
+
+    config: PluginConfig
 
     @abstractmethod
     def generate_ast(
@@ -29,6 +31,3 @@ class Plugin:
         registry,
     ) -> List[ast.AST]:
         raise NotImplementedError("Plugin must overrwrite this")
-
-    def __str__(self) -> str:
-        return self.__class__.__name__

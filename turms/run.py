@@ -26,12 +26,11 @@ import glob
 from .errors import GenerationError
 
 plugins: List[Plugin] = []
-
 processors: List[Processor] = []
 stylers: List[Styler] = []
 
 
-def gen(filepath: str, project=None):
+def gen(filepath: str = "graphql.config.yaml", project=None):
 
     with open(filepath, "r") as f:
         yaml_dict = yaml.safe_load(f)
@@ -85,6 +84,7 @@ def generate(config: GraphQLConfig) -> str:
 
     gen_config.documents = config.documents
     gen_config.domain = config.domain
+    verbose = gen_config.verbose
 
     plugins = []
     stylers = []
@@ -92,25 +92,27 @@ def generate(config: GraphQLConfig) -> str:
     processors = []
 
     for parser_config in gen_config.parsers:
-        x = instantiate(parser_config.type, **parser_config.dict())
-
-        get_console().print(f"Using Parser {x}")
+        x = instantiate(parser_config.type, config=parser_config.dict())
+        if verbose:
+            get_console().print(f"Using Parser {x}")
         parsers.append(x)
 
     for plugins_config in gen_config.plugins:
-        x = instantiate(plugins_config.type, **plugins_config.dict())
-        get_console().print(f"Using Plugin {x}")
-        print(plugins_config.dict())
+        x = instantiate(plugins_config.type, config=plugins_config.dict())
+        if verbose:
+            get_console().print(f"Using Plugin {x}")
         plugins.append(x)
 
     for styler_config in gen_config.stylers:
-        x = instantiate(styler_config.type, **styler_config.dict())
-        get_console().print(f"Using Styler {x}")
+        x = instantiate(styler_config.type, config=styler_config.dict())
+        if verbose:
+            get_console().print(f"Using Styler {x}")
         stylers.append(x)
 
     for proc_config in gen_config.processors:
-        x = instantiate(proc_config.type, **proc_config.dict())
-        get_console().print(f"Using Styler {x}")
+        x = instantiate(proc_config.type, config=proc_config.dict())
+        if verbose:
+            get_console().print(f"Using Processor {x}")
         processors.append(x)
 
     generated_ast = generate_ast(

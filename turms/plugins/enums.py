@@ -5,7 +5,7 @@ from typing import List, Optional
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from turms.plugins.base import Plugin
-from pydantic import BaseModel, BaseSettings
+from pydantic import BaseModel, BaseSettings, Field
 from graphql.type.definition import (
     GraphQLEnumType,
 )
@@ -98,8 +98,7 @@ def generate_enums(
 
 
 class EnumsPlugin(Plugin):
-    def __init__(self, config=None, **data):
-        self.plugin_config = config or EnumsPluginConfig(**data)
+    config: EnumsPluginConfig = Field(default_factory=EnumsPluginConfig)
 
     def generate_ast(
         self,
@@ -110,4 +109,4 @@ class EnumsPlugin(Plugin):
 
         registry.register_import("enum.Enum")
 
-        return generate_enums(client_schema, config, self.plugin_config, registry)
+        return generate_enums(client_schema, config, self.config, registry)

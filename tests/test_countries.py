@@ -11,7 +11,7 @@ from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
 from turms.plugins.fragments import FragmentsPlugin
-from turms.plugins.operation import OperationsPlugin
+from turms.plugins.operations import OperationsPlugin
 from turms.stylers.default import DefaultStyler
 from turms.helpers import build_schema_from_glob, build_schema_from_introspect_url
 

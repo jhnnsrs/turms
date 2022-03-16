@@ -13,7 +13,7 @@ from typing import List, Optional
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from turms.plugins.base import Plugin
-from pydantic import BaseModel, BaseSettings
+from pydantic import BaseModel, BaseSettings, Field
 from graphql.type.definition import (
     GraphQLEnumType,
 )
@@ -225,8 +225,7 @@ def generate_inputs(
 
 
 class InputsPlugin(Plugin):
-    def __init__(self, config=None, **data):
-        self.plugin_config = config or InputsPluginConfig(**data)
+    config: InputsPluginConfig = Field(default_factory=InputsPluginConfig)
 
     def generate_ast(
         self,
@@ -235,7 +234,7 @@ class InputsPlugin(Plugin):
         registry: ClassRegistry,
     ) -> List[ast.AST]:
 
-        for base in self.plugin_config.inputtype_bases:
+        for base in self.config.inputtype_bases:
             registry.register_import(base)
 
-        return generate_inputs(client_schema, config, self.plugin_config, registry)
+        return generate_inputs(client_schema, config, self.config, registry)

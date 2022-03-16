@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from rich import get_console
 from turms.processors.base import Processor, ProcessorConfig
 
@@ -9,8 +9,7 @@ class IsortProcessorConfig(ProcessorConfig):
 
 
 class IsortProcessor(Processor):
-    def __init__(self, config=None, **data):
-        self.plugin_config = config or IsortProcessorConfig(**data)
+    config: IsortProcessorConfig = Field(default_factory=IsortProcessorConfig)
 
     def run(self, gen_file: str):
         import isort

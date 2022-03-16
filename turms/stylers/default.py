@@ -1,3 +1,4 @@
+from pydantic import Field
 from turms.stylers.base import BaseStyler, StylerConfig
 import re
 
@@ -12,9 +13,7 @@ class DefaultStylerConfig(StylerConfig):
 
 
 class DefaultStyler(BaseStyler):
-    def __init__(self, config: DefaultStylerConfig = None, **kwargs) -> None:
-        super().__init__()
-        self.config = config or DefaultStylerConfig(**kwargs)
+    config: DefaultStylerConfig = Field(default_factory=DefaultStylerConfig)
 
     def style_fragment_name(self, typename):
         return typename[0].upper() + typename[1:]

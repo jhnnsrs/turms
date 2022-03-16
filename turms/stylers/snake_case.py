@@ -1,3 +1,4 @@
+from pydantic import Field
 from turms.stylers.base import BaseStyler, StylerConfig
 import re
 
@@ -12,6 +13,8 @@ class SnakeCaseStylerConfig(StylerConfig):
 
 
 class SnakeCaseStyler(BaseStyler):
+    config: SnakeCaseStylerConfig = Field(default_factory=SnakeCaseStylerConfig)
+
     def style_node_name(self, name: str) -> str:
         return camel_to_snake(name)
 

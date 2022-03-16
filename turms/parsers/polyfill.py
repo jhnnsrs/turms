@@ -1,22 +1,13 @@
 from turms.parsers.base import Parser, ParserConfig
 from typing import Union, Literal, List
 import ast
-from pydantic import validator
+from pydantic import Field, validator
 
 
 class PolyfillPluginConfig(ParserConfig):
     type = "turms.parsers.polyfill.PolyfillPlugin"
     skip_underscore: bool = True
-    python_version: Union[
-        Literal["3.7"], Literal["3.8"], Literal["3.9"], Literal["3.10"]
-    ] = "3.9"
-
-    @validator("python_version", pre=True)
-    def validate(cls, v):
-        v = str(v)
-        if v not in ["3.7", "3.8", "3.9", "3.10"]:
-            raise ValueError(f"Invalid python version: {v}")
-        return v
+    python_version: str
 
     class Config:
         env_prefix = "TURMS_PARSERS_POLYFILL_"
@@ -66,18 +57,15 @@ class PolyfillParser(Parser):
         NotImplementedError: [description]
     """
 
-    plugin_config: PolyfillPluginConfig
-
-    def __init__(self, config: PolyfillPluginConfig = None, **data):
-        self.plugin_config = config or PolyfillPluginConfig(**data)
+    config: PolyfillPluginConfig = Field(default_factory=PolyfillPluginConfig)
 
     def parse_ast(
         self,
         asts: List[ast.AST],
     ) -> List[ast.AST]:
 
-        if self.plugin_config.python_version == "3.7":
-            return polyfill_python_seven(asts, self.plugin_config)
+        if self.config.python_version == "3.7":
+            return polyfill_python_seven(asts, self.config)
 
         return asts
 

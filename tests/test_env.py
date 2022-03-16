@@ -8,7 +8,7 @@ from graphql.language import parse
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
 from turms.plugins.fragments import FragmentsPlugin
-from turms.plugins.operation import OperationsPlugin
+from turms.plugins.operations import OperationsPlugin
 from turms.stylers.snake_case import SnakeCaseStyler
 from turms.stylers.capitalize import CapitalizeStyler
 from turms.helpers import build_schema_from_glob
@@ -37,7 +37,6 @@ def test_small(hello_world_schema, monkeypatch):
 
 
 def test_env_complex(arkitekt_schema, monkeypatch):
-
     monkeypatch.setenv(
         "TURMS_SCALAR_DEFINITIONS",
         json.dumps(
