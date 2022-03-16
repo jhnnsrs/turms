@@ -28,7 +28,7 @@ It makes heavy use of pydantic and its serialization capablities and provides fu
 
 - Fully Modular (agnostic of graphql transport)
 - Tries to minimise Class Generation if using Fragments
-- Autocollapsing operation (if mutation or query has only one operation) functions
+- Autocollapsing operation functions
 - Specify type mixins, baseclasses...
 - Fully Support type hints for variables (Pylance)
 - Compliant with graphl-config
@@ -57,17 +57,17 @@ projects:
       turms: # path for configuration for turms
         out_dir: examples/api
         stylers:
-          - type: turms.stylers.capitalize.Capitalizer
-          - type: turms.stylers.snake.SnakeNodeName
+          - type: turms.stylers.capitalize.CapitalizeStyler
+          - type: turms.stylers.snake_case.SnakeCaseStyler
         plugins:
           - type: turms.plugins.enums.EnumsPlugin
           - type: turms.plugins.inputs.InputsPlugin
           - type: turms.plugins.fragments.FragmentsPlugin
-          - type: turms.plugins.operation.OperationsPlugin
-          - type: turms.plugins.funcs.OperationsFuncPlugin
+          - type: turms.plugins.operations.OperationsPlugin
+          - type: turms.plugins.funcs.FuncsPlugin
         processors:
-          - type: turms.processor.black.BlackProcessor
-          - type: turms.processor.isort.IsortProcessor
+          - type: turms.processors.black.BlackProcessor
+          - type: turms.processors.isort.IsortProcessor
         scalar_definitions:
           uuid: str
           timestamptz: str
@@ -89,8 +89,15 @@ Plugins are the generators of code, that traverse through the direcotry and ad n
 - turms.plugins.enums.EnumsPlugin
 - turms.plugins.inputs.InputsPlugin
 - turms.plugins.fragments.FragmentsPlugin
-- turms.plugins.operation.OperationsPlugin
-- turms.plugins.funcs.OperationsFuncPlugin
+- turms.plugins.operations.OperationsPlugin
+- turms.plugins.funcs.FuncsPlugin
+
+## Parsers
+
+Processors take the generated python.AST, and can parse this code. (e.g enabling polyfills for different python versions)
+Includes Parsers are
+
+- turms.parsers.polyfill.PolyfillParser (only working for python 3.7)
 
 ## Processors
 

@@ -27,10 +27,10 @@ projects:
           - type: turms.plugins.enums.EnumsPlugin
           - type: turms.plugins.inputs.InputsPlugin
           - type: turms.plugins.fragments.FragmentsPlugin
-          - type: turms.plugins.operation.OperationsPlugin
-          - type: turms.plugins.funcs.OperationsFuncPlugin
+          - type: turms.plugins.operations.OperationsPlugin
+          - type: turms.plugins.funcs.FuncsPlugin
         processors:
-          - type: turms.processor.black.BlackProcessor
+          - type: turms.processors.black.BlackProcessor
         scalar_definitions:
           uuid: str
 """
