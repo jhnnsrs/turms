@@ -19,7 +19,7 @@ from graphql import (
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from turms.plugins.base import Plugin, PluginConfig
-from pydantic import BaseModel, BaseSettings
+from pydantic import BaseModel, BaseSettings, Field
 from graphql.language.ast import OperationDefinitionNode, OperationType
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
@@ -78,7 +78,8 @@ class FunctionDefinition(BaseModel):
     use: str
 
 
-class OperationsFuncPluginConfig(PluginConfig):
+class FuncsPluginConfig(PluginConfig):
+    type = "turms.plugins.funcs.FuncsPlugin"
     funcs_glob: Optional[str]
     prepend_sync: str = ""
     prepend_async: str = "a"
@@ -897,9 +898,8 @@ def generate_operation_func(
     return tree
 
 
-class OperationsFuncPlugin(Plugin):
-    def __init__(self, config=None, **data):
-        self.plugin_config = config or OperationsFuncPluginConfig(**data)
+class FuncsPlugin(Plugin):
+    config: FuncsPluginConfig = Field(default_facotry=FuncsPluginConfig)
 
     def generate_ast(
         self,
@@ -912,7 +912,7 @@ class OperationsFuncPlugin(Plugin):
 
         try:
             documents = parse_documents(
-                client_schema, self.plugin_config.funcs_glob or config.documents
+                client_schema, self.config.funcs_glob or config.documents
             )
         except NoDocumentsFoundError as e:
             logger.exception(e)
@@ -925,13 +925,13 @@ class OperationsFuncPlugin(Plugin):
         ]
 
         for operation in operations:
-            for definition in get_definitions_for_onode(operation, self.plugin_config):
+            for definition in get_definitions_for_onode(operation, self.config):
                 plugin_tree += generate_operation_func(
                     definition,
                     operation,
                     client_schema,
                     config,
-                    self.plugin_config,
+                    self.config,
                     registry,
                 )
 

@@ -1,4 +1,5 @@
-from turms.stylers.base import BaseStyler
+from pydantic import Field
+from turms.stylers.base import BaseStyler, StylerConfig
 import re
 
 
@@ -7,7 +8,13 @@ def camel_to_snake(name):
     return re.sub("([a-z0-9])([A-Z])", r"\1_\2", name).lower()
 
 
-class SnakeNodeName(BaseStyler):
+class SnakeCaseStylerConfig(StylerConfig):
+    type = "turms.stylers.snake_case.SnakeCaseStyler"
+
+
+class SnakeCaseStyler(BaseStyler):
+    config: SnakeCaseStylerConfig = Field(default_factory=SnakeCaseStylerConfig)
+
     def style_node_name(self, name: str) -> str:
         return camel_to_snake(name)
 

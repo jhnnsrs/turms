@@ -1,8 +1,6 @@
 from enum import Enum
-from typing import List, Literal, Optional
+from typing import Literal, Optional
 
-from arkitekt.funcs import aexecute, execute
-from arkitekt.rath import ArkitektRath
 from pydantic import BaseModel, Field
 
 
@@ -35,99 +33,3 @@ class CreateIntBeast(BaseModel):
     class Meta:
         domain = "default"
         document = "mutation createIntBeast($nested: [[String!]!], $nonOptionalParameter: Int! = 999) {\n  createIntBeast(nested: $nested, nonOptionalParameter: $nonOptionalParameter) {\n    binomial\n  }\n}"
-
-
-async def acreate_beast(
-    nested: Optional[List[List[str]]] = None,
-    non_optional_parameter: str = "999",
-    rath: ArkitektRath = None,
-) -> CreateBeastCreatebeast:
-    """createBeast
-
-    Genrates a best which is nice
-
-    Arguments:
-        nested (Optional[List[List[str]]], optional): nested.
-        non_optional_parameter (str, optional): nonOptionalParameter. Defaults to 999
-        rath (arkitekt.rath.ArkitektRath, optional): The arkitekt rath client
-
-    Returns:
-        CreateBeastCreatebeast"""
-    return (
-        await aexecute(
-            CreateBeast,
-            {"nested": nested, "nonOptionalParameter": non_optional_parameter},
-            rath=rath,
-        )
-    ).create_beast
-
-
-def create_beast(
-    nested: Optional[List[List[str]]] = None,
-    non_optional_parameter: str = "999",
-    rath: ArkitektRath = None,
-) -> CreateBeastCreatebeast:
-    """createBeast
-
-    Genrates a best which is nice
-
-    Arguments:
-        nested (Optional[List[List[str]]], optional): nested.
-        non_optional_parameter (str, optional): nonOptionalParameter. Defaults to 999
-        rath (arkitekt.rath.ArkitektRath, optional): The arkitekt rath client
-
-    Returns:
-        CreateBeastCreatebeast"""
-    return execute(
-        CreateBeast,
-        {"nested": nested, "nonOptionalParameter": non_optional_parameter},
-        rath=rath,
-    ).create_beast
-
-
-async def acreate_int_beast(
-    nested: Optional[List[List[str]]] = None,
-    non_optional_parameter: int = 999,
-    rath: ArkitektRath = None,
-) -> CreateIntBeastCreateintbeast:
-    """createIntBeast
-
-
-
-    Arguments:
-        nested (Optional[List[List[str]]], optional): nested.
-        non_optional_parameter (int, optional): nonOptionalParameter. Defaults to 999
-        rath (arkitekt.rath.ArkitektRath, optional): The arkitekt rath client
-
-    Returns:
-        CreateIntBeastCreateintbeast"""
-    return (
-        await aexecute(
-            CreateIntBeast,
-            {"nested": nested, "nonOptionalParameter": non_optional_parameter},
-            rath=rath,
-        )
-    ).create_int_beast
-
-
-def create_int_beast(
-    nested: Optional[List[List[str]]] = None,
-    non_optional_parameter: int = 999,
-    rath: ArkitektRath = None,
-) -> CreateIntBeastCreateintbeast:
-    """createIntBeast
-
-
-
-    Arguments:
-        nested (Optional[List[List[str]]], optional): nested.
-        non_optional_parameter (int, optional): nonOptionalParameter. Defaults to 999
-        rath (arkitekt.rath.ArkitektRath, optional): The arkitekt rath client
-
-    Returns:
-        CreateIntBeastCreateintbeast"""
-    return execute(
-        CreateIntBeast,
-        {"nested": nested, "nonOptionalParameter": non_optional_parameter},
-        rath=rath,
-    ).create_int_beast

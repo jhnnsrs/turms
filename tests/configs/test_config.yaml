@@ -15,7 +15,7 @@ projects:
           - type: turms.plugins.enums.EnumsPlugin
           - type: turms.plugins.inputs.InputsPlugin
           - type: turms.plugins.fragments.FragmentsPlugin
-          - type: turms.plugins.operations.OperationsPlugin
+          - type: turms.plugins.operation.OperationsPlugin
           - type: turms.plugins.funcs.FuncsPlugin
             global_kwargs:
               - type: mikro.mikro.MikroRath

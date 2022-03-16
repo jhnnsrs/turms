@@ -1,7 +1,18 @@
 from abc import abstractmethod
 
+from pydantic import BaseModel, BaseSettings
 
-class Styler:
+
+class StylerConfig(BaseSettings):
+    type: str
+
+    class Config:
+        extra = "forbid"
+
+
+class Styler(BaseModel):
+    config: StylerConfig
+
     @abstractmethod
     def style_subscription_name(self, name: str) -> str:
         raise NotImplementedError("Plugin must overrwrite this")
@@ -19,7 +30,7 @@ class Styler:
         raise NotImplementedError("Plugin must overrwrite this")
 
     @abstractmethod
-    def style_fragment_class_name(self, name: str) -> str:
+    def style_fragment_name(self, name: str) -> str:
         raise NotImplementedError("Plugin must overrwrite this")
 
     @abstractmethod
@@ -36,9 +47,6 @@ class Styler:
 
 
 class BaseStyler(Styler):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__()
-
     def style_operation_name(self, name: str) -> str:
         return name
 

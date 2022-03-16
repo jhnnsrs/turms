@@ -14,6 +14,7 @@ from turms.stylers.capitalize import CapitalizeStyler
 from turms.helpers import build_schema_from_glob
 from turms.processors.black import BlackProcessor
 from turms.processors.isort import IsortProcessor
+from turms.parsers.polyfill import PolyfillParser, PolyfillPluginConfig
 import os
 
 
@@ -36,7 +37,8 @@ def test_small(hello_world_schema, monkeypatch):
     assert config.domain == "test_domain"
 
 
-def test_env_complex(arkitekt_schema, monkeypatch):
+def test_polyfill_seven(arkitekt_schema, monkeypatch):
+
     monkeypatch.setenv(
         "TURMS_SCALAR_DEFINITIONS",
         json.dumps(
@@ -59,11 +61,9 @@ def test_env_complex(arkitekt_schema, monkeypatch):
         plugins=[EnumsPlugin(), InputsPlugin(), FragmentsPlugin(), OperationsPlugin()],
     )
 
+    for parser in [PolyfillParser(config=PolyfillPluginConfig(python_version="3.7"))]:
+        generated_ast = parser.parse_ast(generated_ast)
+
     md = ast.Module(body=generated_ast, type_ignores=[])
     generated = ast.unparse(ast.fix_missing_locations(md))
-
-    for processor in [
-        IsortProcessor(),
-        BlackProcessor(),
-    ]:
-        generated = processor.run(generated)
+    assert "from typing_extensions import Literal" in generated

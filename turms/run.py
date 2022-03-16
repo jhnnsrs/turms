@@ -8,14 +8,13 @@ from turms.helpers import (
     build_schema_from_introspect_url,
     import_string,
 )
-from turms.processor.base import Processor
-from turms.processor.black import BlackProcessor
+from turms.processors.base import Processor
+from turms.processors.black import BlackProcessor
 from turms.registry import ClassRegistry
 from turms.stylers import Styler
 from turms.stylers.default import DefaultStyler
 from turms.utils import build_schema
 from turms.plugins.base import Plugin
-from turms.compat.funcs import unparse
 from typing import Dict, List
 import ast
 import yaml
@@ -27,12 +26,11 @@ import glob
 from .errors import GenerationError
 
 plugins: List[Plugin] = []
-
 processors: List[Processor] = []
 stylers: List[Styler] = []
 
 
-def gen(filepath: str, project=None):
+def gen(filepath: str = "graphql.config.yaml", project=None):
 
     with open(filepath, "r") as f:
         yaml_dict = yaml.safe_load(f)
@@ -46,76 +44,19 @@ def gen(filepath: str, project=None):
             )
             config = GraphQLConfig(**project, domain=key)
 
-            if isinstance(config.schema_url, AnyHttpUrl):
-                schema = build_schema_from_introspect_url(
-                    config.schema_url, config.bearer_token
-                )
-            else:
-                schema = build_schema_from_glob(config.schema_url)
+            generated_code = generate(config)
 
-            turms_config = project["extensions"]["turms"]
-
-            gen_config = GeneratorConfig(
-                **turms_config, documents=project["documents"], domain=config.domain
-            )
-
-            plugins = []
-            stylers = []
-            processors = []
-
-            if "plugins" in turms_config:
-                plugin_configs = turms_config["plugins"]
-                for plugin_config in plugin_configs:
-                    assert (
-                        "type" in plugin_config
-                    ), "A plugin must at least specify type"
-                    plugin_class = import_string(plugin_config["type"])
-                    plugins.append(plugin_class(**plugin_config))
-                    get_console().print(f"Using Plugin {plugin_class}")
-
-            if "stylers" in turms_config:
-                plugin_configs = turms_config["stylers"]
-                for plugin_config in plugin_configs:
-                    assert (
-                        "type" in plugin_config
-                    ), "A styler must at least specify type"
-                    styler_class = import_string(plugin_config["type"])
-                    stylers.append(styler_class(**plugin_config))
-                    get_console().print(f"Using Styler {styler_class}")
-
-            else:
-                stylers.append(DefaultStyler())
-
-            if "processors" in turms_config:
-                proc_configs = turms_config["processors"]
-                for proc_config in proc_configs:
-                    assert (
-                        "type" in proc_config
-                    ), "A processor must at least specify type"
-                    proc_class = import_string(proc_config["type"])
-                    processors.append(proc_class(**proc_config))
-                    get_console().print(f"Using Processor {proc_class}")
-
-            generated_ast = generate_ast(
-                gen_config,
-                schema,
-                plugins=plugins,
-                stylers=stylers,
-            )
-
-            md = ast.Module(body=generated_ast, type_ignores=[])
-            generated = unparse(ast.fix_missing_locations(md))
-
-            for processor in processors:
-                generated = processor.run(generated)
-
-            if not os.path.isdir(gen_config.out_dir):
-                os.makedirs(gen_config.out_dir)
+            if not os.path.isdir(config.extensions.turms.out_dir):
+                os.makedirs(config.extensions.turms.out_dir)
 
             with open(
-                os.path.join(gen_config.out_dir, gen_config.generated_name), "w"
+                os.path.join(
+                    config.extensions.turms.out_dir,
+                    config.extensions.turms.generated_name,
+                ),
+                "w",
             ) as f:
-                f.write(generated)
+                f.write(generated_code)
 
             get_console().print("Sucessfull!! :right-facing_fist::left-facing_fist:")
         except:
@@ -126,12 +67,79 @@ def gen(filepath: str, project=None):
             raise
 
 
+def instantiate(filepath: str, **kwargs):
+    return import_string(filepath)(**kwargs)
+
+
+def generate(config: GraphQLConfig) -> str:
+
+    if isinstance(config.schema_url, AnyHttpUrl):
+        schema = build_schema_from_introspect_url(
+            config.schema_url, config.bearer_token
+        )
+    else:
+        schema = build_schema_from_glob(config.schema_url)
+
+    gen_config = config.extensions.turms
+
+    gen_config.documents = config.documents
+    gen_config.domain = config.domain
+    verbose = gen_config.verbose
+
+    plugins = []
+    stylers = []
+    parsers = []
+    processors = []
+
+    for parser_config in gen_config.parsers:
+        x = instantiate(parser_config.type, config=parser_config.dict())
+        if verbose:
+            get_console().print(f"Using Parser {x}")
+        parsers.append(x)
+
+    for plugins_config in gen_config.plugins:
+        x = instantiate(plugins_config.type, config=plugins_config.dict())
+        if verbose:
+            get_console().print(f"Using Plugin {x}")
+        plugins.append(x)
+
+    for styler_config in gen_config.stylers:
+        x = instantiate(styler_config.type, config=styler_config.dict())
+        if verbose:
+            get_console().print(f"Using Styler {x}")
+        stylers.append(x)
+
+    for proc_config in gen_config.processors:
+        x = instantiate(proc_config.type, config=proc_config.dict())
+        if verbose:
+            get_console().print(f"Using Processor {x}")
+        processors.append(x)
+
+    generated_ast = generate_ast(
+        gen_config,
+        schema,
+        plugins=plugins,
+        stylers=stylers,
+    )
+
+    for parser in parsers:
+        generated_ast = parser.parse_ast(generated_ast)
+
+    md = ast.Module(body=generated_ast, type_ignores=[])
+    generated = ast.unparse(ast.fix_missing_locations(md))
+
+    for processor in processors:
+        generated = processor.run(generated)
+
+    return generated
+
+
 def generate_ast(
     config: GeneratorConfig,
     schema: GraphQLSchema,
     plugins=plugins,
     stylers=stylers,
-):
+) -> List[ast.AST]:
 
     global_tree = []
     registry = ClassRegistry(config, stylers)

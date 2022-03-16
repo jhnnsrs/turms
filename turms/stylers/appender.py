@@ -1,20 +1,19 @@
-from pydantic import BaseModel
-from turms.stylers.base import BaseStyler
+from pydantic import BaseModel, Field
+from turms.stylers.base import BaseStyler, StylerConfig
 
 
-class AppenderConfig(BaseModel):
+class AppenderStylerConfig(StylerConfig):
+    type = "turms.stylers.appender.AppenderStyler"
     append_fragment: str = "Fragment"
     append_query: str = "Query"
     append_mutation: str = "Mutation"
     append_subscription: str = "Subscription"
-    append_enum: str = "Enum"
-    append_input: str = "Input"
+    append_enum: str = ""
+    append_input: str = ""
 
 
-class Appender(BaseStyler):
-    def __init__(self, **kwargs) -> None:
-        super().__init__()
-        self.config = AppenderConfig(**kwargs)
+class AppenderStyler(BaseStyler):
+    config: AppenderStylerConfig = Field(default_factory=AppenderStylerConfig)
 
     def style_fragment_name(self, typename):
         return f"{typename}{self.config.append_fragment}"

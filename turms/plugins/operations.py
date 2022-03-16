@@ -4,9 +4,9 @@ from typing import List, Optional
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.language.ast import OperationDefinitionNode, OperationType
-from turms.parser.recurse import recurse_annotation, type_field_node
+from turms.recurse import recurse_annotation, type_field_node
 from turms.plugins.base import Plugin, PluginConfig
-from pydantic import BaseModel, BaseSettings
+from pydantic import BaseModel, BaseSettings, Field
 from graphql.error.graphql_error import GraphQLError
 from graphql.error.syntax_error import GraphQLSyntaxError
 from graphql.language.ast import (
@@ -58,6 +58,7 @@ fragment_searcher = re.compile(r"\.\.\.(?P<fragment>[a-zA-Z]*)")
 
 
 class OperationsPluginConfig(PluginConfig):
+    type = "turms.plugins.operations.OperationsPlugin"
     query_bases: List[str] = None
     mutation_bases: List[str] = None
     subscription_bases: List[str] = None
@@ -219,8 +220,7 @@ def generate_operation(
 
 
 class OperationsPlugin(Plugin):
-    def __init__(self, config=None, **data):
-        self.plugin_config = config or OperationsPluginConfig(**data)
+    config: OperationsPluginConfig = Field(default_factory=OperationsPluginConfig)
 
     def generate_ast(
         self,
@@ -233,7 +233,7 @@ class OperationsPlugin(Plugin):
 
         try:
             documents = parse_documents(
-                client_schema, self.plugin_config.operations_glob or config.documents
+                client_schema, self.config.operations_glob or config.documents
             )
         except NoDocumentsFoundError as e:
             logger.exception(e)
@@ -246,7 +246,7 @@ class OperationsPlugin(Plugin):
 
         for operation in operations:
             plugin_tree += generate_operation(
-                operation, client_schema, config, self.plugin_config, registry
+                operation, client_schema, config, self.config, registry
             )
 
         return plugin_tree

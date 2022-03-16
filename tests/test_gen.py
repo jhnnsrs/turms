@@ -3,17 +3,16 @@ import ast
 import pytest
 from turms.config import GeneratorConfig
 from turms.run import gen, generate_ast
-from turms.compat.funcs import unparse
 from graphql.language import parse
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
 from turms.plugins.fragments import FragmentsPlugin
-from turms.plugins.operation import OperationsPlugin
-from turms.stylers.snake import SnakeNodeName
-from turms.stylers.capitalize import Capitalizer
+from turms.plugins.operations import OperationsPlugin
+from turms.stylers.snake_case import SnakeCaseStyler
+from turms.stylers.capitalize import CapitalizeStyler
 from turms.helpers import build_schema_from_glob
-from turms.processor.black import BlackProcessor
-from turms.processor.isort import IsortProcessor
+from turms.processors.black import BlackProcessor
+from turms.processors.isort import IsortProcessor
 
 
 @pytest.fixture()
@@ -39,7 +38,7 @@ class TestClass:
     """
 
     x = ast.parse(instring)
-    unparse(x)
+    ast.alias(x)
 
 
 def test_small(hello_world_schema):
@@ -50,7 +49,7 @@ def test_small(hello_world_schema):
     )
 
     md = ast.Module(body=generated_ast, type_ignores=[])
-    generated = unparse(ast.fix_missing_locations(md))
+    generated = ast.unparse(ast.fix_missing_locations(md))
     assert "from enum import Enum" in generated, "EnumPlugin not working"
     assert "class HelloWorldOrder(str, Enum):" in generated, "EnumPlugin not working"
 
@@ -63,7 +62,7 @@ def test_small(hello_world_schema):
     )
 
     md = ast.Module(body=generated_ast, type_ignores=[])
-    generated = unparse(ast.fix_missing_locations(md))
+    generated = ast.unparse(ast.fix_missing_locations(md))
     assert "from enum import Enum" in generated, "EnumPlugin not working"
     assert "class HelloWorldOrder(str, Enum):" in generated, "EnumPlugin not working"
 
@@ -73,12 +72,12 @@ def test_snake_case_styler(hello_world_schema):
     generated_ast = generate_ast(
         config,
         hello_world_schema,
-        stylers=[SnakeNodeName()],
+        stylers=[SnakeCaseStyler()],
         plugins=[EnumsPlugin(), InputsPlugin()],
     )
 
     md = ast.Module(body=generated_ast, type_ignores=[])
-    generated = unparse(ast.fix_missing_locations(md))
+    generated = ast.unparse(ast.fix_missing_locations(md))
     assert "from enum import Enum" in generated, "EnumPlugin not working"
     assert "search_massimo: str" in generated, "Snake Casing not Working"
     assert (
@@ -91,12 +90,12 @@ def test_beast_styler(beast_schema):
     generated_ast = generate_ast(
         config,
         beast_schema,
-        stylers=[SnakeNodeName()],
+        stylers=[SnakeCaseStyler()],
         plugins=[EnumsPlugin(), InputsPlugin()],
     )
 
     md = ast.Module(body=generated_ast, type_ignores=[])
-    generated = unparse(ast.fix_missing_locations(md))
+    generated = ast.unparse(ast.fix_missing_locations(md))
     assert "from enum import Enum" in generated, "EnumPlugin not working"
 
 
@@ -105,12 +104,12 @@ def test_beast_operations(beast_schema):
     generated_ast = generate_ast(
         config,
         beast_schema,
-        stylers=[Capitalizer()],
+        stylers=[CapitalizeStyler()],
         plugins=[EnumsPlugin(), InputsPlugin(), FragmentsPlugin(), OperationsPlugin()],
     )
 
     md = ast.Module(body=generated_ast, type_ignores=[])
-    generated = unparse(ast.fix_missing_locations(md))
+    generated = ast.unparse(ast.fix_missing_locations(md))
     print(generated)
     assert "from enum import Enum" in generated, "EnumPlugin not working"
     assert "class Get_beasts(BaseModel):" in generated, "OpertiationsPlugin not working"
@@ -121,12 +120,12 @@ def test_beast_operations(beast_schema):
     generated_ast = generate_ast(
         config,
         beast_schema,
-        stylers=[Capitalizer(), SnakeNodeName()],
+        stylers=[CapitalizeStyler(), SnakeCaseStyler()],
         plugins=[EnumsPlugin(), InputsPlugin(), FragmentsPlugin(), OperationsPlugin()],
     )
 
     md = ast.Module(body=generated_ast, type_ignores=[])
-    generated = unparse(ast.fix_missing_locations(md))
+    generated = ast.unparse(ast.fix_missing_locations(md))
     print(generated)
     assert "from enum import Enum" in generated, "EnumPlugin not working"
     assert "class Get_beasts(BaseModel):" in generated, "OpertiationsPlugin not working"
@@ -146,12 +145,12 @@ def test_arkitekt_operations(arkitekt_schema):
     generated_ast = generate_ast(
         config,
         arkitekt_schema,
-        stylers=[Capitalizer(), SnakeNodeName()],
+        stylers=[CapitalizeStyler(), SnakeCaseStyler()],
         plugins=[EnumsPlugin(), InputsPlugin(), FragmentsPlugin(), OperationsPlugin()],
     )
 
     md = ast.Module(body=generated_ast, type_ignores=[])
-    generated = unparse(ast.fix_missing_locations(md))
+    generated = ast.unparse(ast.fix_missing_locations(md))
     print(generated)
     assert "from enum import Enum" in generated, "EnumPlugin not working"
     assert (
@@ -172,12 +171,12 @@ def test_black_complex(arkitekt_schema):
     generated_ast = generate_ast(
         config,
         arkitekt_schema,
-        stylers=[Capitalizer(), SnakeNodeName()],
+        stylers=[CapitalizeStyler(), SnakeCaseStyler()],
         plugins=[EnumsPlugin(), InputsPlugin(), FragmentsPlugin(), OperationsPlugin()],
     )
 
     md = ast.Module(body=generated_ast, type_ignores=[])
-    generated = unparse(ast.fix_missing_locations(md))
+    generated = ast.unparse(ast.fix_missing_locations(md))
 
     for processor in [
         IsortProcessor(),

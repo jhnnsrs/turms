@@ -3,9 +3,9 @@ import ast
 from typing import Callable, List, Optional
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
-from turms.parser.recurse import recurse_annotation, type_field_node
+from turms.recurse import recurse_annotation, type_field_node
 from turms.plugins.base import Plugin, PluginConfig
-from pydantic import BaseModel, BaseSettings
+from pydantic import BaseModel, BaseSettings, Field
 from graphql.language.ast import FragmentDefinitionNode
 from turms.registry import ClassRegistry
 from turms.utils import (
@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 class FragmentsPluginConfig(PluginConfig):
+    type = "turms.plugins.fragments.FragmentsPlugin"
     fragment_bases: List[str] = None
     fragments_glob: Optional[str]
 
@@ -265,8 +266,7 @@ def generate_fragment(
 
 
 class FragmentsPlugin(Plugin):
-    def __init__(self, config=None, **data):
-        self.plugin_config = config or FragmentsPluginConfig(**data)
+    config: FragmentsPluginConfig = Field(default_factory=FragmentsPluginConfig)
 
     def generate_ast(
         self,
@@ -279,7 +279,7 @@ class FragmentsPlugin(Plugin):
 
         try:
             documents = parse_documents(
-                client_schema, self.plugin_config.fragments_glob or config.documents
+                client_schema, self.config.fragments_glob or config.documents
             )
         except NoDocumentsFoundError as e:
             logger.exception(e)
@@ -293,7 +293,7 @@ class FragmentsPlugin(Plugin):
 
         for fragment in fragments:
             plugin_tree += generate_fragment(
-                fragment, client_schema, config, self.plugin_config, registry
+                fragment, client_schema, config, self.config, registry
             )
 
         return plugin_tree

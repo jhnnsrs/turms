@@ -1,4 +1,5 @@
-from turms.stylers.base import BaseStyler
+from pydantic import Field
+from turms.stylers.base import BaseStyler, StylerConfig
 import re
 
 
@@ -7,7 +8,13 @@ def camel_to_snake(name):
     return re.sub("([a-z0-9])([A-Z])", r"\1_\2", name).lower()
 
 
+class DefaultStylerConfig(StylerConfig):
+    type: str = "turms.stylers.default.DefaultStyler"
+
+
 class DefaultStyler(BaseStyler):
+    config: DefaultStylerConfig = Field(default_factory=DefaultStylerConfig)
+
     def style_fragment_name(self, typename):
         return typename[0].upper() + typename[1:]
 

@@ -4,22 +4,16 @@ import pytest
 from turms.config import GeneratorConfig
 from turms.plugins.funcs import (
     FunctionDefinition,
-    OperationsFuncPlugin,
-    OperationsFuncPluginConfig,
+    FuncsPlugin,
+    FuncsPluginConfig,
 )
-from turms.run import gen, generate_ast
-from turms.compat.funcs import unparse
-from graphql.language import parse
+from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
 from turms.plugins.fragments import FragmentsPlugin
-from turms.plugins.operation import OperationsPlugin
-from turms.stylers.snake import SnakeNodeName
+from turms.plugins.operations import OperationsPlugin
 from turms.stylers.default import DefaultStyler
-from turms.stylers.capitalize import Capitalizer
 from turms.helpers import build_schema_from_glob, build_schema_from_introspect_url
-from turms.processor.black import BlackProcessor
-from turms.processor.isort import IsortProcessor
 
 
 @pytest.fixture()
@@ -41,8 +35,8 @@ def test_complex_operations(countries_schema):
             InputsPlugin(),
             FragmentsPlugin(),
             OperationsPlugin(),
-            OperationsFuncPlugin(
-                config=OperationsFuncPluginConfig(
+            FuncsPlugin(
+                config=FuncsPluginConfig(
                     definitions=(
                         [
                             FunctionDefinition(
@@ -58,7 +52,7 @@ def test_complex_operations(countries_schema):
     )
 
     md = ast.Module(body=generated_ast, type_ignores=[])
-    generated = unparse(ast.fix_missing_locations(md))
+    generated = ast.unparse(ast.fix_missing_locations(md))
     print(generated)
     assert "from enum import Enum" in generated, "EnumPlugin not working"
     assert (
