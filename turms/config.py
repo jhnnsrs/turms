@@ -7,6 +7,13 @@ from turms.processors.base import ProcessorConfig
 from turms.stylers.base import StylerConfig
 
 
+class ConfigProxy(BaseModel):
+    type: str
+
+    class Config:
+        extras = "allow"
+
+
 class GeneratorConfig(BaseSettings):
     domain: str = "default"
     out_dir: str = "api"
@@ -23,10 +30,10 @@ class GeneratorConfig(BaseSettings):
     additional_bases = {}
     extensions: Dict = {}
 
-    parsers: List[ParserConfig] = []
-    plugins: List[PluginConfig] = []
-    processors: List[ProcessorConfig] = []
-    stylers: List[StylerConfig] = []
+    parsers: List[ConfigProxy] = []
+    plugins: List[ConfigProxy] = []
+    processors: List[ConfigProxy] = []
+    stylers: List[ConfigProxy] = []
 
     @validator("parsers", "plugins", "processors", "stylers")
     def validate_importable(cls, v):
@@ -39,7 +46,7 @@ class GeneratorConfig(BaseSettings):
 
     class Config:
         env_prefix = "TURMS_"
-        extra = "allow"
+        extra = "forbid"
 
 
 class Extensions(BaseModel):

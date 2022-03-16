@@ -11,7 +11,7 @@ class PluginConfig(BaseSettings):
     type: str
 
     class Config:
-        extra = "allow"
+        extra = "forbid"
 
 
 class Plugin(BaseModel):

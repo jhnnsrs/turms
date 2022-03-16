@@ -9,7 +9,7 @@ class ParserConfig(BaseSettings):
     type: str
 
     class Config:
-        extra = "allow"
+        extra = "forbid"
 
 
 class Parser(BaseModel):

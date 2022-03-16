@@ -7,7 +7,7 @@ class StylerConfig(BaseSettings):
     type: str
 
     class Config:
-        extra = "allow"
+        extra = "forbid"
 
 
 class Styler(BaseModel):

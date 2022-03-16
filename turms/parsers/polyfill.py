@@ -7,7 +7,7 @@ from pydantic import Field, validator
 class PolyfillPluginConfig(ParserConfig):
     type = "turms.parsers.polyfill.PolyfillPlugin"
     skip_underscore: bool = True
-    python_version: str
+    python_version: str = "3.9"
 
     class Config:
         env_prefix = "TURMS_PARSERS_POLYFILL_"

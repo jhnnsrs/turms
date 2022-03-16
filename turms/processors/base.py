@@ -8,7 +8,7 @@ class ProcessorConfig(BaseSettings):
     type: str
 
     class Config:
-        extra = "allow"
+        extra = "forbid"
 
 
 class Processor(BaseModel):
