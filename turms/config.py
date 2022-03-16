@@ -11,7 +11,7 @@ class ConfigProxy(BaseModel):
     type: str
 
     class Config:
-        extras = "allow"
+        extra = "allow"
 
 
 class GeneratorConfig(BaseSettings):
@@ -42,6 +42,7 @@ class GeneratorConfig(BaseSettings):
                 import_string(parser.type)
         except Exception as e:
             raise ValueError(f"Invalid import: {parser.type} {e}") from e
+
         return v
 
     class Config:
