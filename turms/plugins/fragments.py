@@ -3,7 +3,7 @@ import ast
 from typing import Callable, List, Optional
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
-from turms.parser.recurse import recurse_annotation, type_field_node
+from turms.recurse import recurse_annotation, type_field_node
 from turms.plugins.base import Plugin, PluginConfig
 from pydantic import BaseModel, BaseSettings
 from graphql.language.ast import FragmentDefinitionNode
@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 class FragmentsPluginConfig(PluginConfig):
+    type = "turms.plugins.fragments.FragmentsPlugin"
     fragment_bases: List[str] = None
     fragments_glob: Optional[str]
 

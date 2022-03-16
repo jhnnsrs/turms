@@ -2,8 +2,19 @@ from pydantic import BaseModel
 from turms.stylers.base import BaseStyler
 
 
-class Capitalizer(BaseStyler):
-    def __init__(self, **kwargs) -> None:
+class CapitalizeSylerConfig(BaseModel):
+    type = "turms.stylers.capitalize.CapitalizerSyler"
+    capitalize_fragment: bool = True
+    capitalize_query: bool = True
+    capitalize_mutation: bool = True
+    capitalize_subscription: bool = True
+    capitalize_enum: bool = True
+    capitalize_input: bool = True
+
+
+class CapitalizeStyler(BaseStyler):
+    def __init__(self, config: CapitalizeSylerConfig = None, **kwargs) -> None:
+        self.config = config or CapitalizeSylerConfig(**kwargs)
         super().__init__()
 
     def style_fragment_name(self, typename):

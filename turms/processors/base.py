@@ -1,4 +1,14 @@
 from abc import abstractmethod
+from typing import Optional
+
+from pydantic import BaseSettings
+
+
+class ProcessorConfig(BaseSettings):
+    type: str
+
+    class Config:
+        extra = "allow"
 
 
 class Processor:

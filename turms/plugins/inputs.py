@@ -22,6 +22,7 @@ from turms.registry import ClassRegistry
 
 
 class InputsPluginConfig(PluginConfig):
+    type = "turms.plugins.inputs.InputsPlugin"
     inputtype_bases: List[str] = ["pydantic.BaseModel"]
     skip_underscore: bool = True
 

@@ -3,7 +3,6 @@ import ast
 import pytest
 from turms.config import GeneratorConfig
 from turms.run import gen, generate_ast
-from turms.compat.funcs import unparse
 from graphql.language import parse
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
@@ -11,14 +10,14 @@ from turms.plugins.fragments import FragmentsPlugin
 from turms.plugins.operation import OperationsPlugin
 from turms.plugins.funcs import (
     FunctionDefinition,
-    OperationsFuncPlugin,
-    OperationsFuncPluginConfig,
+    FuncsPlugin,
+    FuncsPluginConfig,
 )
-from turms.stylers.snake import SnakeNodeName
-from turms.stylers.capitalize import Capitalizer
+from turms.stylers.snake_case import SnakeCaseStyler
+from turms.stylers.capitalize import CapitalizeStyler
 from turms.helpers import build_schema_from_glob
-from turms.processor.black import BlackProcessor
-from turms.processor.isort import IsortProcessor
+from turms.processors.black import BlackProcessor
+from turms.processors.isort import IsortProcessor
 
 
 @pytest.fixture()
@@ -33,14 +32,14 @@ def test_nested_input_funcs(nested_input_schema):
     generated_ast = generate_ast(
         config,
         nested_input_schema,
-        stylers=[Capitalizer(), SnakeNodeName()],
+        stylers=[CapitalizeStyler(), SnakeCaseStyler()],
         plugins=[
             EnumsPlugin(),
             InputsPlugin(),
             FragmentsPlugin(),
             OperationsPlugin(),
-            OperationsFuncPlugin(
-                config=OperationsFuncPluginConfig(
+            FuncsPlugin(
+                config=FuncsPluginConfig(
                     definitions=(
                         [
                             FunctionDefinition(
@@ -56,7 +55,7 @@ def test_nested_input_funcs(nested_input_schema):
     )
 
     md = ast.Module(body=generated_ast, type_ignores=[])
-    generated = unparse(ast.fix_missing_locations(md))
+    generated = ast.unparse(ast.fix_missing_locations(md))
 
 
 def test_default_input_funcs(nested_input_schema):
@@ -66,14 +65,14 @@ def test_default_input_funcs(nested_input_schema):
     generated_ast = generate_ast(
         config,
         nested_input_schema,
-        stylers=[Capitalizer(), SnakeNodeName()],
+        stylers=[CapitalizeStyler(), SnakeCaseStyler()],
         plugins=[
             EnumsPlugin(),
             InputsPlugin(),
             FragmentsPlugin(),
             OperationsPlugin(),
-            OperationsFuncPlugin(
-                config=OperationsFuncPluginConfig(
+            FuncsPlugin(
+                config=FuncsPluginConfig(
                     definitions=(
                         [
                             FunctionDefinition(
@@ -89,4 +88,4 @@ def test_default_input_funcs(nested_input_schema):
     )
 
     md = ast.Module(body=generated_ast, type_ignores=[])
-    generated = unparse(ast.fix_missing_locations(md))
+    generated = ast.unparse(ast.fix_missing_locations(md))

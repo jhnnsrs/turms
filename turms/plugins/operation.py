@@ -4,7 +4,7 @@ from typing import List, Optional
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.language.ast import OperationDefinitionNode, OperationType
-from turms.parser.recurse import recurse_annotation, type_field_node
+from turms.recurse import recurse_annotation, type_field_node
 from turms.plugins.base import Plugin, PluginConfig
 from pydantic import BaseModel, BaseSettings
 from graphql.error.graphql_error import GraphQLError
@@ -58,6 +58,7 @@ fragment_searcher = re.compile(r"\.\.\.(?P<fragment>[a-zA-Z]*)")
 
 
 class OperationsPluginConfig(PluginConfig):
+    type = "turms.plugins.operations.OperationsPlugin"
     query_bases: List[str] = None
     mutation_bases: List[str] = None
     subscription_bases: List[str] = None

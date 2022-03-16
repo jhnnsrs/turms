@@ -1,9 +1,10 @@
 from pydantic import BaseModel
 from rich import get_console
-from turms.processor.base import Processor
+from turms.processors.base import Processor, ProcessorConfig
 
 
-class BlackProcessorConfig(BaseModel):
+class BlackProcessorConfig(ProcessorConfig):
+    type = "turms.processors.black.BlackProcessor"
     pass
 
 

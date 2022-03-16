@@ -1,5 +1,10 @@
-from pydantic import AnyHttpUrl, BaseModel, BaseSettings, Field
+from pydantic import AnyHttpUrl, BaseModel, BaseSettings, Field, validator
 from typing import Dict, List, Optional, Union
+from turms.helpers import import_string
+from turms.parsers.base import ParserConfig
+from turms.plugins.base import PluginConfig
+from turms.processors.base import ProcessorConfig
+from turms.stylers.base import StylerConfig
 
 
 class GeneratorConfig(BaseSettings):
@@ -17,16 +22,35 @@ class GeneratorConfig(BaseSettings):
     additional_bases = {}
     extensions: Dict = {}
 
+    parsers: List[ParserConfig] = []
+    plugins: List[PluginConfig] = []
+    processors: List[ProcessorConfig] = []
+    stylers: List[StylerConfig] = []
+
+    @validator("parsers", "plugins", "processors", "stylers")
+    def validate_importable(cls, v):
+        try:
+            for parser in v:
+                import_string(parser.type)
+        except Exception as e:
+            raise ValueError(f"Invalid import: {parser.type} {e}") from e
+        return v
+
     class Config:
         env_prefix = "TURMS_"
         extra = "allow"
 
 
-class GraphQLConfig(BaseSettings):
+class Extensions(BaseModel):
+    turms: GeneratorConfig
+
+
+class GraphQLConfig(BaseSettings):  # TODO: Rename to graphql project
     schema_url: Optional[Union[AnyHttpUrl, str]] = Field(alias="schema")
     bearer_token: Optional[str] = None
     documents: Optional[str]
     domain: str = "default"
+    extensions: Extensions
 
     class Config:
         env_prefix = "TURMS_GRAPHQL_"

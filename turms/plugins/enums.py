@@ -19,6 +19,7 @@ class EnumsPluginsError(Exception):
 
 
 class EnumsPluginConfig(PluginConfig):
+    type = "turms.plugins.enums.EnumsPlugin"
     skip_underscore: bool = True
     prepend: str = ""
     append: str = ""

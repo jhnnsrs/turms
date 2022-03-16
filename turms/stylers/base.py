@@ -1,5 +1,14 @@
 from abc import abstractmethod
 
+from pydantic import BaseSettings
+
+
+class StylerConfig(BaseSettings):
+    type: str
+
+    class Config:
+        extra = "allow"
+
 
 class Styler:
     @abstractmethod

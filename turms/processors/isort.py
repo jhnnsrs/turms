@@ -1,9 +1,10 @@
 from pydantic import BaseModel
 from rich import get_console
-from turms.processor.base import Processor
+from turms.processors.base import Processor, ProcessorConfig
 
 
-class IsortProcessorConfig(BaseModel):
+class IsortProcessorConfig(ProcessorConfig):
+    type = "turms.processors.isort.IsortProcessor"
     pass
 
 

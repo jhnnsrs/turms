@@ -1,9 +1,10 @@
 from enum import Enum
-from typing import List, Literal, Optional
+from typing import List, Optional
 
-from arkitekt.funcs import aexecute, execute
-from arkitekt.rath import ArkitektRath
+from mikro.funcs import aexecute, execute
+from mikro.mikro import MikroRath
 from pydantic import BaseModel, Field
+from typing_extensions import Literal
 
 
 class CreateBeastCreatebeast(BaseModel):
@@ -40,8 +41,8 @@ class CreateIntBeast(BaseModel):
 async def acreate_beast(
     nested: Optional[List[List[str]]] = None,
     non_optional_parameter: str = "999",
-    rath: ArkitektRath = None,
-) -> CreateBeastCreatebeast:
+    mikrorath: MikroRath = None,
+) -> Optional[CreateBeastCreatebeast]:
     """createBeast
 
     Genrates a best which is nice
@@ -49,7 +50,7 @@ async def acreate_beast(
     Arguments:
         nested (Optional[List[List[str]]], optional): nested.
         non_optional_parameter (str, optional): nonOptionalParameter. Defaults to 999
-        rath (arkitekt.rath.ArkitektRath, optional): The arkitekt rath client
+        mikrorath (mikro.mikro.MikroRath, optional): The mikro rath client
 
     Returns:
         CreateBeastCreatebeast"""
@@ -57,7 +58,7 @@ async def acreate_beast(
         await aexecute(
             CreateBeast,
             {"nested": nested, "nonOptionalParameter": non_optional_parameter},
-            rath=rath,
+            mikrorath=mikrorath,
         )
     ).create_beast
 
@@ -65,8 +66,8 @@ async def acreate_beast(
 def create_beast(
     nested: Optional[List[List[str]]] = None,
     non_optional_parameter: str = "999",
-    rath: ArkitektRath = None,
-) -> CreateBeastCreatebeast:
+    mikrorath: MikroRath = None,
+) -> Optional[CreateBeastCreatebeast]:
     """createBeast
 
     Genrates a best which is nice
@@ -74,22 +75,22 @@ def create_beast(
     Arguments:
         nested (Optional[List[List[str]]], optional): nested.
         non_optional_parameter (str, optional): nonOptionalParameter. Defaults to 999
-        rath (arkitekt.rath.ArkitektRath, optional): The arkitekt rath client
+        mikrorath (mikro.mikro.MikroRath, optional): The mikro rath client
 
     Returns:
         CreateBeastCreatebeast"""
     return execute(
         CreateBeast,
         {"nested": nested, "nonOptionalParameter": non_optional_parameter},
-        rath=rath,
+        mikrorath=mikrorath,
     ).create_beast
 
 
 async def acreate_int_beast(
     nested: Optional[List[List[str]]] = None,
     non_optional_parameter: int = 999,
-    rath: ArkitektRath = None,
-) -> CreateIntBeastCreateintbeast:
+    mikrorath: MikroRath = None,
+) -> Optional[CreateIntBeastCreateintbeast]:
     """createIntBeast
 
 
@@ -97,7 +98,7 @@ async def acreate_int_beast(
     Arguments:
         nested (Optional[List[List[str]]], optional): nested.
         non_optional_parameter (int, optional): nonOptionalParameter. Defaults to 999
-        rath (arkitekt.rath.ArkitektRath, optional): The arkitekt rath client
+        mikrorath (mikro.mikro.MikroRath, optional): The mikro rath client
 
     Returns:
         CreateIntBeastCreateintbeast"""
@@ -105,7 +106,7 @@ async def acreate_int_beast(
         await aexecute(
             CreateIntBeast,
             {"nested": nested, "nonOptionalParameter": non_optional_parameter},
-            rath=rath,
+            mikrorath=mikrorath,
         )
     ).create_int_beast
 
@@ -113,8 +114,8 @@ async def acreate_int_beast(
 def create_int_beast(
     nested: Optional[List[List[str]]] = None,
     non_optional_parameter: int = 999,
-    rath: ArkitektRath = None,
-) -> CreateIntBeastCreateintbeast:
+    mikrorath: MikroRath = None,
+) -> Optional[CreateIntBeastCreateintbeast]:
     """createIntBeast
 
 
@@ -122,12 +123,12 @@ def create_int_beast(
     Arguments:
         nested (Optional[List[List[str]]], optional): nested.
         non_optional_parameter (int, optional): nonOptionalParameter. Defaults to 999
-        rath (arkitekt.rath.ArkitektRath, optional): The arkitekt rath client
+        mikrorath (mikro.mikro.MikroRath, optional): The mikro rath client
 
     Returns:
         CreateIntBeastCreateintbeast"""
     return execute(
         CreateIntBeast,
         {"nested": nested, "nonOptionalParameter": non_optional_parameter},
-        rath=rath,
+        mikrorath=mikrorath,
     ).create_int_beast

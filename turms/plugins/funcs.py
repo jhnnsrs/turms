@@ -78,7 +78,8 @@ class FunctionDefinition(BaseModel):
     use: str
 
 
-class OperationsFuncPluginConfig(PluginConfig):
+class FuncsPluginConfig(PluginConfig):
+    type = "turms.plugins.funcs.FuncsPlugin"
     funcs_glob: Optional[str]
     prepend_sync: str = ""
     prepend_async: str = "a"
@@ -897,9 +898,9 @@ def generate_operation_func(
     return tree
 
 
-class OperationsFuncPlugin(Plugin):
+class FuncsPlugin(Plugin):
     def __init__(self, config=None, **data):
-        self.plugin_config = config or OperationsFuncPluginConfig(**data)
+        self.plugin_config = config or FuncsPluginConfig(**data)
 
     def generate_ast(
         self,

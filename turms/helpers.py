@@ -76,6 +76,7 @@ def build_schema_from_introspect_url(
 
 
 def build_schema_from_glob(glob_string: str):
+    """Build a GraphQL schema from a glob string"""
     schema_glob = glob.glob(glob_string, recursive=True)
     dsl_string = ""
     introspection_string = ""

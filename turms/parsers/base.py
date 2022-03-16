@@ -1,32 +1,29 @@
 from abc import abstractmethod
 import ast
-from optparse import Option
 from typing import List, Optional
-
-from pydantic import BaseSettings
+from pydantic import BaseModel, BaseSettings
 from graphql.utilities.build_client_schema import GraphQLSchema
 
 
-class PluginConfig(BaseSettings):
+class ParserConfig(BaseSettings):
     type: str
 
     class Config:
         extra = "allow"
 
 
-class Plugin:
-    """Base Plugin Class
+class Parser:
+    """Base Paser Class
 
     Raises:
         NotImplementedError: [description]
     """
 
-    @abstractmethod
-    def generate_ast(
+    plugin_config: ParserConfig
+
+    def parse_ast(
         self,
-        config,
-        client_schema: GraphQLSchema,
-        registry,
+        asts: List[ast.AST],
     ) -> List[ast.AST]:
         raise NotImplementedError("Plugin must overrwrite this")
 
