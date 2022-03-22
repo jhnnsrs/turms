@@ -1,14 +1,12 @@
 import glob
 import re
 from typing import Dict, List
-from turms.config import GeneratorConfig, GraphQLConfig
+from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.language.ast import DocumentNode, FieldNode
 from graphql.error.graphql_error import GraphQLError
 from graphql import (
-    language,
     parse,
-    get_introspection_query,
     validate,
     build_client_schema,
 )

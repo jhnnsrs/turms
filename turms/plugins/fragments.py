@@ -1,11 +1,10 @@
-from abc import abstractmethod
 import ast
-from typing import Callable, List, Optional
+from typing import List, Optional
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
-from turms.recurse import recurse_annotation, type_field_node
+from turms.recurse import type_field_node
 from turms.plugins.base import Plugin, PluginConfig
-from pydantic import BaseModel, BaseSettings, Field
+from pydantic import Field
 from graphql.language.ast import FragmentDefinitionNode
 from turms.registry import ClassRegistry
 from turms.utils import (
@@ -16,20 +15,16 @@ from turms.utils import (
     get_interface_bases,
     parse_documents,
 )
-import re
 from graphql import (
     FieldNode,
     FragmentSpreadNode,
     GraphQLInterfaceType,
     InlineFragmentNode,
     language,
-    parse,
-    get_introspection_query,
-    validate,
 )
 
 
-from graphql.utilities.type_info import TypeInfo, get_field_def
+from graphql.utilities.type_info import get_field_def
 import logging
 
 

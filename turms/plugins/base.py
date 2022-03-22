@@ -1,7 +1,6 @@
 from abc import abstractmethod
 import ast
-from optparse import Option
-from typing import List, Optional
+from typing import List
 
 from pydantic import BaseModel, BaseSettings
 from graphql.utilities.build_client_schema import GraphQLSchema

@@ -1,6 +1,5 @@
 import asyncio
 import asyncio
-import sys
 import time
 from rich.console import Console
 from watchdog.observers import Observer
@@ -9,11 +8,9 @@ from watchdog.events import (
     FileSystemEventHandler,
 )
 import os
-import subprocess
 import janus
 import threading
 import os
-import signal
 import yaml
 
 from turms.config import GraphQLConfig

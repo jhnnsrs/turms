@@ -1,48 +1,22 @@
-from abc import abstractmethod
 import ast
 from typing import List, Optional
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.language.ast import OperationDefinitionNode, OperationType
-from turms.recurse import recurse_annotation, type_field_node
+from turms.recurse import type_field_node
 from turms.plugins.base import Plugin, PluginConfig
-from pydantic import BaseModel, BaseSettings, Field
-from graphql.error.graphql_error import GraphQLError
-from graphql.error.syntax_error import GraphQLSyntaxError
+from pydantic import Field
 from graphql.language.ast import (
-    DefinitionNode,
-    DocumentNode,
     FieldNode,
-    FragmentDefinitionNode,
-    FragmentSpreadNode,
-    InlineFragmentNode,
-    ListTypeNode,
-    NonNullTypeNode,
     OperationDefinitionNode,
     OperationType,
-    SelectionNode,
-    SelectionSetNode,
 )
-from graphql.type.definition import (
-    GraphQLEnumType,
-    GraphQLField,
-    GraphQLInterfaceType,
-    GraphQLList,
-    GraphQLNonNull,
-    GraphQLObjectType,
-    GraphQLScalarType,
-    GraphQLType,
-    get_named_type,
-    is_list_type,
-)
-from graphql.type.validate import get_operation_type_node
-from graphql.utilities.build_client_schema import build_client_schema, GraphQLSchema
+from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.utilities.get_operation_root_type import get_operation_root_type
-from graphql.utilities.type_info import TypeInfo, get_field_def
+from graphql.utilities.type_info import get_field_def
 
-from pydantic.main import BaseModel
 import re
-from graphql import language, parse, get_introspection_query, validate
+from graphql import language
 from turms.registry import ClassRegistry
 from turms.utils import (
     NoDocumentsFoundError,

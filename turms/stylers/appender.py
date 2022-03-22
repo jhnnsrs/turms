@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import Field
 from turms.stylers.base import BaseStyler, StylerConfig
 
 

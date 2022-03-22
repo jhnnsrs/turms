@@ -1,10 +1,6 @@
 from pydantic import AnyHttpUrl, BaseModel, BaseSettings, Field, validator
 from typing import Dict, List, Optional, Union
 from turms.helpers import import_string
-from turms.parsers.base import ParserConfig
-from turms.plugins.base import PluginConfig
-from turms.processors.base import ProcessorConfig
-from turms.stylers.base import StylerConfig
 
 
 class ConfigProxy(BaseModel):

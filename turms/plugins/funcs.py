@@ -1,8 +1,6 @@
 from __future__ import annotations
-from abc import abstractmethod
 import ast
-from typing import Any, List, Literal
-from attr import Attribute
+from typing import Any, List
 
 from graphql import (
     BooleanValueNode,
@@ -19,7 +17,7 @@ from graphql import (
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from turms.plugins.base import Plugin, PluginConfig
-from pydantic import BaseModel, BaseSettings, Field
+from pydantic import BaseModel, Field
 from graphql.language.ast import OperationDefinitionNode, OperationType
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
@@ -35,7 +33,6 @@ from graphql.language.ast import (
 from turms.registry import ClassRegistry
 from turms.utils import (
     NoDocumentsFoundError,
-    generate_typename_field,
     parse_documents,
     target_from_node,
 )
@@ -45,13 +42,11 @@ import ast
 
 from graphql.type.definition import (
     GraphQLList,
-    get_named_type,
-    is_list_type,
 )
 from graphql.utilities.get_operation_root_type import get_operation_root_type
-from graphql.utilities.type_info import TypeInfo, get_field_def
+from graphql.utilities.type_info import get_field_def
 import logging
-from typing import Optional, Union
+from typing import Optional
 
 
 logger = logging.getLogger(__name__)
