@@ -161,23 +161,22 @@ def generate_operation(
 
     merged_document = replace_iteratively(query_document, registry)
 
+    meta_body = [
+        ast.Assign(
+            targets=[ast.Name(id="document", ctx=ast.Store())],
+            value=ast.Constant(value=merged_document),
+        ),
+    ]
+    if config.domain:
+        meta_body += [
+            ast.Assign(
+                targets=[ast.Name(id="domain", ctx=ast.Store())],
+                value=ast.Constant(value=str(config.domain)),
+            )
+        ]
+
     operation_fields += [
-        ast.ClassDef(
-            "Meta",
-            bases=[],
-            decorator_list=[],
-            keywords=[],
-            body=[
-                ast.Assign(
-                    targets=[ast.Name(id="domain", ctx=ast.Store())],
-                    value=ast.Constant(value=str(config.domain)),
-                ),
-                ast.Assign(
-                    targets=[ast.Name(id="document", ctx=ast.Store())],
-                    value=ast.Constant(value=merged_document),
-                ),
-            ],
-        )
+        ast.ClassDef("Meta", bases=[], decorator_list=[], keywords=[], body=meta_body)
     ]
 
     tree.append(

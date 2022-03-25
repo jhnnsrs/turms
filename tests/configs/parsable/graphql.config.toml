@@ -1,0 +1,73 @@
+[projects.default]
+schema = "tests/schemas/nested_inputs.graphql"
+documents = "tests/documents/inputs_default/*.graphql"
+
+[projects.default.extensions.turms]
+out_dir = "examples/api"
+[[projects.default.extensions.turms.parsers]]
+type = "turms.parsers.polyfill.PolyfillParser"
+python_version = 3.7
+
+[[projects.default.extensions.turms.stylers]]
+type = "turms.stylers.capitalize.CapitalizeStyler"
+
+[[projects.default.extensions.turms.stylers]]
+type = "turms.stylers.snake_case.SnakeCaseStyler"
+
+[[projects.default.extensions.turms.plugins]]
+type = "turms.plugins.enums.EnumsPlugin"
+
+[[projects.default.extensions.turms.plugins]]
+type = "turms.plugins.inputs.InputsPlugin"
+
+[[projects.default.extensions.turms.plugins]]
+type = "turms.plugins.fragments.FragmentsPlugin"
+
+[[projects.default.extensions.turms.plugins]]
+type = "turms.plugins.operations.OperationsPlugin"
+
+[[projects.default.extensions.turms.plugins]]
+type = "turms.plugins.funcs.FuncsPlugin"
+[[projects.default.extensions.turms.plugins.global_kwargs]]
+type = "mikro.mikro.MikroRath"
+key = "mikrorath"
+description = "The mikro rath client"
+
+[[projects.default.extensions.turms.plugins.definitions]]
+type = "subscription"
+is_async = true
+use = "mikro.funcs.asubscribe"
+
+[[projects.default.extensions.turms.plugins.definitions]]
+type = "query"
+is_async = true
+use = "mikro.funcs.aexecute"
+
+[[projects.default.extensions.turms.plugins.definitions]]
+type = "mutation"
+is_async = true
+use = "mikro.funcs.aexecute"
+
+[[projects.default.extensions.turms.plugins.definitions]]
+type = "subscription"
+use = "mikro.funcs.subscribe"
+
+[[projects.default.extensions.turms.plugins.definitions]]
+type = "query"
+use = "mikro.funcs.execute"
+
+[[projects.default.extensions.turms.plugins.definitions]]
+type = "mutation"
+use = "mikro.funcs.execute"
+
+
+[[projects.default.extensions.turms.processors]]
+type = "turms.processors.black.BlackProcessor"
+
+[[projects.default.extensions.turms.processors]]
+type = "turms.processors.isort.IsortProcessor"
+
+[projects.default.extensions.turms.scalar_definitions]
+uuid = "str"
+timestamptz = "str"
+Date = "str"

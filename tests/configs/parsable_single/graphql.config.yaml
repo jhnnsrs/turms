@@ -1,0 +1,44 @@
+documents: tests/documents/inputs_default/*.graphql
+extensions:
+  turms:
+    out_dir: examples/api
+    parsers:
+    - python_version: 3.7
+      type: turms.parsers.polyfill.PolyfillParser
+    plugins:
+    - type: turms.plugins.enums.EnumsPlugin
+    - type: turms.plugins.inputs.InputsPlugin
+    - type: turms.plugins.fragments.FragmentsPlugin
+    - type: turms.plugins.operations.OperationsPlugin
+    - definitions:
+      - is_async: true
+        type: subscription
+        use: mikro.funcs.asubscribe
+      - is_async: true
+        type: query
+        use: mikro.funcs.aexecute
+      - is_async: true
+        type: mutation
+        use: mikro.funcs.aexecute
+      - type: subscription
+        use: mikro.funcs.subscribe
+      - type: query
+        use: mikro.funcs.execute
+      - type: mutation
+        use: mikro.funcs.execute
+      global_kwargs:
+      - description: The mikro rath client
+        key: mikrorath
+        type: mikro.mikro.MikroRath
+      type: turms.plugins.funcs.FuncsPlugin
+    processors:
+    - type: turms.processors.black.BlackProcessor
+    - type: turms.processors.isort.IsortProcessor
+    scalar_definitions:
+      Date: str
+      timestamptz: str
+      uuid: str
+    stylers:
+    - type: turms.stylers.capitalize.CapitalizeStyler
+    - type: turms.stylers.snake_case.SnakeCaseStyler
+schema: tests/schemas/nested_inputs.graphql

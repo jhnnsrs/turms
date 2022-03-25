@@ -1,13 +1,18 @@
 import ast
 import os
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import yaml
 from graphql import GraphQLSchema
-from pydantic import AnyHttpUrl
+from pydantic import AnyHttpUrl, ValidationError
 from rich import get_console
 
-from turms.config import GeneratorConfig, GraphQLConfig
+from turms.config import (
+    GeneratorConfig,
+    GraphQLConfigMultiple,
+    GraphQLConfigSingle,
+    GraphQLProject,
+)
 from turms.helpers import (
     build_schema_from_glob,
     build_schema_from_introspect_url,
@@ -17,11 +22,129 @@ from turms.plugins.base import Plugin
 from turms.processors.base import Processor
 from turms.registry import ClassRegistry
 from turms.stylers.base import Styler
+from pydantic.error_wrappers import ValidationError
 
 from .errors import GenerationError
+import json
+import os
+
+try:
+    import toml
+
+    def toml_loader(file):
+        return toml.loads(file.read())
+
+except ImportError:
+
+    def toml_loader(file):
+        raise NotImplementedError("TOML not supported if you dont install `toml`")
 
 
-def gen(filepath: Optional[str] = "graphql.config.yaml", project: Optional[str] = None):
+def json_loader(file):
+    return json.loads(file.read())
+
+
+FILE_NAME_LOADERS = {
+    "graphql.config.yaml": yaml.safe_load,
+    ".graphqlrc.yaml": yaml.safe_load,
+    "graphql.config.yml": yaml.safe_load,
+    ".graphqlrc.yml": yaml.safe_load,
+    "graphql.config.toml": toml_loader,
+    ".graphqlrc.toml": toml_loader,
+    "graphql.config.json": json_loader,
+    ".graphqlrc.json": json_loader,
+}
+
+
+def load_projects_from_configpath(
+    config_path: str, select: str = None
+) -> Dict[str, GraphQLProject]:
+    """Loads the configuration from a configuration file
+
+    Args:
+        config_path (str): The path to the config file
+
+    Returns:
+        GraphQLConfig: The configuration
+    """
+    file_path, file_name = os.path.split(config_path)
+
+    with open(config_path, "r", encoding="utf-8") as file:
+
+        try:
+            loaded_dict = FILE_NAME_LOADERS[file_name.lower()](file)
+        except AttributeError as err:
+            raise GenerationError(
+                f"File {file_name} is not supported. Please use one of {FILE_NAME_LOADERS.keys()}"
+            ) from err
+
+    try:
+        if "projects" in loaded_dict:
+            projects = GraphQLConfigMultiple(**loaded_dict).projects
+        else:
+            projects = {"default": GraphQLConfigSingle(**loaded_dict)}
+    except ValidationError as err:
+        raise GenerationError(
+            f"File {file_name} at {file_path} does not conform with turms."
+        ) from err
+
+    if select:
+        projects = {key: project for key, project in projects.items() if key == select}
+        assert len(projects) >= 1, "At least one project must be selected"
+
+    return projects
+
+
+def scan_folder_for_configs(folder_path: str = None) -> List[str]:
+    """Scans a folder for config files
+
+    Args:
+        folder_path (str): The path to the folder
+
+    Returns:
+        List[str]: The list of config files
+    """
+    if folder_path is None:
+        folder_path = os.getcwd()
+
+    return [
+        os.path.join(folder_path, file_name)
+        for file_name in os.listdir(folder_path)
+        if file_name.lower() in FILE_NAME_LOADERS.keys()
+    ]
+
+
+def scan_folder_for_single_config(folder_path: str = None) -> List[str]:
+    """Scans a folder for one single config file
+
+    Args:
+        folder_path (str): The path to the folder
+
+    Returns:
+        str: The config file
+    """
+
+    configs = scan_folder_for_configs(folder_path=folder_path)
+
+    if len(configs) == 0:
+        raise GenerationError(
+            f"No config files found in {folder_path}. Please use one of {FILE_NAME_LOADERS.keys()}"
+        )
+
+    if len(configs) != 1:
+        raise GenerationError(
+            f"Multiple config files found in {folder_path}. Please only have one of {FILE_NAME_LOADERS.keys()}"
+        )
+
+    return configs[0]
+
+
+def gen(
+    filepath: Optional[str] = None,
+    project: Optional[str] = None,
+    strict: bool = False,
+    overwrite_path: Optional[str] = None,
+):
     """Generates  Code according to the config file
 
     Args:
@@ -29,31 +152,32 @@ def gen(filepath: Optional[str] = "graphql.config.yaml", project: Optional[str] 
         project (str, optional): The project within that should be generated. Defaults to None.
     """
 
-    with open(filepath, "r", encoding="utf-8") as file:
-        yaml_dict = yaml.safe_load(file)
+    if filepath is None:
+        filepath = scan_folder_for_single_config()
 
-    assert "projects" in yaml_dict, "Right now only projects is supported"
+    projects = load_projects_from_configpath(filepath, project)
 
-    projects = yaml_dict["projects"].items()
-    if project:
-        projects = [(project, yaml_dict["projects"][project])]
-
-    for key, project in projects:
+    for key, project in projects.items():
         try:
             get_console().print(
                 f"-------------- Generating project: {key} --------------"
             )
-            config = GraphQLConfig(**project, domain=key)
 
-            generated_code = generate(config)
+            generated_code = generate(project)
 
-            if not os.path.isdir(config.extensions.turms.out_dir):
-                os.makedirs(config.extensions.turms.out_dir)
+            outdir = (
+                project.extensions.turms.out_dir
+                if not overwrite_path
+                else overwrite_path
+            )
+
+            if not os.path.isdir(outdir):
+                os.makedirs(outdir)
 
             with open(
                 os.path.join(
-                    config.extensions.turms.out_dir,
-                    config.extensions.turms.generated_name,
+                    outdir,
+                    project.extensions.turms.generated_name,
                 ),
                 "w",
                 encoding="utf-8",
@@ -61,12 +185,13 @@ def gen(filepath: Optional[str] = "graphql.config.yaml", project: Optional[str] 
                 file.write(generated_code)
 
             get_console().print("Sucessfull!! :right-facing_fist::left-facing_fist:")
-        except:
+        except Exception as e:
             get_console().print(
                 "-------- ERROR FOR PROJECT: " + key.upper() + " --------"
             )
             get_console().print_exception()
-            raise
+            if strict:
+                raise GenerationError from e
 
 
 def instantiate(module_path: str, **kwargs):
@@ -83,7 +208,7 @@ def instantiate(module_path: str, **kwargs):
     return import_string(module_path)(**kwargs)
 
 
-def generate(config: GraphQLConfig) -> str:
+def generate(project: GraphQLProject) -> str:
     """Genrates the code according to the configugration
 
     The code is generated in the following order:
@@ -96,23 +221,22 @@ def generate(config: GraphQLConfig) -> str:
         7. Process the code string through the processors
 
     Args:
-        config (GraphQLConfig): The configuraion for the generation
+        project (GraphQLConfig): The configuraion for the generation
 
     Returns:
         str: The generated code
     """
 
-    if isinstance(config.schema_url, AnyHttpUrl):
+    if isinstance(project.schema_url, AnyHttpUrl):
         schema = build_schema_from_introspect_url(
-            config.schema_url, config.bearer_token
+            project.schema_url, project.bearer_token
         )
     else:
-        schema = build_schema_from_glob(config.schema_url)
+        schema = build_schema_from_glob(project.schema_url)
 
-    gen_config = config.extensions.turms
+    gen_config = project.extensions.turms
 
-    gen_config.documents = config.documents
-    gen_config.domain = config.domain
+    gen_config.documents = gen_config.documents or project.documents
     verbose = gen_config.verbose
 
     plugins = []
@@ -121,28 +245,28 @@ def generate(config: GraphQLConfig) -> str:
     processors = []
 
     for parser_config in gen_config.parsers:
-        x = instantiate(parser_config.type, config=parser_config.dict())
+        styler = instantiate(parser_config.type, config=parser_config.dict())
         if verbose:
-            get_console().print(f"Using Parser {x}")
-        parsers.append(x)
+            get_console().print(f"Using Parser {styler}")
+        parsers.append(styler)
 
     for plugins_config in gen_config.plugins:
-        x = instantiate(plugins_config.type, config=plugins_config.dict())
+        styler = instantiate(plugins_config.type, config=plugins_config.dict())
         if verbose:
-            get_console().print(f"Using Plugin {x}")
-        plugins.append(x)
+            get_console().print(f"Using Plugin {styler}")
+        plugins.append(styler)
 
     for styler_config in gen_config.stylers:
-        x = instantiate(styler_config.type, config=styler_config.dict())
+        styler = instantiate(styler_config.type, config=styler_config.dict())
         if verbose:
-            get_console().print(f"Using Styler {x}")
-        stylers.append(x)
+            get_console().print(f"Using Styler {styler}")
+        stylers.append(styler)
 
     for proc_config in gen_config.processors:
-        x = instantiate(proc_config.type, config=proc_config.dict())
+        styler = instantiate(proc_config.type, config=proc_config.dict())
         if verbose:
-            get_console().print(f"Using Processor {x}")
-        processors.append(x)
+            get_console().print(f"Using Processor {styler}")
+        processors.append(styler)
 
     generated_ast = generate_ast(
         gen_config,
@@ -151,11 +275,11 @@ def generate(config: GraphQLConfig) -> str:
         stylers=stylers,
     )
 
-    for parser in parsers:
-        generated_ast = parser.parse_ast(generated_ast)
+    for styler in parsers:
+        generated_ast = styler.parse_ast(generated_ast)
 
-    md = ast.Module(body=generated_ast, type_ignores=[])
-    generated = ast.unparse(ast.fix_missing_locations(md))
+    module = ast.Module(body=generated_ast, type_ignores=[])
+    generated = ast.unparse(ast.fix_missing_locations(module))
 
     for processor in processors:
         generated = processor.run(generated)
