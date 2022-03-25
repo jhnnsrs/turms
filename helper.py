@@ -11,5 +11,3 @@ class lala(object):
 
 
 """
-
-print(ast.dump(ast.parse(x), indent=4))

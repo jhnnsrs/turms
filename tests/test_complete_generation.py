@@ -97,7 +97,6 @@ def test_beast_operations(beast_schema):
 
     md = ast.Module(body=generated_ast, type_ignores=[])
     generated = ast.unparse(ast.fix_missing_locations(md))
-    print(generated)
     assert "from enum import Enum" in generated, "EnumPlugin not working"
     assert "class Get_beasts(BaseModel):" in generated, "OpertiationsPlugin not working"
     assert "common_name: Optional[str]" in generated, "SnakeNodeName not working"
@@ -122,7 +121,6 @@ def test_arkitekt_operations(arkitekt_schema):
 
     md = ast.Module(body=generated_ast, type_ignores=[])
     generated = ast.unparse(ast.fix_missing_locations(md))
-    print(generated)
     assert "from enum import Enum" in generated, "EnumPlugin not working"
     assert (
         "class Create_template(BaseModel):" in generated

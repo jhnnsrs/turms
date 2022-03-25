@@ -1003,7 +1003,6 @@ def generate_operation_func(
     returns, collapsed = get_return_type_annotation(
         o, client_schema, registry, collapse=collapse
     )
-    print(returns)
 
     doc = generate_query_doc(
         definition, o, client_schema, config, plugin_config, registry, collapse
