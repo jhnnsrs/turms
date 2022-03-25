@@ -1,7 +1,6 @@
 from __future__ import annotations
 import ast
 from ctypes import Union
-from operator import mod
 from typing import Any, List, Tuple
 
 from graphql import (

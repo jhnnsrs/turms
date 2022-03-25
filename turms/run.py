@@ -19,7 +19,6 @@ from turms.helpers import (
     import_string,
 )
 from turms.plugins.base import Plugin
-from turms.processors.base import Processor
 from turms.registry import ClassRegistry
 from turms.stylers.base import Styler
 from pydantic.error_wrappers import ValidationError
