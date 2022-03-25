@@ -11,7 +11,6 @@ from turms.utils import (
     generate_typename_field,
     get_additional_bases_for_type,
     get_interface_bases,
-    parse_documents,
     target_from_node,
 )
 import ast
@@ -24,10 +23,7 @@ from graphql.type.definition import (
     GraphQLObjectType,
     GraphQLScalarType,
     GraphQLType,
-    get_named_type,
-    is_list_type,
 )
-import keyword
 
 
 def recurse_annotation(
@@ -59,7 +55,7 @@ def recurse_annotation(
         config (GeneratorConfig): The generator config (with the defaults)
         subtree (ast.AST): The passed subtree
         registry (ClassRegistry): A class registry where classes and their imports are registered
-        parent_name (str, optional): If resolving nested types the the type of the parent. Defaults to "".
+        parent_name (str, optional): If resolving nested types the name of parent. Defaults to "".
         is_optional (bool, optional): A recurse modifier for optional types. Defaults to True.
 
     Raises:
@@ -128,8 +124,7 @@ def recurse_annotation(
 
         mother_class = ast.ClassDef(
             mother_class_name,
-            bases=get_interface_bases(config, registry)
-            + additional_bases,  # Todo: fill with base
+            bases=get_interface_bases(config, registry) + additional_bases,
             decorator_list=[],
             keywords=[],
             body=body + generate_config_class(config),
@@ -214,7 +209,7 @@ def recurse_annotation(
             union_class_names.append(mother_class_name)
 
         if len(union_class_names) > 1:
-            slice = ast.Tuple(
+            union_slice = ast.Tuple(
                 elts=[
                     ast.Name(id=clsname, ctx=ast.Load())
                     for clsname in union_class_names
@@ -230,14 +225,14 @@ def recurse_annotation(
                     value=ast.Name("Optional", ctx=ast.Load()),
                     slice=ast.Subscript(
                         value=ast.Name("Union", ctx=ast.Load()),
-                        slice=slice,
+                        slice=union_slice,
                     ),
                 )
             else:
                 registry.register_import("typing.Union")
                 return ast.Subscript(
                     value=ast.Name("Union", ctx=ast.Load()),
-                    slice=slice,
+                    slice=union_slice,
                 )
         else:
             return ast.Name(id=union_class_names[0], ctx=ast.Load())
@@ -427,6 +422,23 @@ def type_field_node(
     parent_name="",
     is_optional=True,
 ):
+    """Types a field node
+
+    This
+
+    Args:
+        node (FieldNode): _description_
+        field (GraphQLField): _description_
+        client_schema (GraphQLSchema): _description_
+        config (GeneratorConfig): _description_
+        subtree (ast.AST): _description_
+        registry (ClassRegistry): _description_
+        parent_name (str, optional): _description_. Defaults to "".
+        is_optional (bool, optional): _description_. Defaults to True.
+
+    Returns:
+        _type_: _description_
+    """
 
     target = target_from_node(node)
     field_name = registry.generate_node_name(target)

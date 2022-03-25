@@ -1,5 +1,4 @@
 import ast
-from distutils.command.config import config
 from typing import List
 from turms.config import GeneratorConfig
 from keyword import iskeyword

@@ -1,14 +1,17 @@
 from __future__ import annotations
-from abc import abstractmethod
 import ast
-from typing import Any, List, Literal
-from attr import Attribute
+from ctypes import Union
+from typing import Any, List, Tuple
 
 from graphql import (
     BooleanValueNode,
+    FieldDefinitionNode,
     FloatValueNode,
     FragmentSpreadNode,
+    GraphQLField,
+    GraphQLNamedType,
     GraphQLNonNull,
+    GraphQLScalarType,
     IntValueNode,
     NamedTypeNode,
     NullValueNode,
@@ -16,10 +19,11 @@ from graphql import (
     ValueNode,
     VariableDefinitionNode,
 )
+from enum import Enum
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from turms.plugins.base import Plugin, PluginConfig
-from pydantic import BaseModel, BaseSettings, Field
+from pydantic import BaseModel, Field
 from graphql.language.ast import OperationDefinitionNode, OperationType
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
@@ -35,7 +39,6 @@ from graphql.language.ast import (
 from turms.registry import ClassRegistry
 from turms.utils import (
     NoDocumentsFoundError,
-    generate_typename_field,
     parse_documents,
     target_from_node,
 )
@@ -45,13 +48,11 @@ import ast
 
 from graphql.type.definition import (
     GraphQLList,
-    get_named_type,
-    is_list_type,
 )
 from graphql.utilities.get_operation_root_type import get_operation_root_type
-from graphql.utilities.type_info import TypeInfo, get_field_def
+from graphql.utilities.type_info import get_field_def
 import logging
-from typing import Optional, Union
+from typing import Optional
 
 
 logger = logging.getLogger(__name__)
@@ -99,7 +100,7 @@ def camel_to_snake(name):
 
 def generate_async_func_name(
     o: OperationDefinitionNode,
-    plugin_config: OperationsFuncPluginConfig,
+    plugin_config: FuncsPluginConfig,
     config: GeneratorConfig,
     registry: ClassRegistry,
 ):
@@ -109,7 +110,7 @@ def generate_async_func_name(
 
 def generate_sync_func_name(
     o: OperationDefinitionNode,
-    plugin_config: OperationsFuncPluginConfig,
+    plugin_config: FuncsPluginConfig,
     config: GeneratorConfig,
     registry: ClassRegistry,
 ):
@@ -188,7 +189,7 @@ wanted_definition = {
 
 def get_extra_args_for_onode(
     definition: FunctionDefinition,
-    plugin_config: OperationsFuncPluginConfig,
+    plugin_config: FuncsPluginConfig,
 ) -> List[Arg]:
 
     args = plugin_config.global_args
@@ -196,7 +197,7 @@ def get_extra_args_for_onode(
 
 
 def generate_passing_extra_args_for_onode(
-    definition: FunctionDefinition, plugin_config: OperationsFuncPluginConfig
+    definition: FunctionDefinition, plugin_config: FuncsPluginConfig
 ):
 
     return [
@@ -206,7 +207,7 @@ def generate_passing_extra_args_for_onode(
 
 
 def generate_passing_extra_kwargs_for_onode(
-    definition: FunctionDefinition, plugin_config: OperationsFuncPluginConfig
+    definition: FunctionDefinition, plugin_config: FuncsPluginConfig
 ):
 
     return [
@@ -217,38 +218,60 @@ def generate_passing_extra_kwargs_for_onode(
 
 def get_extra_kwargs_for_onode(
     definition: FunctionDefinition,
-    plugin_config: OperationsFuncPluginConfig,
-) -> List[Arg]:
+    plugin_config: FuncsPluginConfig,
+) -> List[Kwarg]:
 
     kwargs = plugin_config.global_kwargs
 
     return kwargs + definition.extra_kwargs
 
 
-def parse_value_node(x: ValueNode):
-    if isinstance(x, IntValueNode):
-        return int(x.value)
-    elif isinstance(x, FloatValueNode):
-        return float(x.value)
-    elif isinstance(x, StringValueNode):
-        return x.value
-    elif isinstance(x, BooleanValueNode):
-        return x.value == "true"
-    elif isinstance(x, NullValueNode):
+def parse_value_node(value_node: ValueNode) -> Union[None, str, int, float, bool]:
+    """Parses a Value Node into a Python value
+    using standard types
+
+    Args:
+        value_node (ValueNode): The Argument Value Node
+
+    Raises:
+        NotImplementedError: If the Value Node is not supported
+
+    Returns:
+        Union[None, str, int, float, bool]: The parsed value
+    """
+    if isinstance(value_node, IntValueNode):
+        return int(value_node.value)
+    elif isinstance(value_node, FloatValueNode):
+        return float(value_node.value)
+    elif isinstance(value_node, StringValueNode):
+        return value_node.value
+    elif isinstance(value_node, BooleanValueNode):
+        return value_node.value == "true"
+    elif isinstance(value_node, NullValueNode):
         return None
     else:
-        raise NotImplementedError(f"cannot parse {x}")
+        raise NotImplementedError(f"Cannot parse {value_node}")
 
 
 def get_definitions_for_onode(
-    o: OperationDefinitionNode,
-    plugin_config: OperationsFuncPluginConfig,
+    operation_definition: OperationDefinitionNode,
+    plugin_config: FuncsPluginConfig,
 ) -> List[Arg]:
+    """Checks the Plugin Config if the operation definition should be included
+    in the generated functions
+
+    Args:
+        operation_definition (OperationDefinitionNode): _description_
+        plugin_config (FuncsPluginConfig): _description_
+
+    Returns:
+        List[Arg]: _description_
+    """
 
     definitions = [
         definition
         for definition in plugin_config.definitions
-        if definition.type == o.operation
+        if definition.type == operation_definition.operation
     ]
 
     return definitions
@@ -256,9 +279,9 @@ def get_definitions_for_onode(
 
 def generate_query_args(
     definition: FunctionDefinition,
-    o: OperationDefinitionNode,
+    operation_definition: OperationDefinitionNode,
     config: GeneratorConfig,
-    plugin_config: OperationsFuncPluginConfig,
+    plugin_config: FuncsPluginConfig,
     registry: ClassRegistry,
 ):
 
@@ -277,7 +300,7 @@ def generate_query_args(
             )
         )
 
-    for v in o.variable_definitions:
+    for v in operation_definition.variable_definitions:
         if isinstance(v.type, NonNullTypeNode) and not v.default_value:
             pos_args.append(
                 ast.arg(
@@ -289,7 +312,7 @@ def generate_query_args(
     kw_args = []
     kw_values = []
 
-    for v in o.variable_definitions:
+    for v in operation_definition.variable_definitions:
         if not isinstance(v.type, NonNullTypeNode) or v.default_value:
             kw_args.append(
                 ast.arg(
@@ -356,7 +379,7 @@ def recurse_variable_annotation(
     if isinstance(v.type, NamedTypeNode):
         try:
             x = registry.get_scalar_equivalent(v.type.name.value)
-        except NoScalarEquivalentFound as e:
+        except NoScalarEquivalentFound:
             x = registry.get_inputtype_class(v.type.name.value)
         if optional:
             return "Optional[" + x + "]"
@@ -376,18 +399,7 @@ def recurse_variable_annotation(
     raise NotImplementedError()
 
 
-def generate_query_doc(
-    definition: FunctionDefinition,
-    o: OperationDefinitionNode,
-    client_schema: GraphQLSchema,
-    config: GeneratorConfig,
-    plugin_config: OperationsFuncPluginConfig,
-    registry: ClassRegistry,
-    collapse=False,
-):
-
-    x = get_operation_root_type(client_schema, o)
-    o.__annotations__
+def get_operation_class_name(o: OperationDefinitionNode, registry: ClassRegistry):
 
     if o.operation == OperationType.QUERY:
         o_name = registry.generate_query_classname(o.name.value)
@@ -396,33 +408,279 @@ def generate_query_doc(
     if o.operation == OperationType.SUBSCRIPTION:
         o_name = registry.generate_subscription_classname(o.name.value)
 
-    if collapse:
-        # Check if was collapsed from fragment
+    return o_name
 
-        return_type = f"{o_name}{o.selection_set.selections[0].name.value.capitalize()}"
-        field_definition = get_field_def(
-            client_schema, x, o.selection_set.selections[0]
+
+class FieldModifier(str, Enum):
+    OPTIONAL = "OPTIONAL"
+    LIST = "LIST"
+
+
+def formalize_type(
+    field_definition: FieldDefinitionNode,
+    registry: ClassRegistry,
+    modifiers=None,
+    next_is_optional=True,
+):
+    if modifiers is None:
+        modifiers = []
+
+    if isinstance(field_definition, GraphQLNonNull):
+        return formalize_type(
+            field_definition.of_type,
+            registry,
+            modifiers=modifiers,
+            next_is_optional=False,
         )
 
-        potential_item = o.selection_set.selections[0]
+    modifiers = modifiers + [FieldModifier.OPTIONAL] if next_is_optional else modifiers
 
-        if potential_item.selection_set is None:
-            return_type = registry.get_scalar_equivalent(field_definition.type.name)
+    if isinstance(field_definition, GraphQLList):
+        return formalize_type(
+            field_definition.of_type,
+            registry,
+            modifiers=modifiers + [FieldModifier.LIST],
+            next_is_optional=True,
+        )
 
-        elif len(potential_item.selection_set.selections) == 1:
+    if isinstance(field_definition, GraphQLScalarType):
+        x = registry.get_scalar_equivalent(field_definition.name)
+        return x, modifiers
+
+    if isinstance(field_definition, GraphQLNamedType):
+        try:
+            x = registry.get_scalar_equivalent(field_definition.name)
+        except NoScalarEquivalentFound as e:
+            x = registry.get_inputtype_class(field_definition.name)
+
+        return x, modifiers
+
+    raise NotImplementedError(f"Cannot Handle this type of Node {field_definition}")
+
+
+def build_type_annotation_for_field(
+    field: GraphQLField, registry: ClassRegistry, overwrite_type: str = None
+) -> ast.AST:
+    """For a given field, build the type annotation for the field.
+
+    This is used to build the type annotation for the field in the generated ast
+    Graph. It first formalizes the type into the type.class and its modifiers
+    as a list of Modifiers and then generates an annotation for this type
+
+
+    Args:
+        field (GraphQLField): The field to build the type annotation for
+        registry (ClassRegistry): The class registry to use
+        overwrite_type (str, optional): Overwrite the type. Defaults to None.
+
+    Returns:
+        ast.AST: The generated Annotation
+    """
+
+    end_type, modifiers = formalize_type(field.type, registry)
+    end_type = overwrite_type if overwrite_type else end_type
+
+    def recurse_annotate(modifiers):
+        if len(modifiers) == 0:
+            return ast.Name(id=end_type, ctx=ast.Load())
+        else:
+            this_modifier = modifiers[0]
+            rest_modifiers = modifiers[1:]
+
+            if this_modifier == FieldModifier.OPTIONAL:
+                value = ast.Name(id="Optional", ctx=ast.Load())
+            if this_modifier == FieldModifier.LIST:
+                value = ast.Name(id="List", ctx=ast.Load())
+
+            return ast.Subscript(
+                value=value,
+                slice=recurse_annotate(rest_modifiers),
+            )
+
+    return recurse_annotate(modifiers)
+
+
+def build_type_annotation_str_for_field(
+    field: GraphQLField, registry: ClassRegistry, overwrite_type: str = None
+) -> str:
+    """For a given field, build the type annotation string for the field.
+
+    This is used to build the type annotation for the field in the documentatoin
+
+    Args:
+        field (GraphQLField): The field to build the type annotation for
+        registry (ClassRegistry): The class registry to use
+        overwrite_type (str, optional): Overwrite the type. Defaults to None.
+
+    Returns:
+        str: The type anotation string
+    """
+
+    end_type, modifiers = formalize_type(field.type, registry)
+    end_type = overwrite_type if overwrite_type else end_type
+
+    def recurse_annotate(modifiers):
+        if len(modifiers) == 0:
+            return end_type
+        else:
+            this_modifier = modifiers[0]
+            rest_modifiers = modifiers[1:]
+
+            if this_modifier == FieldModifier.OPTIONAL:
+                value = "Optional"
+            if this_modifier == FieldModifier.LIST:
+                value = "List"
+
+            return f"{value}[{recurse_annotate(rest_modifiers)}]"
+
+    return recurse_annotate(modifiers)
+
+
+def get_return_type_annotation(
+    o: OperationDefinitionNode,
+    client_schema: GraphQLSchema,
+    registry: ClassRegistry,
+    collapse: bool = True,
+) -> Tuple[ast.AST, bool]:
+
+    o_name = get_operation_class_name(o, registry)
+
+    if len(o.selection_set.selections) == 0:
+        raise NotImplementedError(
+            "No operation specified. If you see this you probably didn't check the validities of your document."
+        )
+
+    root = get_operation_root_type(client_schema, o)
+
+    if len(o.selection_set.selections) == 1 and collapse is True:
+        potential_return_field = o.selection_set.selections[0]
+        potential_return_type = get_field_def(
+            client_schema, root, potential_return_field
+        )
+
+        if potential_return_field.selection_set is None:  # Dealing with a scalar type
+            return (
+                build_type_annotation_for_field(potential_return_type, registry),
+                False,
+            )
+
+        if (
+            len(potential_return_field.selection_set.selections) == 1
+        ):  # Dealing with one Element
             if isinstance(
-                potential_item.selection_set.selections[0], FragmentSpreadNode
-            ):
-                return_type = registry.get_fragment_class(
-                    potential_item.selection_set.selections[0].name.value
+                potential_return_field.selection_set.selections[0], FragmentSpreadNode
+            ):  # Dealing with a on element fragment
+                return (
+                    ast.Name(
+                        id=registry.get_fragment_class(
+                            potential_return_field.selection_set.selections[
+                                0
+                            ].name.value
+                        ),
+                        ctx=ast.Load(),
+                    ),
+                    True,
                 )
 
+        # is a subseleciton of maybe multiple fragments or just a normal selection
+        return (
+            build_type_annotation_for_field(
+                potential_return_type,
+                registry,
+                overwrite_type=f"{o_name}{o.selection_set.selections[0].name.value.capitalize()}",
+            ),
+            True,
+        )
+
+    return (
+        ast.Name(
+            id=o_name,
+            ctx=ast.Load(),
+        ),
+        False,
+    )
+
+
+def get_return_type_string(
+    o: OperationDefinitionNode,
+    client_schema: GraphQLSchema,
+    registry: ClassRegistry,
+    collapse=True,
+) -> Tuple[str, bool]:
+
+    o_name = get_operation_class_name(o, registry)
+
+    if len(o.selection_set.selections) == 0:
+        raise NotImplementedError(
+            "No operation specified. If you see this you probably didn't check the validities of your document."
+        )
+
+    root = get_operation_root_type(client_schema, o)
+
+    if len(o.selection_set.selections) == 1 and collapse == True:
+        potential_return_field = o.selection_set.selections[0]
+        potential_return_type = get_field_def(
+            client_schema, root, potential_return_field
+        )
+
+        if potential_return_field.selection_set is None:  # Dealing with a scalar type
+            return (
+                build_type_annotation_str_for_field(potential_return_type, registry),
+                False,
+            )
+
+        if (
+            len(potential_return_field.selection_set.selections) == 1
+        ):  # Dealing with one Element
+            if isinstance(
+                potential_return_field.selection_set.selections[0], FragmentSpreadNode
+            ):  # Dealing with a on element fragment
+                return (
+                    registry.get_fragment_class(
+                        potential_return_field.selection_set.selections[0].name.value
+                    ),
+                    True,
+                )
+
+            else:
+                return (
+                    build_type_annotation_str_for_field(
+                        potential_return_type,
+                        registry,
+                        overwrite_type=f"{o_name}{o.selection_set.selections[0].name.value.capitalize()}",
+                    ),
+                    True,
+                )
+
+        else:
+            return o_name, False
+
     else:
-        return_type = f"{o_name}"
+        return o_name, False
+
+
+def generate_query_doc(
+    definition: FunctionDefinition,
+    o: OperationDefinitionNode,
+    client_schema: GraphQLSchema,
+    config: GeneratorConfig,
+    plugin_config: FuncsPluginConfig,
+    registry: ClassRegistry,
+    collapse=False,
+):
+
+    x = get_operation_root_type(client_schema, o)
+    o.__annotations__
+
+    o_name = get_operation_class_name(o, registry)
+
+    return_type, collapsed = get_return_type_string(
+        o, client_schema, registry, collapse
+    )
 
     header = f"{o.name.value} \n\n"
 
-    if collapse:
+    if collapsed:
         field = o.selection_set.selections[0]
         field_definition = get_field_def(client_schema, x, field)
         description = (
@@ -478,7 +736,7 @@ def genereate_async_call(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    plugin_config: OperationsFuncPluginConfig,
+    plugin_config: FuncsPluginConfig,
     registry: ClassRegistry,
     collapse=False,
 ):
@@ -540,7 +798,7 @@ def genereate_sync_call(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    plugin_config: OperationsFuncPluginConfig,
+    plugin_config: FuncsPluginConfig,
     registry: ClassRegistry,
     collapse=False,
 ):
@@ -595,7 +853,7 @@ def genereate_async_iterator(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    plugin_config: OperationsFuncPluginConfig,
+    plugin_config: FuncsPluginConfig,
     registry: ClassRegistry,
     collapse=False,
 ):
@@ -662,7 +920,7 @@ def genereate_sync_iterator(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    plugin_config: OperationsFuncPluginConfig,
+    plugin_config: FuncsPluginConfig,
     registry: ClassRegistry,
     collapse=False,
 ):
@@ -728,7 +986,7 @@ def generate_operation_func(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    plugin_config: OperationsFuncPluginConfig,
+    plugin_config: FuncsPluginConfig,
     registry: ClassRegistry,
 ):
     tree = []
@@ -740,62 +998,12 @@ def generate_operation_func(
     if o.operation == OperationType.SUBSCRIPTION:
         o_name = registry.generate_subscription_classname(o.name.value)
 
-    collapse = len(o.selection_set.selections) == 1 and plugin_config.collapse_lonely
+    collapse = plugin_config.collapse_lonely
 
-    return_type = (
-        f"{o_name}{o.selection_set.selections[0].name.value.capitalize()}"
-        if collapse
-        else o_name
+    returns, collapsed = get_return_type_annotation(
+        o, client_schema, registry, collapse=collapse
     )
-
-    if collapse:
-        x = get_operation_root_type(client_schema, o)
-        field_definition = get_field_def(
-            client_schema, x, o.selection_set.selections[0]
-        )
-
-        potential_item = o.selection_set.selections[0]
-
-        # Check if was collapsed from fragment
-        if potential_item.selection_set is None:
-            return_type = registry.get_scalar_equivalent(field_definition.type.name)
-
-        elif len(potential_item.selection_set.selections) == 1:
-            if isinstance(
-                potential_item.selection_set.selections[0], FragmentSpreadNode
-            ):
-                return_type = registry.get_fragment_class(
-                    potential_item.selection_set.selections[0].name.value
-                )
-        else:
-            return_type = (
-                f"{o_name}{o.selection_set.selections[0].name.value.capitalize()}"
-            )
-
-        if isinstance(field_definition.type, GraphQLNonNull):
-            if isinstance(field_definition.type.of_type, GraphQLList):
-                returns = ast.Subscript(
-                    value=ast.Name(id="List", ctx=ast.Load()),
-                    slice=ast.Name(id=return_type, ctx=ast.Load()),
-                )
-            else:
-                returns = ast.Name(id=return_type, ctx=ast.Load())
-        else:
-            if isinstance(field_definition.type, GraphQLList):
-                returns = ast.Subscript(
-                    value=ast.Name("Optional", ctx=ast.Load()),
-                    slice=ast.Subscript(
-                        value=ast.Name(id="List", ctx=ast.Load()),
-                        slice=ast.Name(id=return_type, ctx=ast.Load()),
-                    ),
-                )
-            else:
-                returns = ast.Subscript(
-                    value=ast.Name("Optional", ctx=ast.Load()),
-                    slice=ast.Name(id=return_type, ctx=ast.Load()),
-                )
-    else:
-        returns = ast.Name(id=return_type, ctx=ast.Load())
+    print(returns)
 
     doc = generate_query_doc(
         definition, o, client_schema, config, plugin_config, registry, collapse

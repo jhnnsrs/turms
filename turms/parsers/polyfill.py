@@ -1,7 +1,7 @@
 from turms.parsers.base import Parser, ParserConfig
-from typing import Union, Literal, List
+from typing import List
 import ast
-from pydantic import Field, validator
+from pydantic import Field
 
 
 class PolyfillPluginConfig(ParserConfig):
@@ -16,7 +16,7 @@ class PolyfillPluginConfig(ParserConfig):
 def polyfill_python_seven(
     asts: List[ast.AST], config: PolyfillPluginConfig
 ) -> List[ast.AST]:
-    print("Hallo")
+
     new_nodes = []
     for node in asts:
         if isinstance(node, ast.ImportFrom):

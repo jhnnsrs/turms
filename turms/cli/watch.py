@@ -1,6 +1,5 @@
 import asyncio
 import asyncio
-import sys
 import time
 from rich.console import Console
 from watchdog.observers import Observer
@@ -9,14 +8,12 @@ from watchdog.events import (
     FileSystemEventHandler,
 )
 import os
-import subprocess
 import janus
 import threading
 import os
-import signal
 import yaml
 
-from turms.config import GraphQLConfig
+from turms.config import GraphQLProject
 from turms.run import gen
 
 
@@ -118,7 +115,7 @@ def watch(filepath, project=None):
 
     project = project or list(yaml_dict["projects"].items())[0][0]
 
-    config = GraphQLConfig(**yaml_dict["projects"][project], domain=project)
+    config = GraphQLProject(**yaml_dict["projects"][project], domain=project)
     console.print(f"Running filewatcher for project: {project}")
 
     host = Host(path=config.documents, config_path=filepath, project=project)

@@ -1,10 +1,6 @@
 from pydantic import AnyHttpUrl, BaseModel, BaseSettings, Field, validator
 from typing import Dict, List, Optional, Union
 from turms.helpers import import_string
-from turms.parsers.base import ParserConfig
-from turms.plugins.base import PluginConfig
-from turms.processors.base import ProcessorConfig
-from turms.stylers.base import StylerConfig
 
 
 class ConfigProxy(BaseModel):
@@ -15,7 +11,7 @@ class ConfigProxy(BaseModel):
 
 
 class GeneratorConfig(BaseSettings):
-    domain: str = "default"
+    domain: Optional[str] = None
     out_dir: str = "api"
     generated_name: str = "schema.py"
     documents: Optional[str]
@@ -28,7 +24,6 @@ class GeneratorConfig(BaseSettings):
     scalar_definitions = {}
     freeze: bool = False
     additional_bases = {}
-    extensions: Dict = {}
 
     parsers: List[ConfigProxy] = []
     plugins: List[ConfigProxy] = []
@@ -54,13 +49,24 @@ class Extensions(BaseModel):
     turms: GeneratorConfig
 
 
-class GraphQLConfig(BaseSettings):  # TODO: Rename to graphql project
+class GraphQLProject(BaseSettings):  # TODO: Rename to graphql project
     schema_url: Optional[Union[AnyHttpUrl, str]] = Field(alias="schema", env="schema")
     bearer_token: Optional[str] = None
     documents: Optional[str]
-    domain: str = "default"
     extensions: Extensions
 
     class Config:
         env_prefix = "TURMS_GRAPHQL_"
+        extra = "allow"
+
+
+class GraphQLConfigMultiple(BaseSettings):
+    projects: Dict[str, GraphQLProject]
+
+    class Config:
+        extra = "allow"
+
+
+class GraphQLConfigSingle(GraphQLProject):
+    class Config:
         extra = "allow"

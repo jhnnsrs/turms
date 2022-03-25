@@ -54,19 +54,6 @@ def test_small(hello_world_schema):
     assert "class HelloWorldOrder(str, Enum):" in generated, "EnumPlugin not working"
 
 
-def test_small(hello_world_schema):
-
-    config = GeneratorConfig()
-    generated_ast = generate_ast(
-        config, hello_world_schema, plugins=[EnumsPlugin(), InputsPlugin()]
-    )
-
-    md = ast.Module(body=generated_ast, type_ignores=[])
-    generated = ast.unparse(ast.fix_missing_locations(md))
-    assert "from enum import Enum" in generated, "EnumPlugin not working"
-    assert "class HelloWorldOrder(str, Enum):" in generated, "EnumPlugin not working"
-
-
 def test_snake_case_styler(hello_world_schema):
     config = GeneratorConfig()
     generated_ast = generate_ast(
@@ -97,22 +84,6 @@ def test_beast_styler(beast_schema):
     md = ast.Module(body=generated_ast, type_ignores=[])
     generated = ast.unparse(ast.fix_missing_locations(md))
     assert "from enum import Enum" in generated, "EnumPlugin not working"
-
-
-def test_beast_operations(beast_schema):
-    config = GeneratorConfig(documents="tests/documents/beasts/*.graphql")
-    generated_ast = generate_ast(
-        config,
-        beast_schema,
-        stylers=[CapitalizeStyler()],
-        plugins=[EnumsPlugin(), InputsPlugin(), FragmentsPlugin(), OperationsPlugin()],
-    )
-
-    md = ast.Module(body=generated_ast, type_ignores=[])
-    generated = ast.unparse(ast.fix_missing_locations(md))
-    print(generated)
-    assert "from enum import Enum" in generated, "EnumPlugin not working"
-    assert "class Get_beasts(BaseModel):" in generated, "OpertiationsPlugin not working"
 
 
 def test_beast_operations(beast_schema):

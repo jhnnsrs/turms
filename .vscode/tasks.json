@@ -1,18 +1,32 @@
 // tasks.json
 {
-    // See https://go.microsoft.com/fwlink/?LinkId=733558
-    // for the documentation about the tasks.json format
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "Patch",
-            "type": "shell",
-            "command": "source venv/bin/activate && poetry version patch && poetry build "
-        },
-        {
-            "label": "Publish",
-            "type": "shell",
-            "command": "source venv/bin/activate && poetry publish"
-        },
-    ]
+  // See https://go.microsoft.com/fwlink/?LinkId=733558
+  // for the documentation about the tasks.json format
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Patch",
+      "type": "shell",
+      "command": "source venv/bin/activate && poetry version patch && poetry build "
+    },
+    {
+      "label": "Publish",
+      "type": "shell",
+      "command": "source venv/bin/activate && poetry publish"
+    },
+    {
+      "type": "shell",
+      "label": "Autoflake",
+      "command": "${command:python.interpreterPath}",
+      "args": [
+        "-m",
+        "autoflake",
+        "-i",
+        "--remove-all-unused-imports",
+        "-r",
+        "turms"
+      ],
+      "problemMatcher": []
+    }
+  ]
 }
