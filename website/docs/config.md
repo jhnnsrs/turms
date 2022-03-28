@@ -9,7 +9,13 @@ Turms relies on and complies with [graphql-config](https://www.graphql-config.co
 your current working dir for the graphql-config file, it currently supports the following formats:
 
 - [x] graphql.config.yaml
-- [ ] .graphqlrc.yaml
+- [x] .graphqlrc.yaml
+- [x] graphql.config.yml
+- [x] .graphqlrc.yml
+- [x] graphql.config.toml
+- [x] .graphqlrc.toml
+- [x] graphql.config.json
+- [x] .graphqlrc.json
 
 ```yaml
 projects:
@@ -37,8 +43,8 @@ projects:
           Date: str
 ```
 
-By default turms requires the projects tree structure, to support multiple schemas within a same project.
-This means you have to follow that structure (for now) to specify your configuration:
+We recommend this layout to ensure support for multiple graphql projects, but you can also opt in
+for a single project configuration.
 
 ### Turms Config
 
@@ -69,22 +75,21 @@ projects:
 As pydantic lovers, configuration is handled by pydantic models, here is an example
 of the configuration
 
-```python file="turms section"
+```yaml file="turms section"
 projects:
   default:
     schema: # A url for intrsopection, or glob if loading locally
     documents: # A glob of documents for the generation of queries, subs, fragments
     extensions:
       turms:
-        domain: #str = "default"
         out_dir: # str = "api" the root of the generated schema
         generated_name:  #str = "schema.py"
         object_bases: #List[str] = ["pydantic.BaseModel"] The base class for objects
         interface_bases: # Optional[List[str]] = None (A different base clas for interfaces. Defaults to object_bases
-        allways_resolve_interfaces: # bool = True if set to true, the abstrac abse for interfaces is part of the union
+        always_resolve_interfaces: # bool = True (if to false, the abstract base for interfaces is part of the union)
         scalar_definitions = #{} A map of grpahql scalars and their python equivalent
         freeze: bool = False # SHould we generate frozen (fake immutability) classes
-        additional_bases = {} # A map of graphql type and additional bases (see traits)
+        additional_bases = {} # A map of graphql (input)type and additional bases (see traits)
 
 ```
 
@@ -98,4 +103,4 @@ scalar_definitions:
   DateTime: datetime.datetime
 ```
 
-This scalar you adhere to the pydantic Field specification and can provide validators
+The scalar can adhere to the pydantic Field specification to provide validators.

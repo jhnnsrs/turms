@@ -34,10 +34,8 @@ As of now turms only supports python 3.9 and higher (3.7 and 3.8 are in the maki
 ### Configuration
 
 Turms relies on and complies with [graphql-config](https://www.graphql-config.com/docs/user/user-introduction) and searches
-your current working dir for the graphql-config file, it currently supports the following formats:
+your current working dir for the graphql-config file.
 
-- [x] graphql.config.yaml
-- [ ] .graphqlrc.yaml
 
 ```yaml
 projects:
@@ -47,9 +45,6 @@ projects:
     extensions:
       turms: # path for configuration for turms
         out_dir: examples/api
-        stylers:
-          - type: turms.stylers.capitalize.Capitalizer
-          - type: turms.stylers.snake.SnakeNodeName
         plugins:
           - type: turms.plugins.enums.EnumsPlugin
           - type: turms.plugins.inputs.InputsPlugin
@@ -81,7 +76,7 @@ Will generate python code according to the schema and your documents.
 
 ### Generation Flow
 
-Turms generates code with the help of plugins, stylers and processors:
+Turms generates code with the help of plugins, parsers and processors:
 
 ```mermaid
 flowchart LR;
@@ -91,16 +86,17 @@ flowchart LR;
     id1(Plugin)-->|python.AST|id50(Appender)
     id2(Plugin)-->|python.AST|id50(Appender)
     id3(Plugin)-->|python.AST|id50(Appender)
-    id50(Appender)-->|str|id61(Processor)
-    id50(Appender)-->|str|id62(Processor)
-    id61(Processor)-->id100(generated.py)
+    id50(Appender)-->|python.AST|id51(Parser A)
+    id51(Parser A)-->|python.AST|id52(Parser B)
+    id52(Parser B)-->|str|id61(Processor)
+    id61(Processor)-->|str|id62(Processor)
     id62(Processor)-->id100(generated.py)
 ```
 
 Turms loads or introspects your schema, parses your configuration and loads the
 plugins sequentially, causing them to generate their part of the python AST,
-concats these together and unparsers this to a codestring that can then be processed
-by tools like black or isort, and are then written to file.
+concats these together, pipes them to parsers to manipulate the ast.Trre and unparsers
+this to a codestring that can then be processed by tools like black or isort, and are then written to file.
 
 If you wish to enforce a specific naming style (like snakecasing, pascal case gql)
 you can do so by specifying stylers. Plugins will then try to resolve a field or classname

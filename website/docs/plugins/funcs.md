@@ -5,9 +5,6 @@ sidebar_label: "Operations Funcs"
 
 # Operations Funcs (Experimental)
 
-Operation funcs are
-
-
 Operations Funcs generated fully typed python functions that can call other functions (for example your GQL Clients execute function) and returns the typed response.
 
 ### Default Configuration
@@ -20,10 +17,9 @@ project:
       turms:
         plugins:
           - type: turms.plugins.operations.OperationsPlugin
-            funcs_glob: #Optional[str]
             prepend_sync: ""
             prepend_async: "a"
-            collapse_lonely: True #bool = True Collapses one operation querys
+            collapse_lonely: True #bool = True Collapses one operation query and return the collapsed type
             global_args: #List[Arg] = [] global additional arguments for the functions to be called
             global_kwargs: #List[Kwarg] = []
             definitions: #List[FunctionDefinition] = []
@@ -33,11 +29,11 @@ Definitions Sepcify a strategy to generate a proxy function
 
 ```yaml
 definitions:
-  type: # OperationType subscrition, query, mutation
+  type: # OperationType subscrpition, query, mutation
   is_async: #bool = False should we generate an async function
-  extra_args: # List[Arg] = [] A list of arguments to be passed
-  extra_kwargs: List[Kwarg] = [] # A list of keyworad arguments to be passed
-  use: path.to.the.function #the function we should actually call
+  extra_args: # List[Arg] = [] A list ofadditional arguments to be passed
+  extra_kwargs: # List[Kwarg] = [] # A list of keyworad arguments to be passed
+  use: path.to.the.function #the function we should proxy to signature def(document, variables, *extra_args, **extra_kwargs)
 ```
 
 Args can be defined as such
