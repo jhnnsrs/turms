@@ -1,6 +1,7 @@
 import ast
 
 import pytest
+from tests.turmstest.utils import build_relative_glob
 from turms.config import GeneratorConfig
 from turms.run import gen, generate_ast
 from graphql.language import parse
@@ -13,21 +14,22 @@ from turms.stylers.capitalize import CapitalizeStyler
 from turms.helpers import build_schema_from_glob
 from turms.processors.black import BlackProcessor
 from turms.processors.isort import IsortProcessor
+import os
 
 
 @pytest.fixture()
 def hello_world_schema():
-    return build_schema_from_glob("tests/schemas/helloworld.graphql")
+    return build_schema_from_glob(build_relative_glob("/schemas/helloworld.graphql"))
 
 
 @pytest.fixture()
 def beast_schema():
-    return build_schema_from_glob("tests/schemas/beasts.graphql")
+    return build_schema_from_glob(build_relative_glob("/schemas/beasts.graphql"))
 
 
 @pytest.fixture()
 def arkitekt_schema():
-    return build_schema_from_glob("tests/schemas/arkitekt.graphql")
+    return build_schema_from_glob(build_relative_glob("/schemas/arkitekt.graphql"))
 
 
 def test_unparse():
@@ -87,7 +89,9 @@ def test_beast_styler(beast_schema):
 
 
 def test_beast_operations(beast_schema):
-    config = GeneratorConfig(documents="tests/documents/beasts/*.graphql")
+    config = GeneratorConfig(
+        documents=build_relative_glob("/documents/beasts/*.graphql")
+    )
     generated_ast = generate_ast(
         config,
         beast_schema,
@@ -104,7 +108,7 @@ def test_beast_operations(beast_schema):
 
 def test_arkitekt_operations(arkitekt_schema):
     config = GeneratorConfig(
-        documents="tests/documents/arkitekt/**/*.graphql",
+        documents=build_relative_glob("/documents/arkitekt/**/*.graphql"),
         scalar_definitions={
             "uuid": "str",
             "Callback": "str",
@@ -129,7 +133,7 @@ def test_arkitekt_operations(arkitekt_schema):
 
 def test_black_complex(arkitekt_schema):
     config = GeneratorConfig(
-        documents="tests/documents/arkitekt/**/*.graphql",
+        documents=build_relative_glob("/documents/arkitekt/**/*.graphql"),
         scalar_definitions={
             "uuid": "str",
             "Callback": "str",

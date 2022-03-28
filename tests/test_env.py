@@ -2,6 +2,7 @@ import ast
 import json
 
 import pytest
+from .utils import build_relative_glob
 from turms.config import GeneratorConfig
 from turms.run import gen, generate_ast
 from graphql.language import parse
@@ -19,12 +20,12 @@ import os
 
 @pytest.fixture()
 def hello_world_schema():
-    return build_schema_from_glob("tests/schemas/helloworld.graphql")
+    return build_schema_from_glob(build_relative_glob("/schemas/helloworld.graphql"))
 
 
 @pytest.fixture()
 def arkitekt_schema():
-    return build_schema_from_glob("tests/schemas/arkitekt.graphql")
+    return build_schema_from_glob(build_relative_glob("/schemas/arkitekt.graphql"))
 
 
 def test_small(hello_world_schema, monkeypatch):
@@ -48,7 +49,9 @@ def test_env_complex(arkitekt_schema, monkeypatch):
         ),
     )
 
-    monkeypatch.setenv("TURMS_DOCUMENTS", "tests/documents/arkitekt/**/*.graphql")
+    monkeypatch.setenv(
+        "TURMS_DOCUMENTS", build_relative_glob("/documents/arkitekt/**/*.graphql")
+    )
 
     config = GeneratorConfig()
 

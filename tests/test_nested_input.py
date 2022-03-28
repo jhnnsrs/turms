@@ -1,6 +1,7 @@
 import ast
 
 import pytest
+from tests.turmstest.utils import build_relative_glob
 from turms.config import GeneratorConfig
 from turms.run import gen, generate_ast
 from graphql.language import parse
@@ -22,12 +23,12 @@ from turms.processors.isort import IsortProcessor
 
 @pytest.fixture()
 def nested_input_schema():
-    return build_schema_from_glob("tests/schemas/nested_inputs.graphql")
+    return build_schema_from_glob(build_relative_glob("/schemas/nested_inputs.graphql"))
 
 
 def test_nested_input_funcs(nested_input_schema):
     config = GeneratorConfig(
-        documents="tests/documents/nested_inputs/*.graphql",
+        documents=build_relative_glob("/documents/nested_inputs/*.graphql"),
     )
     generated_ast = generate_ast(
         config,
@@ -60,7 +61,7 @@ def test_nested_input_funcs(nested_input_schema):
 
 def test_default_input_funcs(nested_input_schema):
     config = GeneratorConfig(
-        documents="tests/documents/inputs_default/*.graphql",
+        documents=build_relative_glob("/documents/inputs_default/*.graphql"),
     )
     generated_ast = generate_ast(
         config,

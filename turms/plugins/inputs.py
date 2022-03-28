@@ -16,6 +16,7 @@ from graphql.type.definition import (
     GraphQLEnumType,
 )
 from turms.registry import ClassRegistry
+from turms.utils import get_additional_bases_for_type
 
 
 class InputsPluginConfig(PluginConfig):
@@ -129,6 +130,7 @@ def generate_inputs(
         if plugin_config.skip_underscore and key.startswith("_"):
             continue
 
+        additional_bases = get_additional_bases_for_type(type.name, config, registry)
         name = registry.generate_inputtype_classname(key)
         fields = (
             [ast.Expr(value=ast.Constant(value=type.description))]
@@ -193,7 +195,8 @@ def generate_inputs(
                 bases=[
                     ast.Name(id=base.split(".")[-1], ctx=ast.Load())
                     for base in plugin_config.inputtype_bases
-                ],
+                ]
+                + additional_bases,
                 decorator_list=[],
                 keywords=[],
                 body=fields,

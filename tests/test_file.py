@@ -1,4 +1,5 @@
 import pytest
+from tests.turmstest.utils import build_relative_glob
 from turms.plugins.operations import OperationsPlugin
 from turms.run import gen, scan_folder_for_configs
 from turms.errors import GenerationError
@@ -6,7 +7,7 @@ from turms.errors import GenerationError
 
 @pytest.fixture()
 def parsable_configs():
-    return scan_folder_for_configs("tests/configs/parsable")
+    return scan_folder_for_configs(build_relative_glob("/configs/parsable"))
 
 
 def test_create_file(tmp_path, parsable_configs):

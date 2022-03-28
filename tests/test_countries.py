@@ -1,6 +1,7 @@
 import ast
 
 import pytest
+from tests.turmstest.utils import build_relative_glob
 from turms.config import GeneratorConfig
 from turms.plugins.funcs import (
     FunctionDefinition,
@@ -23,7 +24,7 @@ def countries_schema():
 
 def test_complex_operations(countries_schema):
     config = GeneratorConfig(
-        documents="tests/documents/countries/**.graphql",
+        documents=build_relative_glob("/documents/countries/**.graphql"),
     )
 
     generated_ast = generate_ast(
