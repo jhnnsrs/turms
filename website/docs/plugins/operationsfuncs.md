@@ -3,7 +3,10 @@ sidebar_position: 5
 sidebar_label: "Operations Funcs"
 ---
 
-# Operations Funcs
+# Operations Funcs (Experimental)
+
+Operation funcs are
+
 
 Operations Funcs generated fully typed python functions that can call other functions (for example your GQL Clients execute function) and returns the typed response.
 

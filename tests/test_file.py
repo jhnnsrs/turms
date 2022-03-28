@@ -1,5 +1,5 @@
 import pytest
-from tests.turmstest.utils import build_relative_glob
+from .utils import build_relative_glob
 from turms.plugins.operations import OperationsPlugin
 from turms.run import gen, scan_folder_for_configs
 from turms.errors import GenerationError

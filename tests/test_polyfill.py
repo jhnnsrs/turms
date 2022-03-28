@@ -2,7 +2,7 @@ import ast
 import json
 
 import pytest
-from tests.turmstest.utils import build_relative_glob
+from .utils import build_relative_glob
 from turms.config import GeneratorConfig
 from turms.run import gen, generate_ast
 from graphql.language import parse
