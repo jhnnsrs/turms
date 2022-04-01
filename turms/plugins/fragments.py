@@ -79,6 +79,7 @@ def generate_fragment(
     if isinstance(type, GraphQLInterfaceType):
         mother_class_fields = []
         base_fragment_name = f"{name}Base"
+        additional_bases = []
 
         if type.description:
             mother_class_fields.append(
@@ -103,7 +104,7 @@ def generate_fragment(
                     parent_name=base_fragment_name,
                 )
 
-        additional_bases = get_additional_bases_for_type(type.name, config, registry)
+        additional_bases += get_additional_bases_for_type(type.name, config, registry)
 
         mother_class = ast.ClassDef(
             base_fragment_name,
@@ -187,13 +188,14 @@ def generate_fragment(
                 tree.append(cls)
                 union_class_names.append(inline_name)
 
-        if not config.always_resolve_interfaces:
-            union_class_names.append(base_fragment_name)
+        union_class_names.append(base_fragment_name)
 
         registry.register_fragment_document(f.name.value, language.print_ast(f))
-        registry.register_fragment_class(f.name.value, name)
 
         if len(union_class_names) > 1:
+            registry.register_import("typing.Union")
+            registry.register_fragment_class(f.name.value, name)
+            registry.register_interface_fragment(f.name.value, name)
             slice = ast.Tuple(
                 elts=[
                     ast.Name(id=clsname, ctx=ast.Load())
@@ -210,6 +212,10 @@ def generate_fragment(
                     ),
                 )
             )
+
+        else:
+            registry.register_fragment_class(f.name.value, union_class_names[0])
+            registry.register_interface_fragment(f.name.value, union_class_names[0])
 
         return tree
 
@@ -230,6 +236,9 @@ def generate_fragment(
             continue
 
         if isinstance(field, FragmentSpreadNode):
+            interface = registry.get_interface_fragment_or_none(field.name.value)
+            if interface:
+                additional_bases.append(ast.Name(id=interface, ctx=ast.Load()))
             continue
 
         field_definition = get_field_def(client_schema, type, field)

@@ -33,6 +33,7 @@ try:
     def toml_loader(file):
         return toml.loads(file.read())
 
+
 except ImportError:
 
     def toml_loader(file):

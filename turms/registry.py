@@ -26,6 +26,7 @@ class ClassRegistry(object):
         self.fragment_document_map = {}
         self.enum_class_map = {}
         self.inputtype_class_map = {}
+        self.interfacefragments_class_map = {}
         self.fragment_class_map = {}
         self.console = get_console()
 
@@ -203,6 +204,12 @@ class ClassRegistry(object):
             )
 
         return scalar_type.split(".")[-1]
+
+    def register_interface_fragment(self, typename: str, cls: str):
+        self.interfacefragments_class_map[typename] = cls
+
+    def get_interface_fragment_or_none(self, typename: str):
+        return self.interfacefragments_class_map.get(typename, None)
 
     def warn(self, message):
         self.console.print("[r]" + message)

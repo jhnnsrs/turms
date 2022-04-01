@@ -208,7 +208,12 @@ def recurse_annotation(
         if not config.always_resolve_interfaces:
             union_class_names.append(mother_class_name)
 
+        assert (
+            len(union_class_names) != 0
+        ), f"You have set 'always_resolve_interfaces' to True but you have no sub-fragments in your query of {base_name}"
+
         if len(union_class_names) > 1:
+            registry.register_import("typing.Union")
             union_slice = ast.Tuple(
                 elts=[
                     ast.Name(id=clsname, ctx=ast.Load())
@@ -219,7 +224,6 @@ def recurse_annotation(
 
             if is_optional:
                 registry.register_import("typing.Optional")
-                registry.register_import("typing.Union")
 
                 return ast.Subscript(
                     value=ast.Name("Optional", ctx=ast.Load()),
@@ -271,7 +275,7 @@ def recurse_annotation(
             if isinstance(sub_node, FragmentSpreadNode):
                 additional_bases.append(
                     ast.Name(
-                        id=registry.get_fragment_class(subnode.name.value),
+                        id=registry.get_fragment_class(sub_node.name.value),
                         ctx=ast.Load(),
                     )
                 )
