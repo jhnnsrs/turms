@@ -1,0 +1,23 @@
+query Graph($id: ID, $template: ID) {
+  graph(id: $id, template: $template) {
+    ...Graph
+  }
+}
+
+query Flow($id: ID) {
+  flow(id: $id) {
+    ...Flow
+  }
+}
+
+query MyGraphs {
+  mygraphs {
+    ...ListGraph
+  }
+}
+
+query MyFlows {
+  myflows {
+    ...ListFlow
+  }
+}

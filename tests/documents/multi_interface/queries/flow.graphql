@@ -1,0 +1,5 @@
+query get_flow($id: ID) {
+  flow(id: $id) {
+    ...Flow
+  }
+}

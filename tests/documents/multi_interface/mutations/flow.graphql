@@ -1,0 +1,5 @@
+mutation draw($name: String!, $nodes: [NodeInput], $edges: [EdgeInput]) {
+  makeflow(name: $name, nodes: $nodes, edges: $edges) {
+    ...Flow
+  }
+}

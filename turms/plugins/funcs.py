@@ -1,7 +1,11 @@
 from __future__ import annotations
+
 import ast
+import logging
+import re
 from ctypes import Union
-from typing import Any, List, Tuple
+from enum import Enum
+from typing import Any, List, Optional, Tuple
 
 from graphql import (
     BooleanValueNode,
@@ -19,16 +23,6 @@ from graphql import (
     ValueNode,
     VariableDefinitionNode,
 )
-from enum import Enum
-from turms.config import GeneratorConfig
-from graphql.utilities.build_client_schema import GraphQLSchema
-from turms.plugins.base import Plugin, PluginConfig
-from pydantic import BaseModel, Field
-from graphql.language.ast import OperationDefinitionNode, OperationType
-from turms.config import GeneratorConfig
-from graphql.utilities.build_client_schema import GraphQLSchema
-from turms.plugins.base import Plugin
-from pydantic import BaseModel
 from graphql.language.ast import (
     FieldNode,
     ListTypeNode,
@@ -36,24 +30,16 @@ from graphql.language.ast import (
     OperationDefinitionNode,
     OperationType,
 )
-from turms.registry import ClassRegistry
-from turms.utils import (
-    NoDocumentsFoundError,
-    parse_documents,
-    target_from_node,
-)
-from turms.errors import NoScalarEquivalentFound
-import re
-import ast
-
-from graphql.type.definition import (
-    GraphQLList,
-)
+from graphql.type.definition import GraphQLList
+from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.utilities.get_operation_root_type import get_operation_root_type
 from graphql.utilities.type_info import get_field_def
-import logging
-from typing import Optional
-
+from pydantic import BaseModel, Field
+from turms.config import GeneratorConfig
+from turms.errors import NoScalarEquivalentFound
+from turms.plugins.base import Plugin, PluginConfig
+from turms.registry import ClassRegistry
+from turms.utils import NoDocumentsFoundError, parse_documents, target_from_node
 
 logger = logging.getLogger(__name__)
 

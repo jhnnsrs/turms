@@ -24,7 +24,8 @@
         "-i",
         "--remove-all-unused-imports",
         "-r",
-        "turms"
+        "turms",
+        "tests"
       ],
       "problemMatcher": []
     }

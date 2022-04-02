@@ -1,0 +1,252 @@
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+interface FlowEdgeCommons {
+  label: String
+}
+
+interface FlowNodeCommons {
+  args: [FlowArg]
+  kwargs: [FlowKwarg]
+  returns: [FlowReturn]
+}
+
+type ArgNode implements FlowNode & FlowNodeCommons {
+  id: String!
+  position: Position!
+  args: [FlowArg]
+  kwargs: [FlowKwarg]
+  returns: [FlowReturn]
+  extra: String
+}
+
+type ArkitektNode implements FlowNode & FlowNodeCommons {
+  id: String!
+  position: Position!
+  args: [FlowArg]
+  kwargs: [FlowKwarg]
+  returns: [FlowReturn]
+  package: String
+  interface: String
+  name: String
+  description: String
+  kind: String!
+}
+
+scalar DateTime
+
+type DeleteGraphReturn {
+  id: ID
+}
+
+input EdgeInput {
+  id: String!
+  type: String!
+  source: String!
+  target: String!
+  sourceHandle: String
+  targetHandle: String
+  label: String
+}
+
+type FancyEdge implements FlowEdge & FlowEdgeCommons {
+  id: String!
+  source: String!
+  target: String!
+  sourceHandle: String!
+  targetHandle: String!
+  label: String
+}
+
+type Flow {
+  id: ID!
+  creator: User
+  version: String!
+  name: String
+  nodes: [FlowNode]
+  edges: [FlowEdge]
+  description: String
+  zoom: Float
+  position: [Int]
+}
+
+type FlowArg {
+  key: String!
+  label: String
+  name: String
+  type: String
+  description: String
+}
+
+input FlowArgInput {
+  key: String!
+  label: String
+  name: String
+  type: String
+  description: String
+}
+
+interface FlowEdge {
+  id: String!
+  source: String!
+  target: String!
+  sourceHandle: String!
+  targetHandle: String!
+}
+
+type FlowKwarg {
+  key: String!
+  label: String
+  name: String
+  type: String
+  description: String
+}
+
+input FlowKwargInput {
+  key: String!
+  label: String
+  name: String
+  type: String
+  description: String
+}
+
+interface FlowNode {
+  id: String!
+  position: Position!
+}
+
+type FlowReturn {
+  key: String!
+  label: String
+  name: String
+  type: String
+  description: String
+}
+
+input FlowReturnInput {
+  key: String!
+  label: String
+  name: String
+  type: String
+  description: String
+}
+
+scalar GenericScalar
+
+type Graph {
+  id: ID!
+  template: String
+  creator: User
+  version: String!
+  name: String
+  diagram: GenericScalar
+  description: String
+}
+
+type KwargNode implements FlowNode & FlowNodeCommons {
+  id: String!
+  position: Position!
+  args: [FlowArg]
+  kwargs: [FlowKwarg]
+  returns: [FlowReturn]
+  extra: String
+}
+
+type LabeledEdge implements FlowEdge & FlowEdgeCommons {
+  id: String!
+  source: String!
+  target: String!
+  sourceHandle: String!
+  targetHandle: String!
+  label: String
+}
+
+type Mutation {
+  deploy(graph: ID): Graph
+  draw(node: ID): Graph
+  deleteGraph(id: ID!): DeleteGraphReturn
+  updateGraph(diagram: GenericScalar, id: ID!): Graph
+  createGraph(name: String): Graph
+  reset: ResetReturn
+  makeflow(edges: [EdgeInput], name: String!, nodes: [NodeInput]): Flow
+  updateflow(edges: [EdgeInput], id: ID!, nodes: [NodeInput]): Flow
+  drawvanilla(name: String!): Flow
+}
+
+input NodeInput {
+  id: String!
+  type: String!
+  args: [FlowArgInput]
+  kwargs: [FlowKwargInput]
+  returns: [FlowReturnInput]
+  package: String
+  name: String
+  description: String
+  interface: String
+  kind: String
+  implementation: String
+  position: PositionInput!
+  extra: GenericScalar
+}
+
+type Position {
+  x: Int!
+  y: Int!
+}
+
+input PositionInput {
+  x: Float!
+  y: Float!
+}
+
+type Query {
+  hello: String
+  void: String
+  graphs: [Graph]
+  graph(id: ID, template: ID): Graph
+  mygraphs: [Graph]
+  flows: [Flow]
+  flow(id: ID): Flow
+  myflows: [Flow]
+}
+
+type ReactiveNode implements FlowNode & FlowNodeCommons {
+  id: String!
+  position: Position!
+  args: [FlowArg]
+  kwargs: [FlowKwarg]
+  returns: [FlowReturn]
+  implementation: String
+}
+
+type ResetReturn {
+  ok: Boolean
+}
+
+type ReturnNode implements FlowNode & FlowNodeCommons {
+  id: String!
+  position: Position!
+  args: [FlowArg]
+  kwargs: [FlowKwarg]
+  returns: [FlowReturn]
+  extra: String
+}
+
+type User {
+  id: ID!
+  password: String!
+  lastLogin: DateTime
+  isSuperuser: Boolean!
+  username: String!
+  firstName: String!
+  lastName: String!
+  isStaff: Boolean!
+  isActive: Boolean!
+  dateJoined: DateTime!
+  email: String!
+  roles: GenericScalar
+  graphSet: [Graph!]!
+  flowSet: [Flow!]!
+}
