@@ -86,7 +86,7 @@ def build_schema_from_glob(glob_string: str):
                 dsl_string += f.read()
             elif file.endswith(".json"):
                 # not really necessary as json files are generally not splitable
-                introspection_string += f.read
+                introspection_string += f.read()
 
     if not dsl_string and not introspection_string:
         raise GenerationError(f"No schema files found in {glob_string}")
