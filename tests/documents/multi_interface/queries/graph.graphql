@@ -1,0 +1,11 @@
+query get_graph($id: ID, $template: ID) {
+  graph(id: $id, template: $template) {
+    ...Graph
+  }
+}
+
+query my_graphs {
+  mygraphs {
+    ...ListGraph
+  }
+}

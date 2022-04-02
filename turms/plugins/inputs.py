@@ -140,6 +140,10 @@ def generate_inputs(
 
         for value_key, value in type.fields.items():
 
+            if isinstance(value.type, GraphQLNonNull):
+                if isinstance(value.type.of_type, GraphQLInputObjectType):
+                    self_referential.add(name)
+
             if isinstance(value.type, GraphQLInputObjectType):
                 self_referential.add(name)
 

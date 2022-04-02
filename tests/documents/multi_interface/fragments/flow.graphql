@@ -1,0 +1,131 @@
+fragment FlowArg on FlowArg {
+  key
+  type
+  name
+  label
+  type
+  description
+}
+
+fragment FlowKwarg on FlowKwarg {
+  key
+  type
+  label
+  name
+  type
+  description
+}
+
+fragment FlowReturn on FlowReturn {
+  key
+  type
+  name
+  label
+  type
+  description
+}
+
+fragment FlowNodeCommons on FlowNodeCommons {
+  args {
+    __typename
+    ...FlowArg
+  }
+  kwargs {
+    __typename
+    ...FlowKwarg
+  }
+  returns {
+    __typename
+    ...FlowReturn
+  }
+}
+
+fragment ArkitektNode on ArkitektNode {
+  ...FlowNodeCommons
+  __typename
+  name
+  description
+  package
+  interface
+  kind
+}
+
+fragment ReactiveNode on ReactiveNode {
+  ...FlowNodeCommons
+  __typename
+  implementation
+}
+
+fragment ArgNode on ArgNode {
+  ...FlowNodeCommons
+  __typename
+  extra
+}
+
+fragment KwargNode on KwargNode {
+  ...FlowNodeCommons
+  __typename
+  extra
+}
+
+fragment ReturnNode on ReturnNode {
+  ...FlowNodeCommons
+  __typename
+  extra
+}
+
+fragment FlowNode on FlowNode {
+  id
+  position {
+    x
+    y
+  }
+  type: __typename
+  ...ArkitektNode
+  ...ReactiveNode
+  ...ArgNode
+  ...KwargNode
+  ...ReturnNode
+}
+
+fragment FlowEdgeCommons on FlowEdgeCommons {
+  label
+}
+
+fragment LabeledEdge on LabeledEdge {
+  ...FlowEdgeCommons
+  __typename
+}
+
+fragment FancyEdge on FancyEdge {
+  ...FlowEdgeCommons
+  __typename
+}
+
+fragment FlowEdge on FlowEdge {
+  id
+  source
+  sourceHandle
+  target
+  targetHandle
+  type: __typename
+  ...LabeledEdge
+  ...FancyEdge
+}
+
+fragment Flow on Flow {
+  __typename
+  name
+  id
+  nodes {
+    ...FlowNode
+  }
+  edges {
+    ...FlowEdge
+  }
+}
+
+fragment ListFlow on Flow {
+  id
+  name
+}

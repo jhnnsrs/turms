@@ -1,36 +1,35 @@
 import ast
 
 import pytest
-from .utils import build_relative_glob
 from turms.config import GeneratorConfig
-from turms.plugins.funcs import (
-    FunctionDefinition,
-    FuncsPlugin,
-    FuncsPluginConfig,
-)
-from turms.run import generate_ast
+from turms.helpers import build_schema_from_glob
 from turms.plugins.enums import EnumsPlugin
-from turms.plugins.inputs import InputsPlugin
 from turms.plugins.fragments import FragmentsPlugin
+from turms.plugins.funcs import FuncsPlugin, FuncsPluginConfig, FunctionDefinition
+from turms.plugins.inputs import InputsPlugin
 from turms.plugins.operations import OperationsPlugin
-from turms.stylers.default import DefaultStyler
-from turms.helpers import build_schema_from_introspect_url
+from turms.run import generate_ast
+from turms.stylers.capitalize import CapitalizeStyler
+from turms.stylers.snake_case import SnakeCaseStyler
+
+from .utils import build_relative_glob
 
 
 @pytest.fixture()
-def countries_schema():
-    return build_schema_from_introspect_url("https://countries.trevorblades.com/")
-
-
-def test_complex_operations(countries_schema):
-    config = GeneratorConfig(
-        documents=build_relative_glob("/documents/countries/**.graphql"),
+def multi_interface_schema():
+    return build_schema_from_glob(
+        build_relative_glob("/schemas/multi_interface.graphql")
     )
 
+
+def test_multi_interface_funcs(multi_interface_schema):
+    config = GeneratorConfig(
+        documents=build_relative_glob("/documents/multi_interface/*.graphql"),
+    )
     generated_ast = generate_ast(
         config,
-        countries_schema,
-        stylers=[DefaultStyler()],
+        multi_interface_schema,
+        stylers=[CapitalizeStyler(), SnakeCaseStyler()],
         plugins=[
             EnumsPlugin(),
             InputsPlugin(),
@@ -41,7 +40,7 @@ def test_complex_operations(countries_schema):
                     definitions=(
                         [
                             FunctionDefinition(
-                                type="query",
+                                type="mutation",
                                 use="test.func",
                                 is_async=False,
                             )
@@ -54,8 +53,3 @@ def test_complex_operations(countries_schema):
 
     md = ast.Module(body=generated_ast, type_ignores=[])
     generated = ast.unparse(ast.fix_missing_locations(md))
-    print(generated)
-    assert "from enum import Enum" in generated, "EnumPlugin not working"
-    assert (
-        "def countries() -> List[CountriesCountries]:" in generated
-    ), "Collapse not working"
