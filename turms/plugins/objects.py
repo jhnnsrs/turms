@@ -1,6 +1,5 @@
 from graphql import (
     GraphQLInputObjectType,
-    GraphQLInputType,
     GraphQLInterfaceType,
     GraphQLList,
     GraphQLNonNull,
@@ -85,40 +84,43 @@ def generate_object_field_annotation(
 
     if isinstance(graphql_type, GraphQLUnionType):
         if is_optional:
+            registry.register_import("typing.Optional")
             registry.register_import("typing.Union")
             return ast.Subscript(
-                value=ast.Name("Union", ctx=ast.Load()),
-                slice=ast.Tuple(
-                    elts=[
-                        generate_object_field_annotation(
-                            union_type,
-                            config,
-                            plugin_config,
-                            registry,
-                            is_optional=False,
-                        )
-                        for union_type in graphql_type.types
-                    ],
-                    ctx=ast.Load(),
+                value=ast.Name("Optional", ctx=ast.Load()),
+                slice=ast.Subscript(
+                    value=ast.Name("Union", ctx=ast.Load()),
+                    slice=ast.Tuple(
+                        elts=[
+                            generate_object_field_annotation(
+                                union_type,
+                                config,
+                                plugin_config,
+                                registry,
+                                is_optional=False,
+                            )
+                            for union_type in graphql_type.types
+                        ],
+                        ctx=ast.Load(),
+                    ),
                 ),
             )
+        registry.register_import("typing.Union")
+
         return ast.Subscript(
-            value=ast.Name("Optional", ctx=ast.Load()),
-            slice=ast.Subscript(
-                value=ast.Name("Union", ctx=ast.Load()),
-                slice=ast.Tuple(
-                    elts=[
-                        generate_object_field_annotation(
-                            union_type,
-                            config,
-                            plugin_config,
-                            registry,
-                            is_optional=False,
-                        )
-                        for union_type in graphql_type.types
-                    ],
-                    ctx=ast.Load(),
-                ),
+            value=ast.Name("Union", ctx=ast.Load()),
+            slice=ast.Tuple(
+                elts=[
+                    generate_object_field_annotation(
+                        union_type,
+                        config,
+                        plugin_config,
+                        registry,
+                        is_optional=False,
+                    )
+                    for union_type in graphql_type.types
+                ],
+                ctx=ast.Load(),
             ),
         )
 
@@ -240,10 +242,22 @@ def generate_types(
 
             if isinstance(value.type, GraphQLNonNull):
                 if isinstance(value.type.of_type, GraphQLObjectType):
-                    self_referential.add(name)
+                    self_referential.add(
+                        registry.generate_inputtype_classname(value.type.of_type.name)
+                    )
+                if isinstance(value.type.of_type, GraphQLInterfaceType):
+                    self_referential.add(
+                        registry.generate_interface_classname(value.type.of_type.name)
+                    )
 
             if isinstance(value.type, GraphQLObjectType):
-                self_referential.add(name)
+                self_referential.add(
+                    registry.generate_inputtype_classname(value.type.name)
+                )
+            if isinstance(value.type, GraphQLInterfaceType):
+                self_referential.add(
+                    registry.generate_interface_classname(value.type.name)
+                )
 
             field_name = registry.generate_node_name(value_key)
 
