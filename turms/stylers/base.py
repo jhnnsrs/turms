@@ -45,6 +45,10 @@ class Styler(BaseModel):
     def style_input_name(self, name: str) -> str:
         raise NotImplementedError("Plugin must overrwrite this")
 
+    @abstractmethod
+    def style_object_name(self, name: str) -> str:
+        raise NotImplementedError("Plugin must overrwrite this")
+
 
 class BaseStyler(Styler):
     def style_operation_name(self, name: str) -> str:
@@ -72,4 +76,7 @@ class BaseStyler(Styler):
         return name
 
     def style_subscription_name(self, name: str) -> str:
+        return name
+
+    def style_object_name(self, name: str) -> str:
         return name

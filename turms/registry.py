@@ -6,7 +6,6 @@ from turms.errors import NoScalarEquivalentFound
 from turms.stylers.base import Styler
 from rich import get_console
 
-
 SCALAR_DEFAULTS = {
     "ID": "str",
     "String": "str",
@@ -18,17 +17,72 @@ SCALAR_DEFAULTS = {
 }
 
 
+built_in_map = {
+    "__TypeKind": ast.ClassDef(
+        "__TypeKind",
+        bases=[
+            ast.Name(id="str", ctx=ast.Load()),
+            ast.Name(id="Enum", ctx=ast.Load()),
+        ],
+        decorator_list=[],
+        keywords=[],
+        body=[
+            ast.Assign(
+                targets=[ast.Name(id=str(value), ctx=ast.Store())],
+                value=ast.Constant(value=value),
+            )
+            for value in ["OBJECT", "INTERFACE", "UNION", "ENUM", "INPUT_OBJECT"]
+        ],
+    ),
+    "__DirectiveLocation": ast.ClassDef(
+        "__DirectiveLocation",
+        bases=[
+            ast.Name(id="str", ctx=ast.Load()),
+            ast.Name(id="Enum", ctx=ast.Load()),
+        ],
+        decorator_list=[],
+        keywords=[],
+        body=[
+            ast.Assign(
+                targets=[ast.Name(id=str(value), ctx=ast.Store())],
+                value=ast.Constant(value=value),
+            )
+            for value in [
+                "SCALAR",
+                "OBJECT",
+                "FIELD_DEFINITION",
+                "ARGUMENT_DEFINITION",
+                "INTERFACE",
+                "UNION",
+                "ENUM",
+                "ENUM_VALUE",
+                "INPUT_OBJECT",
+                "INPUT_FIELD_DEFINITION",
+                "SCHEMA",
+            ]
+        ],
+    ),
+}
+
+
 class ClassRegistry(object):
     def __init__(self, config: GeneratorConfig, stylers: List[Styler]):
         self.stylers = stylers
         self._imports = set()
+        self._builtins = set()
         self.config = config
         self.fragment_document_map = {}
         self.enum_class_map = {}
         self.inputtype_class_map = {}
+        self.object_class_map = {}
         self.interfacefragments_class_map = {}
         self.fragment_class_map = {}
         self.console = get_console()
+
+    def check_builtin_imports(self, typename: str):
+        if typename in built_in_map:
+            print("Adding")
+            self._builtins.add(typename)
 
     def generate_type_name_field(self, typename):
         return ast.AnnAssign(
@@ -50,6 +104,24 @@ class ClassRegistry(object):
     def generate_inputtype_classname(self, typename: str):
         for styler in self.stylers:
             typename = styler.style_input_name(typename)
+
+        if iskeyword(typename):
+            return typename + "_"
+
+        return typename
+
+    def generate_objecttype_classname(self, typename: str):
+        for styler in self.stylers:
+            typename = styler.style_object_name(typename)
+
+        if iskeyword(typename):
+            return typename + "_"
+
+        return typename
+
+    def generate_interface_classname(self, typename: str):
+        for styler in self.stylers:
+            typename = styler.style_object_name(typename)
 
         if iskeyword(typename):
             return typename + "_"
@@ -146,6 +218,14 @@ class ClassRegistry(object):
 
         return imports
 
+    def generate_builtins(self):
+        builtins = []
+
+        for built_in in self._builtins:
+            builtins.append(built_in_map[built_in])
+
+        return builtins
+
     def register_enum_class(self, typename: str, cls: str):
         assert cls not in self.enum_class_map, f"{cls} already registered"
         self.enum_class_map[typename] = cls
@@ -153,6 +233,10 @@ class ClassRegistry(object):
     def register_inputtype_class(self, typename: str, cls: str):
         assert cls not in self.inputtype_class_map, f"{cls} already registered"
         self.inputtype_class_map[typename] = cls
+
+    def register_object_class(self, typename: str, cls: str):
+        assert cls not in self.object_class_map, f"{cls} already registered"
+        self.object_class_map[typename] = cls
 
     def register_fragment_class(self, typename: str, cls: str):
         assert cls not in self.fragment_class_map, f"{cls} already registered"

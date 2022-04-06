@@ -1,134 +1,86 @@
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Union
 
-from mikro.funcs import aexecute, execute
-from mikro.mikro import MikroRath
 from pydantic import BaseModel, Field
-from typing_extensions import Literal
 
 
-class CreateBeastCreatebeast(BaseModel):
-    typename: Optional[Literal["Beast"]] = Field(alias="__typename")
-    binomial: Optional[str]
-    "a beast's name in Latin"
+class StringQueryOperatorInput(BaseModel):
+    eq: Optional[str]
+    ne: Optional[str]
+    in_: Optional[List[Optional[str]]] = Field(alias="in")
+    nin: Optional[List[Optional[str]]]
+    regex: Optional[str]
+    glob: Optional[str]
 
 
-class CreateBeast(BaseModel):
-    create_beast: Optional[CreateBeastCreatebeast] = Field(alias="createBeast")
-    "Genrates a best which is nice"
-
-    class Meta:
-        domain = "default"
-        document = 'mutation createBeast($nested: [[String!]!], $nonOptionalParameter: String! = "999") {\n  createBeast(nested: $nested, nonOptionalParameter: $nonOptionalParameter) {\n    binomial\n  }\n}'
+class CountryFilterInput(BaseModel):
+    code: Optional["StringQueryOperatorInput"]
+    currency: Optional["StringQueryOperatorInput"]
+    continent: Optional["StringQueryOperatorInput"]
 
 
-class CreateIntBeastCreateintbeast(BaseModel):
-    typename: Optional[Literal["Beast"]] = Field(alias="__typename")
-    binomial: Optional[str]
-    "a beast's name in Latin"
+class ContinentFilterInput(BaseModel):
+    code: Optional["StringQueryOperatorInput"]
 
 
-class CreateIntBeast(BaseModel):
-    create_int_beast: Optional[CreateIntBeastCreateintbeast] = Field(
-        alias="createIntBeast"
-    )
-
-    class Meta:
-        domain = "default"
-        document = "mutation createIntBeast($nested: [[String!]!], $nonOptionalParameter: Int! = 999) {\n  createIntBeast(nested: $nested, nonOptionalParameter: $nonOptionalParameter) {\n    binomial\n  }\n}"
+class LanguageFilterInput(BaseModel):
+    code: Optional["StringQueryOperatorInput"]
 
 
-async def acreate_beast(
-    nested: Optional[List[List[str]]] = None,
-    non_optional_parameter: str = "999",
-    mikrorath: MikroRath = None,
-) -> Optional[CreateBeastCreatebeast]:
-    """createBeast
-
-    Genrates a best which is nice
-
-    Arguments:
-        nested (Optional[List[List[str]]], optional): nested.
-        non_optional_parameter (str, optional): nonOptionalParameter. Defaults to 999
-        mikrorath (mikro.mikro.MikroRath, optional): The mikro rath client
-
-    Returns:
-        CreateBeastCreatebeast"""
-    return (
-        await aexecute(
-            CreateBeast,
-            {"nested": nested, "nonOptionalParameter": non_optional_parameter},
-            mikrorath=mikrorath,
-        )
-    ).create_beast
+ContinentFilterInput.update_forward_refs()
+CountryFilterInput.update_forward_refs()
+LanguageFilterInput.update_forward_refs()
 
 
-def create_beast(
-    nested: Optional[List[List[str]]] = None,
-    non_optional_parameter: str = "999",
-    mikrorath: MikroRath = None,
-) -> Optional[CreateBeastCreatebeast]:
-    """createBeast
-
-    Genrates a best which is nice
-
-    Arguments:
-        nested (Optional[List[List[str]]], optional): nested.
-        non_optional_parameter (str, optional): nonOptionalParameter. Defaults to 999
-        mikrorath (mikro.mikro.MikroRath, optional): The mikro rath client
-
-    Returns:
-        CreateBeastCreatebeast"""
-    return execute(
-        CreateBeast,
-        {"nested": nested, "nonOptionalParameter": non_optional_parameter},
-        mikrorath=mikrorath,
-    ).create_beast
+class Country(BaseModel):
+    code: str
+    name: str
+    native: str
+    phone: str
+    continent: "Continent"
+    capital: Optional[str]
+    currency: Optional[str]
+    languages: List["Language"]
+    emoji: str
+    emoji_u: str = Field(alias="emojiU")
+    states: List["State"]
 
 
-async def acreate_int_beast(
-    nested: Optional[List[List[str]]] = None,
-    non_optional_parameter: int = 999,
-    mikrorath: MikroRath = None,
-) -> Optional[CreateIntBeastCreateintbeast]:
-    """createIntBeast
+class Continent(BaseModel):
+    code: str
+    name: str
+    countries: List["Country"]
 
 
-
-    Arguments:
-        nested (Optional[List[List[str]]], optional): nested.
-        non_optional_parameter (int, optional): nonOptionalParameter. Defaults to 999
-        mikrorath (mikro.mikro.MikroRath, optional): The mikro rath client
-
-    Returns:
-        CreateIntBeastCreateintbeast"""
-    return (
-        await aexecute(
-            CreateIntBeast,
-            {"nested": nested, "nonOptionalParameter": non_optional_parameter},
-            mikrorath=mikrorath,
-        )
-    ).create_int_beast
+class Language(BaseModel):
+    code: str
+    name: Optional[str]
+    native: Optional[str]
+    rtl: bool
 
 
-def create_int_beast(
-    nested: Optional[List[List[str]]] = None,
-    non_optional_parameter: int = 999,
-    mikrorath: MikroRath = None,
-) -> Optional[CreateIntBeastCreateintbeast]:
-    """createIntBeast
+class State(BaseModel):
+    code: Optional[str]
+    name: str
+    country: "Country"
 
 
+class Query(BaseModel):
+    _entities: List[Union["Country", "Continent", "Language"]]
+    _service: "_Service"
+    countries: List["Country"]
+    country: Optional["Country"]
+    continents: List["Continent"]
+    continent: Optional["Continent"]
+    languages: List["Language"]
+    language: Optional["Language"]
 
-    Arguments:
-        nested (Optional[List[List[str]]], optional): nested.
-        non_optional_parameter (int, optional): nonOptionalParameter. Defaults to 999
-        mikrorath (mikro.mikro.MikroRath, optional): The mikro rath client
 
-    Returns:
-        CreateIntBeastCreateintbeast"""
-    return execute(
-        CreateIntBeast,
-        {"nested": nested, "nonOptionalParameter": non_optional_parameter},
-        mikrorath=mikrorath,
-    ).create_int_beast
+class _Service(BaseModel):
+    sdl: Optional[str]
+    "The sdl representing the federated service capabilities. Includes federation directives, removes federation types, and includes rest of full schema after schema directives have been applied"
+
+
+Query.update_forward_refs()
+Country.update_forward_refs()
+State.update_forward_refs()
