@@ -1,7 +1,6 @@
+from pydantic import Field, BaseModel
+from typing import Optional, Union, List
 from enum import Enum
-from typing import List, Optional, Union
-
-from pydantic import BaseModel, Field
 
 
 class StringQueryOperatorInput(BaseModel):
@@ -27,9 +26,7 @@ class LanguageFilterInput(BaseModel):
     code: Optional["StringQueryOperatorInput"]
 
 
-ContinentFilterInput.update_forward_refs()
-CountryFilterInput.update_forward_refs()
-LanguageFilterInput.update_forward_refs()
+StringQueryOperatorInput.update_forward_refs()
 
 
 class Country(BaseModel):
@@ -66,7 +63,7 @@ class State(BaseModel):
 
 
 class Query(BaseModel):
-    _entities: List[Union["Country", "Continent", "Language"]]
+    _entities: List[Optional[Union["Country", "Continent", "Language"]]]
     _service: "_Service"
     countries: List["Country"]
     country: Optional["Country"]
@@ -81,6 +78,7 @@ class _Service(BaseModel):
     "The sdl representing the federated service capabilities. Includes federation directives, removes federation types, and includes rest of full schema after schema directives have been applied"
 
 
-Query.update_forward_refs()
 Country.update_forward_refs()
-State.update_forward_refs()
+Continent.update_forward_refs()
+Language.update_forward_refs()
+_Service.update_forward_refs()

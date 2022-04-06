@@ -33,7 +33,6 @@ try:
     def toml_loader(file):
         return toml.loads(file.read())
 
-
 except ImportError:
 
     def toml_loader(file):
@@ -320,6 +319,8 @@ def generate_ast(
         except Exception as e:
             raise GenerationError(f"Plugin:{plugin} failed!") from e
 
-    global_tree = registry.generate_imports() + global_tree
+    global_tree = (
+        registry.generate_imports() + registry.generate_builtins() + global_tree
+    )
 
     return global_tree

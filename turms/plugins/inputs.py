@@ -142,10 +142,14 @@ def generate_inputs(
 
             if isinstance(value.type, GraphQLNonNull):
                 if isinstance(value.type.of_type, GraphQLInputObjectType):
-                    self_referential.add(name)
+                    self_referential.add(
+                        registry.generate_inputtype_classname(value.type.of_type.name)
+                    )
 
             if isinstance(value.type, GraphQLInputObjectType):
-                self_referential.add(name)
+                self_referential.add(
+                    registry.generate_inputtype_classname(value.type.name)
+                )
 
             field_name = registry.generate_node_name(value_key)
 

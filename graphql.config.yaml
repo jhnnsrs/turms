@@ -1,7 +1,6 @@
 projects:
   default:
-    schema: tests/schemas/nested_inputs.graphql
-    documents: tests/documents/inputs_default/*.graphql
+    schema: https://countries.trevorblades.com/
     extensions:
       turms:
         out_dir: examples/api
@@ -14,33 +13,14 @@ projects:
         plugins:
           - type: turms.plugins.enums.EnumsPlugin
           - type: turms.plugins.inputs.InputsPlugin
-          - type: turms.plugins.fragments.FragmentsPlugin
-          - type: turms.plugins.operations.OperationsPlugin
-          - type: turms.plugins.funcs.FuncsPlugin
-            global_kwargs:
-              - type: mikro.mikro.MikroRath
-                key: mikrorath
-                description: "The mikro rath client"
-            definitions:
-              - type: subscription
-                is_async: True
-                use: mikro.funcs.asubscribe
-              - type: query
-                is_async: True
-                use: mikro.funcs.aexecute
-              - type: mutation
-                is_async: True
-                use: mikro.funcs.aexecute
-              - type: subscription
-                use: mikro.funcs.subscribe
-              - type: query
-                use: mikro.funcs.execute
-              - type: mutation
-                use: mikro.funcs.execute
+          - type: turms.plugins.objects.ObjectsPlugin
         processors:
           - type: turms.processors.black.BlackProcessor
           - type: turms.processors.isort.IsortProcessor
         scalar_definitions:
           uuid: str
-          timestamptz: str
-          Date: str
+          UUID: str
+          Callback: str
+          Any: typing.Any
+          QString: str
+          ID: str

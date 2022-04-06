@@ -49,7 +49,7 @@ class Extensions(BaseModel):
     turms: GeneratorConfig
 
 
-class GraphQLProject(BaseSettings):  # TODO: Rename to graphql project
+class GraphQLProject(BaseSettings):
     schema_url: Optional[Union[AnyHttpUrl, str]] = Field(alias="schema", env="schema")
     bearer_token: Optional[str] = None
     documents: Optional[str]
