@@ -8,35 +8,35 @@
 [![PyPI status](https://img.shields.io/pypi/status/turms.svg)](https://pypi.python.org/pypi/turms/)
 [![PyPI download month](https://img.shields.io/pypi/dm/turms.svg)](https://pypi.python.org/pypi/turms/)
 
-### DEVELOPMENT
+### BETA
 
 ## Inspiration
 
-Turms is a pure python implementation of the awesome graphql-codegen library, following a simliar extensible design.
+Turms is a pure python implementation following the awesome graphql-codegen library with a similar extensible design.
 It makes heavy use of pydantic and its serialization capablities and provides fully typed querys, mutations and subscriptions
 
 ## Supports
 
-- Documents
-- Fragments
+Schema Generation
 - Enums
+- Inputs
+- Objects
+
+Documents Generation
+- Fragments
 - Operations
-- Operation Functions
-- Scalar (mapping to python equivalent)
+
 
 ## Features
 
-- Fully Modular (agnostic of graphql transport)
-- Tries to minimise Class Generation if using Fragments
+- minimal, but fully documented code generation
+- agnostic of graphql transport (gql, and rath examples)
 - Autocollapsing operation functions
-- Specify type mixins, baseclasses...
-- Fully Support type hints for variables (Pylance)
+- Specify type mixins, configuration
+- full support type hints for variables (Pylance)
 - Compliant with graphl-config
+- Support for custom scalars
 
-## Companion Library
-
-If you are searching for an Apollo-like GraphQL Client you can check out [rath](https://github.com/jhnnsrs/rath), that works especially
-well with turms.
 
 ## Installation
 
@@ -74,6 +74,13 @@ projects:
           Date: str
 ```
 
+## Run 
+
+```bash
+turms gen
+```
+
+
 Turms configuration is based on plugins that can be configured in the graphql.config. There exist three major classes:
 
 ### Stylers
@@ -94,7 +101,7 @@ Plugins are the generators of code, that traverse through the direcotry and ad n
 
 ## Parsers
 
-Processors take the generated python.AST, and can parse this code. (e.g enabling polyfills for different python versions)
+Parsers take the generated python.AST, and can parse this code. (e.g enabling polyfills for different python versions)
 Includes Parsers are
 
 - turms.parsers.polyfill.PolyfillParser (only working for python 3.7)
@@ -129,7 +136,7 @@ In Etruscan religion, Turms (usually written as 𐌕𐌖𐌓𐌌𐌑 Turmś in t
 
 ## Transport Layer
 
-Turms does not come with a default transport layer, but by specifiyng custom queries classes you can easily incorporate your logic (look at turms.types.herre for inspiration)
+Turms does *not* come with a default transport layer but if you are searching for an Apollo-like GraphQL Client you can check out [rath](https://github.com/jhnnsrs/rath), that works especially well with turms.
 
 ## Examples
 
