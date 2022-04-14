@@ -1,0 +1,7 @@
+type Foo {
+    forward: Ref
+}
+
+interface Ref {
+  id: ID
+}

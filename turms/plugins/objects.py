@@ -7,19 +7,22 @@ from graphql import (
     GraphQLScalarType,
     GraphQLType,
     GraphQLUnionType,
+    is_wrapping_type,
 )
 from turms.plugins.base import Plugin, PluginConfig
 import ast
 from typing import List
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
-from turms.plugins.base import Plugin
 from pydantic import Field
 from graphql.type.definition import (
     GraphQLEnumType,
 )
 from turms.registry import ClassRegistry
-from turms.utils import get_additional_bases_for_type
+from turms.utils import (
+    get_additional_bases_for_type,
+    interface_is_extended_by_other_interfaces,
+)
 
 
 class ObjectsPluginConfig(PluginConfig):
@@ -232,12 +235,15 @@ def generate_types(
 
         for interface in object_type.interfaces:
             interface_map.setdefault(interface.name, []).append(name)
-            additional_bases.append(
-                ast.Name(
-                    id=f"{registry.generate_interface_classname(interface.name)}Base",
-                    ctx=ast.Load(),
+
+            other_interfaces = set(object_type.interfaces) - {interface}
+            if not interface_is_extended_by_other_interfaces(interface, other_interfaces):
+                additional_bases.append(
+                    ast.Name(
+                        id=f"{registry.generate_interface_classname(interface.name)}Base",
+                        ctx=ast.Load(),
+                    )
                 )
-            )
 
         fields = (
             [ast.Expr(value=ast.Constant(value=object_type.description))]
@@ -246,24 +252,17 @@ def generate_types(
         )
 
         for value_key, value in object_type.fields.items():
+            type_ = value.type
+            while is_wrapping_type(type_):
+                type_ = type_.of_type
 
-            if isinstance(value.type, GraphQLNonNull):
-                if isinstance(value.type.of_type, GraphQLObjectType):
-                    self_referential.add(
-                        registry.generate_inputtype_classname(value.type.of_type.name)
-                    )
-                if isinstance(value.type.of_type, GraphQLInterfaceType):
-                    self_referential.add(
-                        registry.generate_interface_classname(value.type.of_type.name)
-                    )
-
-            if isinstance(value.type, GraphQLObjectType):
+            if isinstance(type_, GraphQLObjectType):
                 self_referential.add(
-                    registry.generate_inputtype_classname(value.type.name)
+                    registry.generate_objecttype_classname(type_.name)
                 )
-            if isinstance(value.type, GraphQLInterfaceType):
+            elif isinstance(type_, GraphQLInterfaceType):
                 self_referential.add(
-                    registry.generate_interface_classname(value.type.name)
+                    f"{registry.generate_interface_classname(type_.name)}Base"
                 )
 
             field_name = registry.generate_node_name(value_key)
