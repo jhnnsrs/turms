@@ -58,6 +58,7 @@ class GeneratorConfig(BaseSettings):
     scalar_definitions: Dict[str, PythonScalar] = {}
     freeze: bool = False
     additional_bases = {}
+    force_plugin_order = True
 
     parsers: List[ConfigProxy] = []
     plugins: List[ConfigProxy] = []

@@ -326,7 +326,6 @@ def generate_ast(
             raise GenerationError(f"Plugin:{plugin} failed!") from e
 
     global_tree = (
-        registry.generate_imports() + registry.generate_builtins() + global_tree
-    )
+        registry.generate_imports() + registry.generate_builtins() + global_tree + registry.generate_forward_refs())
 
     return global_tree

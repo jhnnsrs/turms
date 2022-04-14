@@ -153,13 +153,13 @@ def generate_operation(
     assert o.name.value, "Operation names are required"
 
     if o.operation == OperationType.MUTATION:
-        class_name = registry.generate_mutation_classname(o.name.value)
+        class_name = registry.generate_mutation(o.name.value)
         extra_bases = get_mutation_bases(config, plugin_config, registry)
     if o.operation == OperationType.SUBSCRIPTION:
-        class_name = registry.generate_subscription_classname(o.name.value)
+        class_name = registry.generate_subscription(o.name.value)
         extra_bases = get_subscription_bases(config, plugin_config, registry)
     if o.operation == OperationType.QUERY:
-        class_name = registry.generate_query_classname(o.name.value)
+        class_name = registry.generate_query(o.name.value)
         extra_bases = get_query_bases(config, plugin_config, registry)
 
     x = get_operation_root_type(client_schema, o)
@@ -174,12 +174,12 @@ def generate_operation(
         class_body_fields += [
             type_field_node(
                 field_node,
+                class_name,
                 field_definition,
                 client_schema,
                 config,
                 tree,
                 registry,
-                parent_name=class_name,
             ),
         ]
 

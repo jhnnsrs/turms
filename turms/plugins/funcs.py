@@ -114,23 +114,37 @@ def get_input_type_annotation(
     if isinstance(input_type, NamedTypeNode):
         try:
             type_name = registry.get_scalar_equivalent(input_type.name.value)
-        except NoScalarEquivalentFound as e:
-            type_name = registry.get_inputtype_class(input_type.name.value)
 
-        if optional:
-            registry.register_import("typing.Optional")
-            return ast.Subscript(
-                value=ast.Name(id="Optional", ctx=ast.Load()),
-                slice=ast.Name(
-                    id=type_name,
+            if optional:
+                registry.register_import("typing.Optional")
+                return ast.Subscript(
+                    value=ast.Name(id="Optional", ctx=ast.Load()),
+                    slice=ast.Name(
+                        id=type_name,
+                        ctx=ast.Load(),
+                    ),
                     ctx=ast.Load(),
-                ),
+                )
+
+            return ast.Name(
+                id=type_name,
                 ctx=ast.Load(),
             )
 
-        return ast.Name(
-            id=type_name,
-            ctx=ast.Load(),
+        except NoScalarEquivalentFound as e:
+
+            if optional:
+                registry.register_import("typing.Optional")
+                return ast.Subscript(
+                    value=ast.Name(id="Optional", ctx=ast.Load()),
+                    slice=registry.reference_inputtype(
+                        input_type.name.value, "", allow_forward=False
+                    ),
+                    ctx=ast.Load(),
+                )
+
+        return registry.reference_inputtype(
+            input_type.name.value, "", allow_forward=False
         )
 
     elif isinstance(input_type, ListTypeNode):
@@ -391,11 +405,11 @@ def recurse_variable_annotation(
 def get_operation_class_name(o: OperationDefinitionNode, registry: ClassRegistry):
 
     if o.operation == OperationType.QUERY:
-        o_name = registry.generate_query_classname(o.name.value)
+        o_name = registry.reference_query(o.name.value, "", allow_forward=False)
     if o.operation == OperationType.MUTATION:
-        o_name = registry.generate_mutation_classname(o.name.value)
+        o_name = registry.reference_mutation(o.name.value, "", allow_forward=False)
     if o.operation == OperationType.SUBSCRIPTION:
-        o_name = registry.generate_subscription_classname(o.name.value)
+        o_name = registry.reference_subscription(o.name.value, "", allow_forward=False)
 
     return o_name
 
@@ -560,18 +574,11 @@ def get_return_type_annotation(
             if isinstance(
                 potential_return_field.selection_set.selections[0], FragmentSpreadNode
             ):  # Dealing with a on element fragment
-                return (
-                    ast.Name(
-                        id=registry.get_fragment_class(
-                            potential_return_field.selection_set.selections[
-                                0
-                            ].name.value
-                        ),
-                        ctx=ast.Load(),
-                    ),
-                    True,
+                return registry.reference_fragment(
+                    potential_return_field.selection_set.selections[0].name.value,
+                    "",
+                    allow_forward=False,
                 )
-
         # is a subseleciton of maybe multiple fragments or just a normal selection
         return (
             build_type_annotation_for_field(
@@ -981,12 +988,7 @@ def generate_operation_func(
 ):
     tree = []
 
-    if o.operation == OperationType.QUERY:
-        o_name = registry.generate_query_classname(o.name.value)
-    if o.operation == OperationType.MUTATION:
-        o_name = registry.generate_mutation_classname(o.name.value)
-    if o.operation == OperationType.SUBSCRIPTION:
-        o_name = registry.generate_subscription_classname(o.name.value)
+    o_name = get_operation_class_name(o, registry)
 
     collapse = plugin_config.collapse_lonely
 
@@ -1040,7 +1042,9 @@ def generate_operation_func(
                 returns=returns
                 if definition.type != OperationType.SUBSCRIPTION
                 else ast.Subscript(
-                    value=ast.Name(id="AsyncIterator", ctx=ast.Load()), slice=returns,ctx=ast.Load(),
+                    value=ast.Name(id="AsyncIterator", ctx=ast.Load()),
+                    slice=returns,
+                    ctx=ast.Load(),
                 ),
             )
         )
@@ -1087,7 +1091,8 @@ def generate_operation_func(
                 returns=returns
                 if definition.type != OperationType.SUBSCRIPTION
                 else ast.Subscript(
-                    value=ast.Name(id="Iterator", ctx=ast.Load()), slice=returns,
+                    value=ast.Name(id="Iterator", ctx=ast.Load()),
+                    slice=returns,
                     ctx=ast.Load(),
                 ),
             )

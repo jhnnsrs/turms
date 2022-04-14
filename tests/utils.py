@@ -39,6 +39,8 @@ def unit_test_with(generated_ast: List[ast.AST], test_string: str):
             except Exception as e:
                 raise e from ExecuteException(f"Code: \n\n{parsed_code} \n\n failed with: \n {test_string}")
 
+            raise Exception("This should not be called")
+
 
 
 

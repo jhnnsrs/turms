@@ -19,6 +19,7 @@ from graphql import (
     FieldNode,
     FragmentSpreadNode,
     GraphQLInterfaceType,
+    GraphQLObjectType,
     InlineFragmentNode,
     language,
 )
@@ -74,12 +75,13 @@ def generate_fragment(
     tree = []
     fields = []
     type = client_schema.get_type(f.type_condition.name.value)
-    name = registry.generate_fragment_classname(f.name.value)
+    name = registry.generate_fragment(f.name.value)
+    registry.register_fragment_document(f.name.value, language.print_ast(f))
 
     if isinstance(type, GraphQLInterfaceType):
         mother_class_fields = []
         base_fragment_name = f"{name}Base"
-        additional_bases = []
+        additional_bases = get_additional_bases_for_type(type.name, config, registry)
 
         if type.description:
             mother_class_fields.append(
@@ -96,15 +98,13 @@ def generate_fragment(
                 field_type = type.fields[sub_node.name.value]
                 mother_class_fields += type_field_node(
                     sub_node,
+                    base_fragment_name,
                     field_type,
                     client_schema,
                     config,
                     tree,
                     registry,
-                    parent_name=base_fragment_name,
                 )
-
-        additional_bases += get_additional_bases_for_type(type.name, config, registry)
 
         mother_class = ast.ClassDef(
             base_fragment_name,
@@ -122,14 +122,14 @@ def generate_fragment(
         for sub_node in f.selection_set.selections:
 
             if isinstance(sub_node, FragmentSpreadNode):
-
+                # Spread nodes are like inheritance?
                 spreaded_name = f"{base_fragment_name}{sub_node.name.value}"
 
                 cls = ast.ClassDef(
                     spreaded_name,
                     bases=[
                         ast.Name(
-                            id=registry.get_fragment_class(sub_node.name.value),
+                            id=registry.inherit_fragment(sub_node.name.value),
                             ctx=ast.Load(),
                         ),
                         ast.Name(id=base_fragment_name, ctx=ast.Load()),
@@ -190,12 +190,8 @@ def generate_fragment(
 
         union_class_names.append(base_fragment_name)
 
-        registry.register_fragment_document(f.name.value, language.print_ast(f))
-
         if len(union_class_names) > 1:
             registry.register_import("typing.Union")
-            registry.register_fragment_class(f.name.value, name)
-            registry.register_interface_fragment(f.name.value, name)
             slice = ast.Tuple(
                 elts=[
                     ast.Name(id=clsname, ctx=ast.Load())
@@ -214,60 +210,58 @@ def generate_fragment(
                 )
             )
 
-        else:
-            registry.register_fragment_class(f.name.value, union_class_names[0])
-            registry.register_interface_fragment(f.name.value, union_class_names[0])
-
         return tree
 
-    name = registry.generate_fragment_classname(f.name.value)
-
-    additional_bases = get_additional_bases_for_type(
-        f.type_condition.name.value, config, registry
-    )
-
-    fields += [generate_typename_field(type.name, registry)]
-
-    for field in f.selection_set.selections:
-
-        if field.name.value == "__typename":
-            continue
-
-        if isinstance(field, FragmentDefinitionNode):
-            continue
-
-        if isinstance(field, FragmentSpreadNode):
-            interface = registry.get_interface_fragment_or_none(field.name.value)
-            if interface:
-                additional_bases.append(ast.Name(id=interface, ctx=ast.Load()))
-            continue
-
-        field_definition = get_field_def(client_schema, type, field)
-        assert field_definition, "Couldn't find field definition"
-
-        fields += type_field_node(
-            field,
-            field_definition,
-            client_schema,
-            config,
-            tree,
-            registry,
-            parent_name=name,
+    elif isinstance(type, GraphQLObjectType):
+        additional_bases = get_additional_bases_for_type(
+            f.type_condition.name.value, config, registry
         )
 
-    registry.register_fragment_document(f.name.value, language.print_ast(f))
-    registry.register_fragment_class(f.name.value, name)
-    tree.append(
-        ast.ClassDef(
-            name,
-            bases=additional_bases
-            + get_fragment_bases(config, plugin_config, registry),
-            decorator_list=[],
-            keywords=[],
-            body=fields + generate_config_class(config),
+        fields += [generate_typename_field(type.name, registry)]
+
+        for field in f.selection_set.selections:
+
+            if field.name.value == "__typename":
+                continue
+
+            if isinstance(field, FragmentDefinitionNode):
+                continue
+
+            if isinstance(field, FragmentSpreadNode):
+                interface = registry.get_interface_fragment_or_none(field.name.value)
+                if interface:
+                    additional_bases.append(ast.Name(id=interface, ctx=ast.Load()))
+                continue
+
+            field_definition = get_field_def(client_schema, type, field)
+            assert field_definition, "Couldn't find field definition"
+
+            fields += type_field_node(
+                field,
+                name,
+                field_definition,
+                client_schema,
+                config,
+                tree,
+                registry,
+            )
+
+        tree.append(
+            ast.ClassDef(
+                name,
+                bases=additional_bases
+                + get_fragment_bases(config, plugin_config, registry),
+                decorator_list=[],
+                keywords=[],
+                body=fields + generate_config_class(config),
+            )
         )
-    )
-    return tree
+        return tree
+
+    else:
+        raise NotImplementedError(
+            "Neither Interface nor Object Fragment. That should not happen"
+        )
 
 
 class FragmentsPlugin(Plugin):

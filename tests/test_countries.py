@@ -36,19 +36,6 @@ def test_complex_operations(countries_schema):
             InputsPlugin(),
             FragmentsPlugin(),
             OperationsPlugin(),
-            FuncsPlugin(
-                config=FuncsPluginConfig(
-                    definitions=(
-                        [
-                            FunctionDefinition(
-                                type="query",
-                                use="tests.mocks.query",
-                                is_async=False,
-                            )
-                        ]
-                    )
-                ),
-            ),
         ],
     )
 
@@ -56,6 +43,3 @@ def test_complex_operations(countries_schema):
     generated = ast.unparse(ast.fix_missing_locations(md))
     unit_test_with(generated_ast, "Countries(countries=[])")
     assert "from enum import Enum" in generated, "EnumPlugin not working"
-    assert (
-        "def countries() -> List[CountriesCountries]:" in generated
-    ), "Collapse not working"

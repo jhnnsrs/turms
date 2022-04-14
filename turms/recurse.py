@@ -28,12 +28,12 @@ from graphql.type.definition import (
 
 def recurse_annotation(
     node: FieldNode,
+    parent: str,
     type: GraphQLType,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
     subtree: ast.AST,
     registry: ClassRegistry,
-    parent_name="",
     is_optional=True,
 ) -> ast.AST:
     """Recurse Annotations
@@ -70,8 +70,8 @@ def recurse_annotation(
         # Lets Create Base Class to Inherit from for this
         mother_class_fields = []
         target = target_from_node(node)
-        base_name = f"{parent_name}{target.capitalize()}"
 
+        # SINGLE SPREAD, AUTO COLLAPSING
         if len(node.selection_set.selections) == 1:
             # If there is only one field and its a fragment, we can just use the fragment
 
@@ -81,25 +81,19 @@ def recurse_annotation(
                     registry.register_import("typing.Optional")
                     return ast.Subscript(
                         value=ast.Name("Optional", ctx=ast.Load()),
-                        slice=ast.Name(
-                            id=registry.get_fragment_class(subnode.name.value),
-                            ctx=ast.Load(),
-                        ),
+                        slice=registry.reference_fragment(subnode.name.value, parent),
                         ctx=ast.Load(),
                     )
 
                 else:
-                    return ast.Name(
-                        id=registry.get_fragment_class(subnode.name.value),
-                        ctx=ast.Load(),
-                    )
+                    return registry.reference_fragment(subnode.name.value, parent)
+
+        base_name = f"{parent}{target.capitalize()}"
 
         if type.description:
             mother_class_fields.append(
                 ast.Expr(value=ast.Constant(value=type.description))
             )
-
-        registry.register_import("typing.Optional")
 
         for sub_node in node.selection_set.selections:
 
@@ -110,17 +104,18 @@ def recurse_annotation(
                 field_type = type.fields[sub_node.name.value]
                 mother_class_fields += type_field_node(
                     sub_node,
+                    base_name,
                     field_type,
                     client_schema,
                     config,
                     subtree,
                     registry,
-                    parent_name=base_name,
                 )
 
+        # We first genrate the mother class that will provide common fields of this fragment. This will never be reference
+        # though
         mother_class_name = f"{base_name}Base"
         additional_bases = get_additional_bases_for_type(type.name, config, registry)
-
         body = mother_class_fields if mother_class_fields else [ast.Pass()]
 
         mother_class = ast.ClassDef(
@@ -130,7 +125,6 @@ def recurse_annotation(
             keywords=[],
             body=body + generate_config_class(config),
         )
-
         subtree.append(mother_class)
 
         union_class_names = []
@@ -139,14 +133,14 @@ def recurse_annotation(
 
             if isinstance(sub_node, FragmentSpreadNode):
 
-                name = f"{base_name}{sub_node.name.value}"
+                spreaded_fragment_classname = f"{base_name}{sub_node.name.value}"
 
                 cls = ast.ClassDef(
-                    name,
+                    spreaded_fragment_classname,
                     bases=[
                         ast.Name(id=mother_class_name, ctx=ast.Load()),
                         ast.Name(
-                            id=registry.get_fragment_class(sub_node.name.value),
+                            id=registry.inherit_fragment(sub_node.name.value),
                             ctx=ast.Load(),
                         ),
                     ],
@@ -156,10 +150,12 @@ def recurse_annotation(
                 )
 
                 subtree.append(cls)
-                union_class_names.append(name)
+                union_class_names.append(spreaded_fragment_classname)
 
             if isinstance(sub_node, InlineFragmentNode):
-                name = f"{base_name}{sub_node.type_condition.name.value}Fragment"
+                inline_fragment_name = (
+                    f"{base_name}{sub_node.type_condition.name.value}InlineFragment"
+                )
                 inline_fragment_fields = []
 
                 inline_fragment_fields += [
@@ -181,19 +177,19 @@ def recurse_annotation(
                         field_type = sub_sub_node_type.fields[sub_sub_node.name.value]
                         inline_fragment_fields += type_field_node(
                             sub_sub_node,
+                            inline_fragment_name,
                             field_type,
                             client_schema,
                             config,
                             subtree,
                             registry,
-                            parent_name=name,
                         )
 
                 additional_bases = get_additional_bases_for_type(
                     sub_node.type_condition.name.value, config, registry
                 )
                 cls = ast.ClassDef(
-                    name,
+                    inline_fragment_name,
                     bases=additional_bases
                     + [
                         ast.Name(id=mother_class_name, ctx=ast.Load()),
@@ -204,7 +200,7 @@ def recurse_annotation(
                 )
 
                 subtree.append(cls)
-                union_class_names.append(name)
+                union_class_names.append(inline_fragment_name)
 
         if not config.always_resolve_interfaces:
             union_class_names.append(mother_class_name)
@@ -249,11 +245,14 @@ def recurse_annotation(
         additional_bases = get_additional_bases_for_type(type.name, config, registry)
 
         target = target_from_node(node)
-        nana = f"{parent_name}{target.capitalize()}"
+        object_class_name = f"{parent}{target.capitalize()}"
+
         if type.description:
             pick_fields.append(ast.Expr(value=ast.Constant(value=type.description)))
+
         pick_fields += [generate_typename_field(type.name, registry)]
 
+        # Single Item collapse
         if len(node.selection_set.selections) == 1:
             subnode = node.selection_set.selections[0]
             if isinstance(subnode, FragmentSpreadNode):
@@ -261,17 +260,15 @@ def recurse_annotation(
                     registry.register_import("typing.Optional")
                     return ast.Subscript(
                         value=ast.Name("Optional", ctx=ast.Load()),
-                        slice=ast.Name(
-                            id=registry.get_fragment_class(subnode.name.value),
-                            ctx=ast.Load(),
+                        slice=registry.reference_fragment(
+                            subnode.name.value, object_class_name
                         ),
                         ctx=ast.Load(),
                     )
 
                 else:
-                    return ast.Name(
-                        id=registry.get_fragment_class(subnode.name.value),
-                        ctx=ast.Load(),
+                    return registry.reference_fragment(
+                        subnode.name.value, object_class_name
                     )
 
         for sub_node in node.selection_set.selections:
@@ -279,7 +276,7 @@ def recurse_annotation(
             if isinstance(sub_node, FragmentSpreadNode):
                 additional_bases.append(
                     ast.Name(
-                        id=registry.get_fragment_class(sub_node.name.value),
+                        id=registry.inherit_fragment(sub_node.name.value),
                         ctx=ast.Load(),
                     )
                 )
@@ -290,12 +287,12 @@ def recurse_annotation(
                 field_type = type.fields[sub_node.name.value]
                 pick_fields += type_field_node(
                     sub_node,
+                    object_class_name,
                     field_type,
                     client_schema,
                     config,
                     subtree,
                     registry,
-                    parent_name=nana,
                 )
 
             if isinstance(sub_node, InlineFragmentNode):
@@ -304,7 +301,7 @@ def recurse_annotation(
         body = pick_fields if pick_fields else [ast.Pass()]
 
         cls = ast.ClassDef(
-            nana,
+            object_class_name,
             bases=additional_bases
             + [
                 ast.Name(id=base.split(".")[-1], ctx=ast.Load())
@@ -322,7 +319,7 @@ def recurse_annotation(
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
                 slice=ast.Name(
-                    id=nana,
+                    id=object_class_name,
                     ctx=ast.Load(),
                 ),
                 ctx=ast.Load(),
@@ -330,7 +327,7 @@ def recurse_annotation(
 
         else:
             return ast.Name(
-                id=nana,
+                id=object_class_name,
                 ctx=ast.Load(),
             )
 
@@ -359,28 +356,21 @@ def recurse_annotation(
             registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
-                slice=ast.Name(
-                    id=registry.get_enum_class(type.name),
-                    ctx=ast.Load(),
-                ),
-                ctx=ast.Load(),
+                slice=registry.reference_enum(type.name, parent),
             )
 
         else:
-            return ast.Name(
-                id=registry.get_enum_class(type.name),
-                ctx=ast.Load(),
-            )
+            return registry.reference_enum(type.name, parent)
 
     if isinstance(type, GraphQLNonNull):
         return recurse_annotation(
             node,
+            parent,
             type.of_type,
             client_schema,
             config,
             subtree,
             registry,
-            parent_name=parent_name,
             is_optional=False,
         )
 
@@ -395,12 +385,12 @@ def recurse_annotation(
                     value=ast.Name("List", ctx=ast.Load()),
                     slice=recurse_annotation(
                         node,
+                        parent,
                         type.of_type,
                         client_schema,
                         config,
                         subtree,
                         registry,
-                        parent_name=parent_name,
                     ),
                     ctx=ast.Load(),
                 ),
@@ -413,12 +403,12 @@ def recurse_annotation(
                 value=ast.Name("List", ctx=ast.Load()),
                 slice=recurse_annotation(
                     node,
+                    parent,
                     type.of_type,
                     client_schema,
                     config,
                     subtree,
                     registry,
-                    parent_name=parent_name,
                 ),
                 ctx=ast.Load(),
             )
@@ -428,12 +418,12 @@ def recurse_annotation(
 
 def type_field_node(
     node: FieldNode,
+    parent: str,
     field: GraphQLField,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
     subtree: ast.AST,
     registry: ClassRegistry,
-    parent_name="",
     is_optional=True,
 ):
     """Types a field node
@@ -463,12 +453,12 @@ def type_field_node(
             target=ast.Name(field_name, ctx=ast.Store()),
             annotation=recurse_annotation(
                 node,
+                parent,
                 field.type,
                 client_schema,
                 config,
                 subtree,
                 registry,
-                parent_name=parent_name,
                 is_optional=is_optional,
             ),
             value=ast.Call(
@@ -483,12 +473,12 @@ def type_field_node(
             target=ast.Name(target, ctx=ast.Store()),
             annotation=recurse_annotation(
                 node,
+                parent,
                 field.type,
                 client_schema,
                 config,
                 subtree,
                 registry,
-                parent_name=parent_name,
                 is_optional=is_optional,
             ),
             simple=1,
@@ -502,7 +492,7 @@ def type_field_node(
 
     if field.deprecation_reason:
         registry.warn(
-            f"Field {node.name.value} on {parent_name} is deprecated: {field.deprecation_reason}"
+            f"Field {node.name.value} on {parent} is deprecated: {field.deprecation_reason}"
         )
 
     if potential_comment:

@@ -1,4 +1,5 @@
 from graphql import (
+    GraphQLField,
     GraphQLInputObjectType,
     GraphQLInterfaceType,
     GraphQLList,
@@ -11,7 +12,7 @@ from graphql import (
 )
 from turms.plugins.base import Plugin, PluginConfig
 import ast
-from typing import List
+from typing import Dict, List
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from pydantic import Field
@@ -37,6 +38,7 @@ class ObjectsPluginConfig(PluginConfig):
 
 def generate_object_field_annotation(
     graphql_type: GraphQLType,
+    parent: str,
     config: GeneratorConfig,
     plugin_config: ObjectsPluginConfig,
     registry: ClassRegistry,
@@ -51,7 +53,7 @@ def generate_object_field_annotation(
                 slice=ast.Name(
                     id=registry.get_scalar_equivalent(graphql_type.name), ctx=ast.Load()
                 ),
-                ctx=ast.Load()
+                ctx=ast.Load(),
             )
         else:
             return ast.Name(
@@ -64,14 +66,10 @@ def generate_object_field_annotation(
             registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
-                slice=ast.Constant(
-                    value=registry.generate_interface_classname(graphql_type.name)
-                ),
-                 ctx=ast.Load()
+                slice=registry.reference_interface(graphql_type.name, parent),
+                ctx=ast.Load(),
             )
-        return ast.Constant(
-            value=registry.generate_interface_classname(graphql_type.name),
-        )
+        return registry.reference_interface(graphql_type.name, parent)
 
     if isinstance(graphql_type, GraphQLObjectType):
         registry.check_builtin_imports(graphql_type.name)
@@ -79,14 +77,10 @@ def generate_object_field_annotation(
             registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
-                slice=ast.Constant(
-                    value=registry.generate_objecttype_classname(graphql_type.name)
-                ),
-                 ctx=ast.Load()
+                slice=registry.reference_object(graphql_type.name, parent),
+                ctx=ast.Load(),
             )
-        return ast.Constant(
-            value=registry.generate_objecttype_classname(graphql_type.name),
-        )
+        return registry.reference_object(graphql_type.name, parent)
 
     if isinstance(graphql_type, GraphQLUnionType):
         if is_optional:
@@ -100,6 +94,7 @@ def generate_object_field_annotation(
                         elts=[
                             generate_object_field_annotation(
                                 union_type,
+                                parent,
                                 config,
                                 plugin_config,
                                 registry,
@@ -110,7 +105,7 @@ def generate_object_field_annotation(
                         ctx=ast.Load(),
                     ),
                 ),
-                ctx=ast.Load()
+                ctx=ast.Load(),
             )
         registry.register_import("typing.Union")
 
@@ -120,6 +115,7 @@ def generate_object_field_annotation(
                 elts=[
                     generate_object_field_annotation(
                         union_type,
+                        parent,
                         config,
                         plugin_config,
                         registry,
@@ -129,7 +125,7 @@ def generate_object_field_annotation(
                 ],
                 ctx=ast.Load(),
             ),
-             ctx=ast.Load()
+            ctx=ast.Load(),
         )
 
     if isinstance(graphql_type, GraphQLEnumType):
@@ -138,17 +134,25 @@ def generate_object_field_annotation(
             registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
-                slice=ast.Constant(
-                    value=registry.get_enum_class(graphql_type.name),
+                slice=registry.reference_enum(
+                    graphql_type.name,
+                    parent,
+                    allow_forward=not config.force_plugin_order,
                 ),
-                 ctx=ast.Load()
+                ctx=ast.Load(),
             )
-        return ast.Constant(
-            value=registry.get_enum_class(graphql_type.name),
+        return registry.reference_enum(
+            graphql_type.name, parent, allow_forward=not config.force_plugin_order
         )
+
     if isinstance(graphql_type, GraphQLNonNull):
         return generate_object_field_annotation(
-            graphql_type.of_type, config, plugin_config, registry, is_optional=False
+            graphql_type.of_type,
+            parent,
+            config,
+            plugin_config,
+            registry,
+            is_optional=False,
         )
 
     if isinstance(graphql_type, GraphQLList):
@@ -161,6 +165,7 @@ def generate_object_field_annotation(
                     value=ast.Name("List", ctx=ast.Load()),
                     slice=generate_object_field_annotation(
                         graphql_type.of_type,
+                        parent,
                         config,
                         plugin_config,
                         registry,
@@ -168,14 +173,19 @@ def generate_object_field_annotation(
                     ),
                     ctx=ast.Load(),
                 ),
-                 ctx=ast.Load()
+                ctx=ast.Load(),
             )
 
         registry.register_import("typing.List")
         return ast.Subscript(
             value=ast.Name("List", ctx=ast.Load()),
             slice=generate_object_field_annotation(
-                graphql_type.of_type, config, plugin_config, registry, is_optional=True
+                graphql_type.of_type,
+                parent,
+                config,
+                plugin_config,
+                registry,
+                is_optional=True,
             ),
             ctx=ast.Load(),
         )
@@ -209,12 +219,15 @@ def generate_types(
         )
     }
 
-    interface_map = {}
+    interface_map: Dict[
+        str, List[str]
+    ] = {}  # A list of interfaces with the union classes attached
+    interface_base_map: Dict[
+        str, str
+    ] = {}  # A list of interfaces with its respective base
 
     for base in plugin_config.types_bases:
         registry.register_import(base)
-
-    self_referential = set()
 
     for key, object_type in sorted_objects.items():
 
@@ -229,18 +242,21 @@ def generate_types(
             continue
 
         if isinstance(object_type, GraphQLObjectType):
-            name = registry.generate_objecttype_classname(key)
+            classname = registry.generate_objecttype(key)
         if isinstance(object_type, GraphQLInterfaceType):
-            name = f"{registry.generate_interface_classname(key)}Base"
+            classname = registry.generate_interface(key)
 
         for interface in object_type.interfaces:
-            interface_map.setdefault(interface.name, []).append(name)
+            # Populate the Union_classed
+            interface_map.setdefault(interface.name, []).append(classname)
 
             other_interfaces = set(object_type.interfaces) - {interface}
-            if not interface_is_extended_by_other_interfaces(interface, other_interfaces):
+            if not interface_is_extended_by_other_interfaces(
+                interface, other_interfaces
+            ):
                 additional_bases.append(
                     ast.Name(
-                        id=f"{registry.generate_interface_classname(interface.name)}Base",
+                        id=registry.inherit_interface(interface.name),
                         ctx=ast.Load(),
                     )
                 )
@@ -252,19 +268,7 @@ def generate_types(
         )
 
         for value_key, value in object_type.fields.items():
-            type_ = value.type
-            while is_wrapping_type(type_):
-                type_ = type_.of_type
-
-            if isinstance(type_, GraphQLObjectType):
-                self_referential.add(
-                    registry.generate_objecttype_classname(type_.name)
-                )
-            elif isinstance(type_, GraphQLInterfaceType):
-                self_referential.add(
-                    f"{registry.generate_interface_classname(type_.name)}Base"
-                )
-
+            value: GraphQLField
             field_name = registry.generate_node_name(value_key)
 
             if field_name != value_key:
@@ -272,7 +276,12 @@ def generate_types(
                 assign = ast.AnnAssign(
                     target=ast.Name(field_name, ctx=ast.Store()),
                     annotation=generate_object_field_annotation(
-                        value.type, config, plugin_config, registry, is_optional=True
+                        value.type,
+                        classname,
+                        config,
+                        plugin_config,
+                        registry,
+                        is_optional=True,
                     ),
                     value=ast.Call(
                         func=ast.Name(id="Field", ctx=ast.Load()),
@@ -289,7 +298,12 @@ def generate_types(
                 assign = ast.AnnAssign(
                     target=ast.Name(value_key, ctx=ast.Store()),
                     annotation=generate_object_field_annotation(
-                        value.type, config, plugin_config, registry, is_optional=True
+                        value.type,
+                        classname,
+                        config,
+                        plugin_config,
+                        registry,
+                        is_optional=True,
                     ),
                     simple=1,
                 )
@@ -309,11 +323,9 @@ def generate_types(
             else:
                 fields += [assign]
 
-        registry.register_object_class(key, name)
-
         tree.append(
             ast.ClassDef(
-                name,
+                classname,
                 bases=additional_bases
                 + [
                     ast.Name(id=base.split(".")[-1], ctx=ast.Load())
@@ -341,24 +353,6 @@ def generate_types(
                     ),
                     ctx=ast.Load(),
                 ),
-            )
-        )
-
-    for input_name in self_referential:
-        tree.append(
-            ast.Expr(
-                value=ast.Call(
-                    func=ast.Attribute(
-                        value=ast.Name(
-                            id=input_name,
-                            ctx=ast.Load(),
-                        ),
-                        attr="update_forward_refs",
-                        ctx=ast.Load(),
-                    ),
-                    keywords=[],
-                    args=[],
-                )
             )
         )
 
