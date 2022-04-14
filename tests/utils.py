@@ -13,12 +13,25 @@ def build_relative_glob(path):
 
 
 def unit_test_with(generated_ast: List[ast.AST], test_string: str):
-    added_code = ast.parse(test_string).body
-    md = ast.Module(body=generated_ast + added_code, type_ignores=[])
-    generadet_info= ast.unparse(ast.fix_missing_locations(md))
-    x = compile(generadet_info,"test", mode="exec")
-    exec(x, globals(), globals())
 
+    added_code = ast.parse(test_string).body
+
+    md = ast.Module(body=generated_ast + added_code, type_ignores=[])
+
+    # We need to unparse before otherwise there might be complaints with missing lineno
+    parsed_code= ast.unparse(ast.fix_missing_locations(md))
+    compiled_code = compile(parsed_code,"test", mode="exec")
+
+    exec_locals = {}
+    exec_globals = {}
+
+    imports = [line for line in parsed_code.split("\n") if line.startswith("from")]
+    for import_ in imports:
+        exec(import_, exec_globals, exec_locals)
+    exec_globals.update(exec_locals)
+
+
+    exec(compiled_code, globals(), globals())
 
 
 def generated_module_is_executable(module: str) -> bool:

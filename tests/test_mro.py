@@ -18,7 +18,8 @@ def mro_test_schema():
 
 
 def test_generation(mro_test_schema):
-    config = GeneratorConfig()
+    config = GeneratorConfig(
+    )
 
     generated_ast = generate_ast(
         config,
@@ -30,4 +31,4 @@ def test_generation(mro_test_schema):
             ObjectsPlugin(),
         ],
     )
-    unit_test_with(generated_ast, "ThisWorks()")
+    unit_test_with(generated_ast, "ThisWorks(foo='hallo', bar='good')")

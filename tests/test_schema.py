@@ -21,13 +21,36 @@ def arkitekt_schema():
 
 
 
-@pytest.mark.parametrize("schema", [countries_schema,arkitekt_schema])
-def test_complex_operations(schema):
+def test_countries_schema(countries_schema):
     config = GeneratorConfig()
 
     generated_ast = generate_ast(
         config,
-        schema,
+        countries_schema,
+        stylers=[DefaultStyler()],
+        plugins=[
+            EnumsPlugin(),
+            InputsPlugin(),
+            ObjectsPlugin(),
+        ],
+    )
+
+    unit_test_with(generated_ast, "")
+
+
+def test_arkitekt_schema(arkitekt_schema):
+    config = GeneratorConfig(
+        scalar_definitions={
+            "QString": "str",
+            "Any": "str",
+            "UUID": "pydantic.UUID4"
+        }
+        
+    )
+
+    generated_ast = generate_ast(
+        config,
+        arkitekt_schema,
         stylers=[DefaultStyler()],
         plugins=[
             EnumsPlugin(),
