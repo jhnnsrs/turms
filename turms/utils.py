@@ -1,6 +1,6 @@
 import glob
 import re
-from typing import Dict, List
+from typing import Dict, List, Set
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.language.ast import DocumentNode, FieldNode
@@ -9,6 +9,7 @@ from graphql import (
     parse,
     validate,
     build_client_schema,
+    GraphQLInterfaceType,
 )
 import ast
 from turms.registry import ClassRegistry
@@ -175,3 +176,13 @@ def get_interface_bases(config: GeneratorConfig, registry: ClassRegistry):
             ast.Name(id=base.split(".")[-1], ctx=ast.Load())
             for base in config.object_bases
         ]
+
+
+def interface_is_extended_by_other_interfaces(interface: GraphQLInterfaceType,
+                                              other_interfaces: Set[GraphQLInterfaceType]) -> bool:
+    interfaces_implemented_by_other_interfaces = {
+        nested_interface
+        for other_interface in other_interfaces
+        for nested_interface in other_interface.interfaces
+    }
+    return interface in interfaces_implemented_by_other_interfaces
