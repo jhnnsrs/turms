@@ -1,7 +1,7 @@
 import ast
 
 import pytest
-from .utils import build_relative_glob
+from .utils import build_relative_glob, unit_test_with
 from turms.config import GeneratorConfig
 from turms.plugins.funcs import (
     FunctionDefinition,
@@ -42,7 +42,7 @@ def test_complex_operations(countries_schema):
                         [
                             FunctionDefinition(
                                 type="query",
-                                use="test.func",
+                                use="tests.mocks.query",
                                 is_async=False,
                             )
                         ]
@@ -55,6 +55,7 @@ def test_complex_operations(countries_schema):
     md = ast.Module(body=generated_ast, type_ignores=[])
     generated = ast.unparse(ast.fix_missing_locations(md))
     print(generated)
+    unit_test_with(generated_ast, "Countries(countries=[])")
     assert "from enum import Enum" in generated, "EnumPlugin not working"
     assert (
         "def countries() -> List[CountriesCountries]:" in generated

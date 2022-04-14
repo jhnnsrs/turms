@@ -48,6 +48,7 @@ def generate_object_field_annotation(
                 slice=ast.Name(
                     id=registry.get_scalar_equivalent(graphql_type.name), ctx=ast.Load()
                 ),
+                ctx=ast.Load()
             )
         else:
             return ast.Name(
@@ -63,6 +64,7 @@ def generate_object_field_annotation(
                 slice=ast.Constant(
                     value=registry.generate_interface_classname(graphql_type.name)
                 ),
+                 ctx=ast.Load()
             )
         return ast.Constant(
             value=registry.generate_interface_classname(graphql_type.name),
@@ -77,6 +79,7 @@ def generate_object_field_annotation(
                 slice=ast.Constant(
                     value=registry.generate_objecttype_classname(graphql_type.name)
                 ),
+                 ctx=ast.Load()
             )
         return ast.Constant(
             value=registry.generate_objecttype_classname(graphql_type.name),
@@ -104,6 +107,7 @@ def generate_object_field_annotation(
                         ctx=ast.Load(),
                     ),
                 ),
+                ctx=ast.Load()
             )
         registry.register_import("typing.Union")
 
@@ -122,6 +126,7 @@ def generate_object_field_annotation(
                 ],
                 ctx=ast.Load(),
             ),
+             ctx=ast.Load()
         )
 
     if isinstance(graphql_type, GraphQLEnumType):
@@ -133,6 +138,7 @@ def generate_object_field_annotation(
                 slice=ast.Constant(
                     value=registry.get_enum_class(graphql_type.name),
                 ),
+                 ctx=ast.Load()
             )
         return ast.Constant(
             value=registry.get_enum_class(graphql_type.name),
@@ -159,6 +165,7 @@ def generate_object_field_annotation(
                     ),
                     ctx=ast.Load(),
                 ),
+                 ctx=ast.Load()
             )
 
         registry.register_import("typing.List")
@@ -323,7 +330,7 @@ def generate_types(
         registry.register_import("typing.Union")
         tree.append(
             ast.Assign(
-                targets=(ast.Name(id=interface),),
+                targets=[ast.Name(id=interface, ctx=ast.Store())],
                 value=ast.Subscript(
                     value=ast.Name("Union", ctx=ast.Load()),
                     slice=ast.Tuple(
@@ -333,6 +340,7 @@ def generate_types(
                         ],
                         ctx=ast.Load(),
                     ),
+                    ctx=ast.Load(),
                 ),
             )
         )

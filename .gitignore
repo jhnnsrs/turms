@@ -146,3 +146,4 @@ export
 static_collected
 data
 *.temp
+cov.xml

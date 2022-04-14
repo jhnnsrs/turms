@@ -85,6 +85,7 @@ def recurse_annotation(
                             id=registry.get_fragment_class(subnode.name.value),
                             ctx=ast.Load(),
                         ),
+                        ctx=ast.Load(),
                     )
 
                 else:
@@ -231,12 +232,14 @@ def recurse_annotation(
                         value=ast.Name("Union", ctx=ast.Load()),
                         slice=union_slice,
                     ),
+                    ctx=ast.Load(),
                 )
             else:
                 registry.register_import("typing.Union")
                 return ast.Subscript(
                     value=ast.Name("Union", ctx=ast.Load()),
                     slice=union_slice,
+                    ctx=ast.Load(),
                 )
         else:
             return ast.Name(id=union_class_names[0], ctx=ast.Load())
@@ -262,6 +265,7 @@ def recurse_annotation(
                             id=registry.get_fragment_class(subnode.name.value),
                             ctx=ast.Load(),
                         ),
+                        ctx=ast.Load(),
                     )
 
                 else:
@@ -321,6 +325,7 @@ def recurse_annotation(
                     id=nana,
                     ctx=ast.Load(),
                 ),
+                ctx=ast.Load(),
             )
 
         else:
@@ -339,6 +344,7 @@ def recurse_annotation(
                     id=registry.get_scalar_equivalent(type.name),
                     ctx=ast.Load(),
                 ),
+                ctx=ast.Load(),
             )
 
         else:
@@ -357,6 +363,7 @@ def recurse_annotation(
                     id=registry.get_enum_class(type.name),
                     ctx=ast.Load(),
                 ),
+                ctx=ast.Load(),
             )
 
         else:
@@ -395,7 +402,9 @@ def recurse_annotation(
                         registry,
                         parent_name=parent_name,
                     ),
+                    ctx=ast.Load(),
                 ),
+                ctx=ast.Load(),
             )
 
         else:
@@ -411,6 +420,7 @@ def recurse_annotation(
                     registry,
                     parent_name=parent_name,
                 ),
+                ctx=ast.Load(),
             )
 
     raise NotImplementedError()

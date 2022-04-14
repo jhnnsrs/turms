@@ -209,6 +209,7 @@ def generate_fragment(
                     value=ast.Subscript(
                         value=ast.Name("Union", ctx=ast.Load()),
                         slice=slice,
+                        ctx=ast.Load(),
                     ),
                 )
             )

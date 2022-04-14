@@ -125,6 +125,7 @@ def get_input_type_annotation(
                     id=type_name,
                     ctx=ast.Load(),
                 ),
+                ctx=ast.Load(),
             )
 
         return ast.Name(
@@ -143,10 +144,12 @@ def get_input_type_annotation(
                     value=ast.Name(id="List", ctx=ast.Load()),
                     slice=get_input_type_annotation(input_type.type, config, registry),
                 ),
+                ctx=ast.Load(),
             )
         return ast.Subscript(
             value=ast.Name(id="List", ctx=ast.Load()),
             slice=get_input_type_annotation(input_type.type, config, registry),
+            ctx=ast.Load(),
         )
 
     elif isinstance(input_type, NonNullTypeNode):
@@ -481,6 +484,7 @@ def build_type_annotation_for_field(
             return ast.Subscript(
                 value=value,
                 slice=recurse_annotate(rest_modifiers),
+                ctx=ast.Load(),
             )
 
     return recurse_annotate(modifiers)
@@ -1036,7 +1040,7 @@ def generate_operation_func(
                 returns=returns
                 if definition.type != OperationType.SUBSCRIPTION
                 else ast.Subscript(
-                    value=ast.Name(id="AsyncIterator", ctx=ast.Load()), slice=returns
+                    value=ast.Name(id="AsyncIterator", ctx=ast.Load()), slice=returns,ctx=ast.Load(),
                 ),
             )
         )
@@ -1083,7 +1087,8 @@ def generate_operation_func(
                 returns=returns
                 if definition.type != OperationType.SUBSCRIPTION
                 else ast.Subscript(
-                    value=ast.Name(id="Iterator", ctx=ast.Load()), slice=returns
+                    value=ast.Name(id="Iterator", ctx=ast.Load()), slice=returns,
+                    ctx=ast.Load(),
                 ),
             )
         )

@@ -49,7 +49,9 @@ def generate_typename_field(typename, registry: ClassRegistry):
             slice=ast.Subscript(
                 value=ast.Name("Literal", ctx=ast.Load()),
                 slice=ast.Constant(value=typename),
+                ctx=ast.Load(),
             ),
+            ctx=ast.Load(),
         ),
         value=ast.Call(
             func=ast.Name(id="Field", ctx=ast.Load()),

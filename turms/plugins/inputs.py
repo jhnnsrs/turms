@@ -43,6 +43,7 @@ def generate_input_annotation(
                 slice=ast.Name(
                     id=registry.get_scalar_equivalent(type.name), ctx=ast.Load()
                 ),
+                ctx=ast.Load(),
             )
         else:
             return ast.Name(
@@ -56,6 +57,7 @@ def generate_input_annotation(
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
                 slice=ast.Constant(value=registry.get_inputtype_class(type.name)),
+                ctx=ast.Load(),
             )
         return ast.Constant(
             value=registry.get_inputtype_class(type.name),
@@ -69,6 +71,7 @@ def generate_input_annotation(
                 slice=ast.Constant(
                     value=registry.get_enum_class(type.name),
                 ),
+                ctx=ast.Load(),
             )
         return ast.Constant(
             value=registry.get_enum_class(type.name),
@@ -91,6 +94,7 @@ def generate_input_annotation(
                     ),
                     ctx=ast.Load(),
                 ),
+                ctx=ast.Load(),
             )
 
         registry.register_import("typing.List")

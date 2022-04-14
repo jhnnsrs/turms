@@ -90,6 +90,7 @@ class ClassRegistry(object):
             annotation=ast.Subscript(
                 value=ast.Name(id="Optional", ctx=ast.Load()),
                 slice=ast.Name("str", ctx=ast.Load()),
+                ctx=ast.Load(),
             ),
             value=ast.Call(
                 func=ast.Name(id="Field", ctx=ast.Load()),

@@ -71,6 +71,8 @@ def test_snake_case_styler(hello_world_schema):
         """search_massimo: str = Field(alias='searchMassimo')""" in generated
     ), "Automated Field aliasing not working"
 
+    
+
 
 def test_beast_styler(beast_schema):
     config = GeneratorConfig()
