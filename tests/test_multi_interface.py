@@ -12,7 +12,7 @@ from turms.run import generate_ast
 from turms.stylers.capitalize import CapitalizeStyler
 from turms.stylers.snake_case import SnakeCaseStyler
 
-from .utils import build_relative_glob
+from .utils import build_relative_glob, unit_test_with
 
 
 @pytest.fixture()
@@ -41,7 +41,7 @@ def test_multi_interface_funcs(multi_interface_schema):
                         [
                             FunctionDefinition(
                                 type="mutation",
-                                use="test.func",
+                                use="tests.mocks.query",
                                 is_async=False,
                             )
                         ]
@@ -51,5 +51,4 @@ def test_multi_interface_funcs(multi_interface_schema):
         ],
     )
 
-    md = ast.Module(body=generated_ast, type_ignores=[])
-    generated = ast.unparse(ast.fix_missing_locations(md))
+    unit_test_with(generated_ast, "")

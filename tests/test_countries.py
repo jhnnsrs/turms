@@ -54,7 +54,6 @@ def test_complex_operations(countries_schema):
 
     md = ast.Module(body=generated_ast, type_ignores=[])
     generated = ast.unparse(ast.fix_missing_locations(md))
-    print(generated)
     unit_test_with(generated_ast, "Countries(countries=[])")
     assert "from enum import Enum" in generated, "EnumPlugin not working"
     assert (

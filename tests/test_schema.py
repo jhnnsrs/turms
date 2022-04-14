@@ -7,20 +7,27 @@ from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
 from turms.plugins.objects import ObjectsPlugin
 from turms.stylers.default import DefaultStyler
-from turms.helpers import build_schema_from_introspect_url
-from .utils import unit_test_with
+from turms.helpers import build_schema_from_glob, build_schema_from_introspect_url
+from .utils import build_relative_glob, unit_test_with
 
 @pytest.fixture()
 def countries_schema():
     return build_schema_from_introspect_url("https://countries.trevorblades.com/")
 
 
-def test_complex_operations(countries_schema):
+@pytest.fixture()
+def arkitekt_schema():
+    return build_schema_from_glob(build_relative_glob("/schemas/arkitekt.graphql"))
+
+
+
+@pytest.mark.parametrize("schema", [countries_schema,arkitekt_schema])
+def test_complex_operations(schema):
     config = GeneratorConfig()
 
     generated_ast = generate_ast(
         config,
-        countries_schema,
+        schema,
         stylers=[DefaultStyler()],
         plugins=[
             EnumsPlugin(),
@@ -30,9 +37,3 @@ def test_complex_operations(countries_schema):
     )
 
     unit_test_with(generated_ast, "")
-
-    md = ast.Module(body=generated_ast, type_ignores=[])
-    generated = ast.unparse(ast.fix_missing_locations(md))
-    print(generated)
-    assert "from enum import Enum" in generated, "EnumPlugin not working"
-    assert "class Query(BaseModel)" in generated, "No Query was detected"

@@ -66,3 +66,4 @@ def test_polyfill_seven(arkitekt_schema, monkeypatch):
     md = ast.Module(body=generated_ast, type_ignores=[])
     generated = ast.unparse(ast.fix_missing_locations(md))
     assert "from typing_extensions import Literal" in generated
+    

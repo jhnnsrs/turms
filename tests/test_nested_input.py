@@ -1,7 +1,7 @@
 import ast
 
 import pytest
-from .utils import build_relative_glob
+from .utils import build_relative_glob, unit_test_with
 from turms.config import GeneratorConfig
 from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
@@ -42,7 +42,7 @@ def test_nested_input_funcs(nested_input_schema):
                         [
                             FunctionDefinition(
                                 type="mutation",
-                                use="test.func",
+                                use="tests.mocks.query",
                                 is_async=False,
                             )
                         ]
@@ -52,8 +52,7 @@ def test_nested_input_funcs(nested_input_schema):
         ],
     )
 
-    md = ast.Module(body=generated_ast, type_ignores=[])
-    generated = ast.unparse(ast.fix_missing_locations(md))
+    unit_test_with(generated_ast, "")
 
 
 def test_default_input_funcs(nested_input_schema):
@@ -75,7 +74,7 @@ def test_default_input_funcs(nested_input_schema):
                         [
                             FunctionDefinition(
                                 type="mutation",
-                                use="test.func",
+                                use="tests.mocks.aquery",
                                 is_async=False,
                             )
                         ]
@@ -85,5 +84,4 @@ def test_default_input_funcs(nested_input_schema):
         ],
     )
 
-    md = ast.Module(body=generated_ast, type_ignores=[])
-    generated = ast.unparse(ast.fix_missing_locations(md))
+    unit_test_with(generated_ast, "")
