@@ -27,9 +27,6 @@ def unit_test_with(generated_ast: List[ast.AST], test_string: str):
     parsed_code = ast.unparse(ast.fix_missing_locations(md))
     compiled_code = compile(parsed_code, "test", mode="exec")
 
-    exec(compiled_code, globals(), globals())
-    return
-
     with tempfile.TemporaryDirectory() as tmpdirname:
         print("created temporary directory", tmpdirname)
 
