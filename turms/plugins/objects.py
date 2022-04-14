@@ -45,7 +45,6 @@ def generate_object_field_annotation(
     is_optional=True,
 ):
     if isinstance(graphql_type, GraphQLScalarType):
-        registry.check_builtin_imports(graphql_type.name)
         if is_optional:
             registry.register_import("typing.Optional")
             return ast.Subscript(
@@ -72,7 +71,6 @@ def generate_object_field_annotation(
         return registry.reference_interface(graphql_type.name, parent)
 
     if isinstance(graphql_type, GraphQLObjectType):
-        registry.check_builtin_imports(graphql_type.name)
         if is_optional:
             registry.register_import("typing.Optional")
             return ast.Subscript(
@@ -129,7 +127,6 @@ def generate_object_field_annotation(
         )
 
     if isinstance(graphql_type, GraphQLEnumType):
-        registry.check_builtin_imports(graphql_type.name)
         if is_optional:
             registry.register_import("typing.Optional")
             return ast.Subscript(

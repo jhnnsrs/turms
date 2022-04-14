@@ -90,29 +90,6 @@ class ClassRegistry(object):
         self.interfacefragments_class_map = {}
         self.console = get_console()
 
-    def check_builtin_imports(self, typename: str):
-        if typename in built_in_map:
-            print("Adding")
-            self._builtins.add(typename)
-
-    def generate_type_name_field(self, typename):
-        return ast.AnnAssign(
-            target=ast.Name(id="typename", ctx=ast.Store()),
-            annotation=ast.Subscript(
-                value=ast.Name(id="Optional", ctx=ast.Load()),
-                slice=ast.Name("str", ctx=ast.Load()),
-                ctx=ast.Load(),
-            ),
-            value=ast.Call(
-                func=ast.Name(id="Field", ctx=ast.Load()),
-                args=[],
-                keywords=[
-                    ast.keyword(arg="alias", value=ast.Constant(value="__typename"))
-                ],
-            ),
-            simple=1,
-        )
-
     def style_inputtype_class(self, typename: str):
         for styler in self.stylers:
             typename = styler.style_input_name(typename)
@@ -157,6 +134,12 @@ class ClassRegistry(object):
         return classname
 
     def reference_enum(self, typename: str, parent: str, allow_forward=True) -> ast.AST:
+        if typename in built_in_map:
+            # Builtin enums
+            self._builtins.add(typename)
+            self.forward_references.add(parent)
+            return ast.Constant(value=typename, ctx=ast.Load())
+
         classname = self.style_enum_class(typename)
         if typename not in self.enum_class_map or parent == classname:
             if not allow_forward:
@@ -425,14 +408,6 @@ class ClassRegistry(object):
         assert cls not in self.fragment_document_map, f"{cls} already registered"
         self.fragment_document_map[typename] = cls
 
-    def get_fragment_class(self, typename: str, allow_forward=True):
-        try:
-            return self.fragment_class_map[typename]
-        except KeyError as e:
-            if allow_forward:
-                return self.generate_fragment_classname(typename)
-            raise e
-
     def get_fragment_document(self, typename: str):
         return self.fragment_document_map[typename]
 
@@ -451,12 +426,6 @@ class ClassRegistry(object):
             )
 
         return scalar_type.split(".")[-1]
-
-    def register_interface_fragment(self, typename: str, cls: str):
-        self.interfacefragments_class_map[typename] = cls
-
-    def get_interface_fragment_or_none(self, typename: str):
-        return self.interfacefragments_class_map.get(typename, None)
 
     def warn(self, message):
         self.console.print("[r]" + message)

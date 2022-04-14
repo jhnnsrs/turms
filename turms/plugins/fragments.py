@@ -228,9 +228,9 @@ def generate_fragment(
                 continue
 
             if isinstance(field, FragmentSpreadNode):
-                interface = registry.get_interface_fragment_or_none(field.name.value)
-                if interface:
-                    additional_bases.append(ast.Name(id=interface, ctx=ast.Load()))
+                additional_bases.append(
+                    ast.Name(id=registry.inherit_fragment(field.name), ctx=ast.Load())
+                )
                 continue
 
             field_definition = get_field_def(client_schema, type, field)

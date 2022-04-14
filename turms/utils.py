@@ -33,10 +33,6 @@ def target_from_node(node: FieldNode) -> str:
     )
 
 
-def build_schema(introspection_query: Dict[str, str]):
-    return build_client_schema(introspection_query)
-
-
 def generate_typename_field(typename, registry: ClassRegistry):
 
     registry.register_import("pydantic.Field")
@@ -180,8 +176,9 @@ def get_interface_bases(config: GeneratorConfig, registry: ClassRegistry):
         ]
 
 
-def interface_is_extended_by_other_interfaces(interface: GraphQLInterfaceType,
-                                              other_interfaces: Set[GraphQLInterfaceType]) -> bool:
+def interface_is_extended_by_other_interfaces(
+    interface: GraphQLInterfaceType, other_interfaces: Set[GraphQLInterfaceType]
+) -> bool:
     interfaces_implemented_by_other_interfaces = {
         nested_interface
         for other_interface in other_interfaces

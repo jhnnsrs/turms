@@ -1,4 +1,7 @@
+import pydantic
 import pytest
+
+from turms.config import GeneratorConfig
 from .utils import build_relative_glob
 from turms.run import scan_folder_for_configs
 
@@ -40,3 +43,10 @@ def test_load_unparsable(unparsable_configs):
     for config in unparsable_configs:
         with pytest.raises(GenerationError):
             load_projects_from_configpath(config)
+
+
+def test_failure_on_wrong_scalars():
+    with pytest.raises(pydantic.error_wrappers.ValidationError):
+        x = GeneratorConfig(scalar_definitions={"X": "zzzzz"})
+    with pytest.raises(pydantic.error_wrappers.ValidationError):
+        x = GeneratorConfig(scalar_definitions={"X": 15})

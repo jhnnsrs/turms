@@ -23,4 +23,4 @@ class Parser(BaseModel):
         self,
         asts: List[ast.AST],
     ) -> List[ast.AST]:
-        raise NotImplementedError("Plugin must overrwrite this")
+        ...

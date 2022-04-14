@@ -11,6 +11,7 @@ type Query {
 
 enum HelloWorldOrder {
   ASC
+  "A beautiful thing"
   DESC
 }
 

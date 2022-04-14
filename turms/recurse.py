@@ -413,7 +413,6 @@ def recurse_annotation(
                 ctx=ast.Load(),
             )
 
-    raise NotImplementedError()
 
 
 def type_field_node(

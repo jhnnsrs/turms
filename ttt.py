@@ -33,12 +33,10 @@ generated_ast = generate_ast(
     stylers=[
         CapitalizeStyler(),
         SnakeCaseStyler(),
-        AppenderStyler(config=AppenderStylerConfig(append_fragment="Fragment")),
     ],
     plugins=[
         EnumsPlugin(),
         InputsPlugin(),
-        ObjectsPlugin(),
         FragmentsPlugin(),
         OperationsPlugin(),
     ],

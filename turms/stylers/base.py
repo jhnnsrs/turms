@@ -51,9 +51,6 @@ class Styler(BaseModel):
 
 
 class BaseStyler(Styler):
-    def style_operation_name(self, name: str) -> str:
-        return name
-
     def style_query_name(self, name: str) -> str:
         return name
 

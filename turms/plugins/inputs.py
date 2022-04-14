@@ -67,12 +67,15 @@ def generate_input_annotation(
             registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
-                slice=registry.reference_enum(type.name, parent, allow_forward=not config.force_plugin_order),
+                slice=registry.reference_enum(
+                    type.name, parent, allow_forward=not config.force_plugin_order
+                ),
                 ctx=ast.Load(),
             )
-        return ast.Constant(
-            value=registry.reference_enum(type.name, parent, allow_forward=not config.force_plugin_order),
+        return registry.reference_enum(
+            type.name, parent, allow_forward=not config.force_plugin_order
         )
+
     if isinstance(type, GraphQLNonNull):
         return generate_input_annotation(
             type.of_type, parent, config, plugin_config, registry, is_optional=False
@@ -87,7 +90,12 @@ def generate_input_annotation(
                 slice=ast.Subscript(
                     value=ast.Name("List", ctx=ast.Load()),
                     slice=generate_input_annotation(
-                        type.of_type, parent, config, plugin_config, registry, is_optional=True
+                        type.of_type,
+                        parent,
+                        config,
+                        plugin_config,
+                        registry,
+                        is_optional=True,
                     ),
                     ctx=ast.Load(),
                 ),
@@ -146,7 +154,12 @@ def generate_inputs(
                 assign = ast.AnnAssign(
                     target=ast.Name(field_name, ctx=ast.Store()),
                     annotation=generate_input_annotation(
-                        value.type, name, config, plugin_config, registry, is_optional=True
+                        value.type,
+                        name,
+                        config,
+                        plugin_config,
+                        registry,
+                        is_optional=True,
                     ),
                     value=ast.Call(
                         func=ast.Name(id="Field", ctx=ast.Load()),
@@ -163,7 +176,12 @@ def generate_inputs(
                 assign = ast.AnnAssign(
                     target=ast.Name(value_key, ctx=ast.Store()),
                     annotation=generate_input_annotation(
-                        value.type, name, config, plugin_config, registry, is_optional=True
+                        value.type,
+                        name,
+                        config,
+                        plugin_config,
+                        registry,
+                        is_optional=True,
                     ),
                     simple=1,
                 )
@@ -196,7 +214,6 @@ def generate_inputs(
                 body=fields,
             )
         )
-
 
     return tree
 

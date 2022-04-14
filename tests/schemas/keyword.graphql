@@ -1,0 +1,6 @@
+
+
+type X {
+    from: String!
+    assert: String!
+}
