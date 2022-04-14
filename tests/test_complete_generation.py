@@ -125,7 +125,7 @@ def test_arkitekt_operations(arkitekt_schema):
 
     md = ast.Module(body=generated_ast, type_ignores=[])
     generated = ast.unparse(ast.fix_missing_locations(md))
-    unit_test_with(generated_ast,"")
+    unit_test_with(generated_ast,"Node(name='karl',package='inter', interface='x', description='nanana', type=NodeTypeInput.GENERATOR, id='dd')")
     assert "from enum import Enum" in generated, "EnumPlugin not working"
     assert (
         "class Create_template(BaseModel):" in generated

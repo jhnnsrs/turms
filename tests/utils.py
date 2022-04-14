@@ -4,6 +4,7 @@ import ast
 import sys
 from typing import List
 from turms.run import write_code_to_file
+import tempfile
 
 DIR_NAME = os.path.dirname(os.path.realpath(__file__))
 
@@ -11,6 +12,8 @@ DIR_NAME = os.path.dirname(os.path.realpath(__file__))
 def build_relative_glob(path):
     return DIR_NAME + path
 
+class ExecuteException(Exception):
+    pass
 
 def unit_test_with(generated_ast: List[ast.AST], test_string: str):
 
@@ -22,16 +25,21 @@ def unit_test_with(generated_ast: List[ast.AST], test_string: str):
     parsed_code= ast.unparse(ast.fix_missing_locations(md))
     compiled_code = compile(parsed_code,"test", mode="exec")
 
-    exec_locals = {}
-    exec_globals = {}
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        print('created temporary directory', tmpdirname)
 
-    imports = [line for line in parsed_code.split("\n") if line.startswith("from")]
-    for import_ in imports:
-        exec(import_, exec_globals, exec_locals)
-    exec_globals.update(exec_locals)
+        filename = write_code_to_file(parsed_code, tmpdirname, "minimal.py")
+        s = subprocess.run([sys.executable, filename])
+        if s.returncode == 0:
+            return True
+        else:
+            # If the supbrocess failed we can break out of the sandbox and just return the actual error
+            try:
+                exec(compiled_code, globals(), globals())
+            except Exception as e:
+                raise e from ExecuteException(f"Code: \n\n{parsed_code} \n\n failed with: \n {test_string}")
 
 
-    exec(compiled_code, globals(), globals())
 
 
 def generated_module_is_executable(module: str) -> bool:

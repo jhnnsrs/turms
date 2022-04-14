@@ -9,6 +9,8 @@ from turms.plugins.objects import ObjectsPlugin
 from turms.stylers.default import DefaultStyler
 from turms.helpers import build_schema_from_glob, build_schema_from_introspect_url
 from .utils import build_relative_glob, unit_test_with
+import pydantic
+
 
 @pytest.fixture()
 def countries_schema():
@@ -36,6 +38,9 @@ def test_countries_schema(countries_schema):
     )
 
     unit_test_with(generated_ast, "")
+
+    with pytest.raises(pydantic.error_wrappers.ValidationError):
+        unit_test_with(generated_ast, "Country()")
 
 
 def test_arkitekt_schema(arkitekt_schema):
