@@ -20,7 +20,7 @@ from turms.processors.isort import IsortProcessor
 
 
 config = GeneratorConfig(
-    documents=build_relative_glob("/documents/arkitekt/**/*.graphql"),
+    documents=build_relative_glob("/documents/multi_interface/**/*.graphql"),
     scalar_definitions={
         "uuid": "str",
         "Callback": "str",
@@ -31,7 +31,7 @@ config = GeneratorConfig(
 )
 generated_ast = generate_ast(
     config,
-    build_schema_from_glob(build_relative_glob("/schemas/arkitekt.graphql")),
+    build_schema_from_glob(build_relative_glob("/schemas/multi_interface.graphql")),
     stylers=[
         CapitalizeStyler(),
         SnakeCaseStyler(),
@@ -72,7 +72,7 @@ generated = ast.unparse(ast.fix_missing_locations(md))
 with open("sdfsdf.py", "w") as f:
     f.write(generated)
 
-unit_test_with(generated_ast, "WidgetInput(typename='oisnoisn')")
 unit_test_with(
-    generated_ast, "ReturnPortInput(child=ReturnPortInput(bound=BoundTypeInput.AGENT))"
+    generated_ast,
+    "assert FlowNodeBaseReactiveNode(id='soinosins', position={'x': 3, 'y': 3}).id, 'Needs to be not nown'",
 )

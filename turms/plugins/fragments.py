@@ -232,7 +232,10 @@ def generate_fragment(
 
             if isinstance(field, FragmentSpreadNode):
                 additional_bases.append(
-                    ast.Name(id=registry.inherit_fragment(field.name), ctx=ast.Load())
+                    ast.Name(
+                        id=registry.inherit_fragment(field.name.value) + "Base",
+                        ctx=ast.Load(),
+                    )
                 )
                 continue
 
@@ -274,13 +277,9 @@ class FragmentsPlugin(Plugin):
 
         plugin_tree = []
 
-        try:
-            documents = parse_documents(
-                client_schema, self.config.fragments_glob or config.documents
-            )
-        except NoDocumentsFoundError as e:
-            logger.exception(e)
-            return plugin_tree
+        documents = parse_documents(
+            client_schema, self.config.fragments_glob or config.documents
+        )
 
         definitions = documents.definitions
 

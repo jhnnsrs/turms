@@ -5,6 +5,7 @@ schema {
 }
 
 type Agent {
+  
   id: ID!
   installedAt: DateTime!
   name: String!

@@ -29,3 +29,7 @@ class ExtraArguments(BaseModel):
 
 class ExtraOnOperations(BaseModel):
     extra: Optional[str]
+
+
+class ExtraArg(BaseModel):
+    extra: Optional[str]

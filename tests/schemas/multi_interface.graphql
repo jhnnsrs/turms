@@ -3,16 +3,19 @@ schema {
   mutation: Mutation
 }
 
+"Amazing Interface"
 interface FlowEdgeCommons {
+  "SUper intersting Interface field"
   label: String
 }
 
+"Amazing other interface"
 interface FlowNodeCommons {
   args: [FlowArg]
   kwargs: [FlowKwarg]
   returns: [FlowReturn]
 }
-
+" Impelement Type for whatever"
 type ArgNode implements FlowNode & FlowNodeCommons {
   id: String!
   position: Position!

@@ -1,1120 +1,392 @@
-from typing import Union, Literal, Any, Iterator, Optional, Dict, List
-from enum import Enum
+from typing import Literal, Optional, Union, Dict, List
 from pydantic import Field, BaseModel
 from tests.mocks import query
+from enum import Enum
 
-class AgentStatus(str, Enum):
-    ACTIVE = 'ACTIVE'
-    DISCONNECTED = 'DISCONNECTED'
-    VANILLA = 'VANILLA'
-
-class AgentStatusInput(str, Enum):
-    ACTIVE = 'ACTIVE'
-    DISCONNECTED = 'DISCONNECTED'
-    VANILLA = 'VANILLA'
-
-class AssignationLogLevel(str, Enum):
-    CRITICAL = 'CRITICAL'
-    INFO = 'INFO'
-    DEBUG = 'DEBUG'
-    ERROR = 'ERROR'
-    WARN = 'WARN'
-    YIELD = 'YIELD'
-    CANCEL = 'CANCEL'
-    RETURN = 'RETURN'
-    DONE = 'DONE'
-    EVENT = 'EVENT'
-
-class AssignationStatus(str, Enum):
-    PENDING = 'PENDING'
-    ACKNOWLEDGED = 'ACKNOWLEDGED'
-    RETURNED = 'RETURNED'
-    DENIED = 'DENIED'
-    ASSIGNED = 'ASSIGNED'
-    PROGRESS = 'PROGRESS'
-    RECEIVED = 'RECEIVED'
-    ERROR = 'ERROR'
-    CRITICAL = 'CRITICAL'
-    CANCEL = 'CANCEL'
-    CANCELING = 'CANCELING'
-    CANCELLED = 'CANCELLED'
-    YIELD = 'YIELD'
-    DONE = 'DONE'
-
-class AssignationStatusInput(str, Enum):
-    PENDING = 'PENDING'
-    ACKNOWLEDGED = 'ACKNOWLEDGED'
-    RETURNED = 'RETURNED'
-    DENIED = 'DENIED'
-    ASSIGNED = 'ASSIGNED'
-    PROGRESS = 'PROGRESS'
-    RECEIVED = 'RECEIVED'
-    ERROR = 'ERROR'
-    CRITICAL = 'CRITICAL'
-    CANCEL = 'CANCEL'
-    CANCELING = 'CANCELING'
-    CANCELLED = 'CANCELLED'
-    YIELD = 'YIELD'
-    DONE = 'DONE'
-
-class BoundTypeInput(str, Enum):
-    AGENT = 'AGENT'
-    REGISTRY = 'REGISTRY'
-    APP = 'APP'
-    GLOBAL = 'GLOBAL'
-
-class LogLevelInput(str, Enum):
-    CRITICAL = 'CRITICAL'
-    INFO = 'INFO'
-    DEBUG = 'DEBUG'
-    ERROR = 'ERROR'
-    WARN = 'WARN'
-    YIELD = 'YIELD'
-    CANCEL = 'CANCEL'
-    RETURN = 'RETURN'
-    DONE = 'DONE'
-    EVENT = 'EVENT'
-
-class LokAppGrantType(str, Enum):
-    CLIENT_CREDENTIALS = 'CLIENT_CREDENTIALS'
-    IMPLICIT = 'IMPLICIT'
-    AUTHORIZATION_CODE = 'AUTHORIZATION_CODE'
-    PASSWORD = 'PASSWORD'
-    SESSION = 'SESSION'
-
-class NodeType(str, Enum):
-    GENERATOR = 'GENERATOR'
-    FUNCTION = 'FUNCTION'
-
-class NodeTypeInput(str, Enum):
-    GENERATOR = 'GENERATOR'
-    FUNCTION = 'FUNCTION'
-
-class PostmanProtocol(str, Enum):
-    WEBSOCKET = 'WEBSOCKET'
-    KAFKA = 'KAFKA'
-    RABBITMQ = 'RABBITMQ'
-
-class ProvisionAccess(str, Enum):
-    EXCLUSIVE = 'EXCLUSIVE'
-    EVERYONE = 'EVERYONE'
-
-class ProvisionLogLevel(str, Enum):
-    CRITICAL = 'CRITICAL'
-    INFO = 'INFO'
-    DEBUG = 'DEBUG'
-    ERROR = 'ERROR'
-    WARN = 'WARN'
-    YIELD = 'YIELD'
-    CANCEL = 'CANCEL'
-    RETURN = 'RETURN'
-    DONE = 'DONE'
-    EVENT = 'EVENT'
-
-class ProvisionMode(str, Enum):
-    DEBUG = 'DEBUG'
-    PRODUCTION = 'PRODUCTION'
-
-class ProvisionStatus(str, Enum):
-    PENDING = 'PENDING'
-    BOUND = 'BOUND'
-    PROVIDING = 'PROVIDING'
-    ACTIVE = 'ACTIVE'
-    INACTIVE = 'INACTIVE'
-    CANCELING = 'CANCELING'
-    LOST = 'LOST'
-    RECONNECTING = 'RECONNECTING'
-    DENIED = 'DENIED'
-    ERROR = 'ERROR'
-    CRITICAL = 'CRITICAL'
-    ENDED = 'ENDED'
-    CANCELLED = 'CANCELLED'
-
-class ProvisionStatusInput(str, Enum):
-    PENDING = 'PENDING'
-    BOUND = 'BOUND'
-    PROVIDING = 'PROVIDING'
-    ACTIVE = 'ACTIVE'
-    INACTIVE = 'INACTIVE'
-    CANCELING = 'CANCELING'
-    DISCONNECTED = 'DISCONNECTED'
-    RECONNECTING = 'RECONNECTING'
-    DENIED = 'DENIED'
-    ERROR = 'ERROR'
-    CRITICAL = 'CRITICAL'
-    ENDED = 'ENDED'
-    CANCELLED = 'CANCELLED'
-
-class RepositoryType(str, Enum):
-    APP = 'APP'
-    MIRROR = 'MIRROR'
-
-class ReservationLogLevel(str, Enum):
-    CRITICAL = 'CRITICAL'
-    INFO = 'INFO'
-    DEBUG = 'DEBUG'
-    ERROR = 'ERROR'
-    WARN = 'WARN'
-    YIELD = 'YIELD'
-    CANCEL = 'CANCEL'
-    RETURN = 'RETURN'
-    DONE = 'DONE'
-    EVENT = 'EVENT'
-
-class ReservationStatus(str, Enum):
-    ROUTING = 'ROUTING'
-    PROVIDING = 'PROVIDING'
-    WAITING = 'WAITING'
-    REROUTING = 'REROUTING'
-    DISCONNECTED = 'DISCONNECTED'
-    DISCONNECT = 'DISCONNECT'
-    CANCELING = 'CANCELING'
-    ACTIVE = 'ACTIVE'
-    ERROR = 'ERROR'
-    ENDED = 'ENDED'
-    CANCELLED = 'CANCELLED'
-    CRITICAL = 'CRITICAL'
-
-class ReservationStatusInput(str, Enum):
-    ROUTING = 'ROUTING'
-    PROVIDING = 'PROVIDING'
-    WAITING = 'WAITING'
-    REROUTING = 'REROUTING'
-    DISCONNECTED = 'DISCONNECTED'
-    DISCONNECT = 'DISCONNECT'
-    CANCELING = 'CANCELING'
-    ACTIVE = 'ACTIVE'
-    ERROR = 'ERROR'
-    ENDED = 'ENDED'
-    CANCELLED = 'CANCELLED'
-    CRITICAL = 'CRITICAL'
-
-class StructureBound(str, Enum):
-    AGENT = 'AGENT'
-    REGISTRY = 'REGISTRY'
-    APP = 'APP'
-    GLOBAL = 'GLOBAL'
-
-class WaiterStatus(str, Enum):
-    ACTIVE = 'ACTIVE'
-    DISCONNECTED = 'DISCONNECTED'
-    VANILLA = 'VANILLA'
-
-class WardTypes(str, Enum):
-    GRAPHQL = 'GRAPHQL'
-    REST = 'REST'
-
-class ArgPortInput(BaseModel):
-    key: Optional[str]
-    type: Optional[str]
-    typename: Optional[str]
-    description: Optional[str]
+class EdgeInput(BaseModel):
+    id: str
+    type: str
+    source: str
+    target: str
+    source_handle: Optional[str] = Field(alias='sourceHandle')
+    target_handle: Optional[str] = Field(alias='targetHandle')
     label: Optional[str]
-    identifier: Optional[str]
-    widget: Optional['WidgetInput']
-    bound: Optional[BoundTypeInput]
-    child: Optional['ArgPortInput']
-    transpile: Optional[str]
-    options: Optional[Dict]
 
-class DefinitionInput(BaseModel):
+class FlowArgInput(BaseModel):
+    key: str
+    label: Optional[str]
+    name: Optional[str]
+    type: Optional[str]
     description: Optional[str]
-    name: str
-    args: Optional[List[Optional[ArgPortInput]]]
-    kwargs: Optional[List[Optional['KwargPortInput']]]
-    returns: Optional[List[Optional['ReturnPortInput']]]
-    interfaces: Optional[List[Optional[str]]]
-    type: Optional[NodeTypeInput]
-    interface: str
+
+class FlowKwargInput(BaseModel):
+    key: str
+    label: Optional[str]
+    name: Optional[str]
+    type: Optional[str]
+    description: Optional[str]
+
+class FlowReturnInput(BaseModel):
+    key: str
+    label: Optional[str]
+    name: Optional[str]
+    type: Optional[str]
+    description: Optional[str]
+
+class NodeInput(BaseModel):
+    id: str
+    type: str
+    args: Optional[List[Optional[FlowArgInput]]]
+    kwargs: Optional[List[Optional[FlowKwargInput]]]
+    returns: Optional[List[Optional[FlowReturnInput]]]
     package: Optional[str]
-
-class KwargPortInput(BaseModel):
-    key: Optional[str]
-    type: Optional[str]
-    typename: Optional[str]
-    description: Optional[str]
-    label: Optional[str]
-    default_dict: Optional[Dict] = Field(alias='defaultDict')
-    default_option: Optional[Dict] = Field(alias='defaultOption')
-    default_int: Optional[int] = Field(alias='defaultInt')
-    default_bool: Optional[bool] = Field(alias='defaultBool')
-    default_float: Optional[float] = Field(alias='defaultFloat')
-    default_id: Optional[str] = Field(alias='defaultID')
-    default_string: Optional[str] = Field(alias='defaultString')
-    default_list: Optional[List[Optional[Dict]]] = Field(alias='defaultList')
-    identifier: Optional[str]
-    widget: Optional['WidgetInput']
-    bound: Optional[BoundTypeInput]
-    child: Optional['KwargPortInput']
-    transpile: Optional[str]
-    options: Optional[Dict]
-
-class ReserveParamsInput(BaseModel):
-    auto_provide: Optional[bool] = Field(alias='autoProvide')
-    auto_unprovide: Optional[bool] = Field(alias='autoUnprovide')
-    registries: Optional[List[Optional[str]]]
-    agents: Optional[List[Optional[str]]]
-    templates: Optional[List[Optional[str]]]
-    desired_instances: Optional[int] = Field(alias='desiredInstances')
-    minimal_instances: Optional[int] = Field(alias='minimalInstances')
-
-class ReturnPortInput(BaseModel):
-    key: Optional[str]
-    type: Optional[str]
-    typename: Optional[str]
-    description: Optional[str]
-    bound: Optional[BoundTypeInput]
-    label: Optional[str]
-    identifier: Optional[str]
-    child: Optional['ReturnPortInput']
-    transpile: Optional[str]
-
-class WidgetInput(BaseModel):
-    typename: str
-    query: Optional[str]
-    dependencies: Optional[List[Optional[str]]]
-    max: Optional[int]
-    min: Optional[int]
-    placeholder: Optional[str]
-
-class AssignationParent(BaseModel):
-    typename: Optional[Literal['Assignation']] = Field(alias='__typename')
-    id: str
-
-class Assignation(BaseModel):
-    typename: Optional[Literal['Assignation']] = Field(alias='__typename')
-    args: Optional[List[Optional[Any]]]
-    kwargs: Optional[Dict]
-    id: str
-    parent: Optional[AssignationParent]
-    id: str
-    status: AssignationStatus
-    statusmessage: str
-
-class TranscriptPostman(BaseModel):
-    typename: Optional[Literal['PostmanSettings']] = Field(alias='__typename')
-    type: Optional[PostmanProtocol]
-    kwargs: Optional[Dict]
-
-class Transcript(BaseModel):
-    typename: Optional[Literal['Transcript']] = Field(alias='__typename')
-    postman: Optional[TranscriptPostman]
-
-class StringArgPort(BaseModel):
-    typename: Optional[Literal['StringArgPort']] = Field(alias='__typename')
-    key: Optional[str]
-
-class IntArgPort(BaseModel):
-    typename: Optional[Literal['IntArgPort']] = Field(alias='__typename')
-    key: Optional[str]
-
-class StructureArgPort(BaseModel):
-    typename: Optional[Literal['StructureArgPort']] = Field(alias='__typename')
-    key: Optional[str]
-    identifier: Optional[str]
-
-class ListArgPortChildBase(BaseModel):
-    pass
-
-class ListArgPortChildStructureArgPortInlineFragment(ListArgPortChildBase):
-    typename: Optional[Literal['StructureArgPort']] = Field(alias='__typename')
-    identifier: Optional[str]
-
-class ListArgPortChildIntArgPortInlineFragment(ListArgPortChildBase):
-    typename: Optional[Literal['IntArgPort']] = Field(alias='__typename')
-
-class ListArgPortChildBoolArgPortInlineFragment(ListArgPortChildBase):
-    typename: Optional[Literal['BoolArgPort']] = Field(alias='__typename')
-
-class ListArgPortChildStringArgPortInlineFragment(ListArgPortChildBase):
-    typename: Optional[Literal['StringArgPort']] = Field(alias='__typename')
-
-class ListArgPort(BaseModel):
-    typename: Optional[Literal['ListArgPort']] = Field(alias='__typename')
-    key: Optional[str]
-    child: Optional[Union[ListArgPortChildStructureArgPortInlineFragment, ListArgPortChildIntArgPortInlineFragment, ListArgPortChildBoolArgPortInlineFragment, ListArgPortChildStringArgPortInlineFragment]]
-
-class DictArgPortChildBase(BaseModel):
-    pass
-
-class DictArgPortChildStructureArgPortInlineFragment(DictArgPortChildBase):
-    typename: Optional[Literal['StructureArgPort']] = Field(alias='__typename')
-    identifier: Optional[str]
-
-class DictArgPortChildIntArgPortInlineFragment(DictArgPortChildBase):
-    typename: Optional[Literal['IntArgPort']] = Field(alias='__typename')
-
-class DictArgPortChildBoolArgPortInlineFragment(DictArgPortChildBase):
-    typename: Optional[Literal['BoolArgPort']] = Field(alias='__typename')
-
-class DictArgPortChildStringArgPortInlineFragment(DictArgPortChildBase):
-    typename: Optional[Literal['StringArgPort']] = Field(alias='__typename')
-
-class DictArgPort(BaseModel):
-    typename: Optional[Literal['DictArgPort']] = Field(alias='__typename')
-    key: Optional[str]
-    child: Optional[Union[DictArgPortChildStructureArgPortInlineFragment, DictArgPortChildIntArgPortInlineFragment, DictArgPortChildBoolArgPortInlineFragment, DictArgPortChildStringArgPortInlineFragment]]
-
-class DictKwargPortChildBase(BaseModel):
-    pass
-
-class DictKwargPortChildStructureKwargPortInlineFragment(DictKwargPortChildBase):
-    typename: Optional[Literal['StructureKwargPort']] = Field(alias='__typename')
-    identifier: Optional[str]
-
-class DictKwargPortChildIntKwargPortInlineFragment(DictKwargPortChildBase):
-    typename: Optional[Literal['IntKwargPort']] = Field(alias='__typename')
-
-class DictKwargPortChildBoolKwargPortInlineFragment(DictKwargPortChildBase):
-    typename: Optional[Literal['BoolKwargPort']] = Field(alias='__typename')
-
-class DictKwargPortChildStringKwargPortInlineFragment(DictKwargPortChildBase):
-    typename: Optional[Literal['StringKwargPort']] = Field(alias='__typename')
-
-class DictKwargPort(BaseModel):
-    typename: Optional[Literal['DictKwargPort']] = Field(alias='__typename')
-    key: Optional[str]
-    default_dict: Optional[Dict] = Field(alias='defaultDict')
-    child: Optional[Union[DictKwargPortChildStructureKwargPortInlineFragment, DictKwargPortChildIntKwargPortInlineFragment, DictKwargPortChildBoolKwargPortInlineFragment, DictKwargPortChildStringKwargPortInlineFragment]]
-
-class BoolKwargPort(BaseModel):
-    typename: Optional[Literal['BoolKwargPort']] = Field(alias='__typename')
-    key: Optional[str]
-    default_bool: Optional[bool] = Field(alias='defaultBool')
-
-class IntKwargPort(BaseModel):
-    typename: Optional[Literal['IntKwargPort']] = Field(alias='__typename')
-    key: Optional[str]
-    default_int: Optional[int] = Field(alias='defaultInt')
-
-class StringKwargPort(BaseModel):
-    typename: Optional[Literal['StringKwargPort']] = Field(alias='__typename')
-    key: Optional[str]
-    default_string: Optional[str] = Field(alias='defaultString')
-
-class ListKwargPortChildBase(BaseModel):
-    pass
-
-class ListKwargPortChildStructureKwargPortInlineFragment(ListKwargPortChildBase):
-    typename: Optional[Literal['StructureKwargPort']] = Field(alias='__typename')
-    identifier: Optional[str]
-
-class ListKwargPortChildIntKwargPortInlineFragment(ListKwargPortChildBase):
-    typename: Optional[Literal['IntKwargPort']] = Field(alias='__typename')
-
-class ListKwargPortChildBoolKwargPortInlineFragment(ListKwargPortChildBase):
-    typename: Optional[Literal['BoolKwargPort']] = Field(alias='__typename')
-
-class ListKwargPortChildStringKwargPortInlineFragment(ListKwargPortChildBase):
-    typename: Optional[Literal['StringKwargPort']] = Field(alias='__typename')
-
-class ListKwargPort(BaseModel):
-    typename: Optional[Literal['ListKwargPort']] = Field(alias='__typename')
-    key: Optional[str]
-    child: Optional[Union[ListKwargPortChildStructureKwargPortInlineFragment, ListKwargPortChildIntKwargPortInlineFragment, ListKwargPortChildBoolKwargPortInlineFragment, ListKwargPortChildStringKwargPortInlineFragment]]
-    default_list: Optional[List[Optional[Dict]]] = Field(alias='defaultList')
-
-class ListReturnPortChildBase(BaseModel):
-    pass
-
-class ListReturnPortChildStructureReturnPortInlineFragment(ListReturnPortChildBase):
-    typename: Optional[Literal['StructureReturnPort']] = Field(alias='__typename')
-    identifier: Optional[str]
-
-class ListReturnPortChildStringReturnPortInlineFragment(ListReturnPortChildBase):
-    typename: Optional[Literal['StringReturnPort']] = Field(alias='__typename')
-
-class ListReturnPortChildIntReturnPortInlineFragment(ListReturnPortChildBase):
-    typename: Optional[Literal['IntReturnPort']] = Field(alias='__typename')
-
-class ListReturnPortChildBoolReturnPortInlineFragment(ListReturnPortChildBase):
-    typename: Optional[Literal['BoolReturnPort']] = Field(alias='__typename')
-
-class ListReturnPort(BaseModel):
-    typename: Optional[Literal['ListReturnPort']] = Field(alias='__typename')
-    key: Optional[str]
-    child: Optional[Union[ListReturnPortChildStructureReturnPortInlineFragment, ListReturnPortChildStringReturnPortInlineFragment, ListReturnPortChildIntReturnPortInlineFragment, ListReturnPortChildBoolReturnPortInlineFragment]]
-
-class DictReturnPortChildBase(BaseModel):
-    pass
-
-class DictReturnPortChildStructureReturnPortInlineFragment(DictReturnPortChildBase):
-    typename: Optional[Literal['StructureReturnPort']] = Field(alias='__typename')
-    identifier: Optional[str]
-
-class DictReturnPortChildStringReturnPortInlineFragment(DictReturnPortChildBase):
-    typename: Optional[Literal['StringReturnPort']] = Field(alias='__typename')
-
-class DictReturnPortChildIntReturnPortInlineFragment(DictReturnPortChildBase):
-    typename: Optional[Literal['IntReturnPort']] = Field(alias='__typename')
-
-class DictReturnPortChildBoolReturnPortInlineFragment(DictReturnPortChildBase):
-    typename: Optional[Literal['BoolReturnPort']] = Field(alias='__typename')
-
-class DictReturnPort(BaseModel):
-    typename: Optional[Literal['DictReturnPort']] = Field(alias='__typename')
-    key: Optional[str]
-    child: Optional[Union[DictReturnPortChildStructureReturnPortInlineFragment, DictReturnPortChildStringReturnPortInlineFragment, DictReturnPortChildIntReturnPortInlineFragment, DictReturnPortChildBoolReturnPortInlineFragment]]
-
-class StructureReturnPort(BaseModel):
-    typename: Optional[Literal['StructureReturnPort']] = Field(alias='__typename')
-    key: Optional[str]
-    identifier: Optional[str]
-
-class StringReturnPort(BaseModel):
-    typename: Optional[Literal['StringReturnPort']] = Field(alias='__typename')
-    key: Optional[str]
-
-class IntReturnPort(BaseModel):
-    typename: Optional[Literal['IntReturnPort']] = Field(alias='__typename')
-    key: Optional[str]
-
-class ReturnPortBase(BaseModel):
-    key: Optional[str]
-    description: Optional[str]
-
-class ReturnPortBaseListReturnPort(ListReturnPort, ReturnPortBase):
-    pass
-
-class ReturnPortBaseStructureReturnPort(StructureReturnPort, ReturnPortBase):
-    pass
-
-class ReturnPortBaseStringReturnPort(StringReturnPort, ReturnPortBase):
-    pass
-
-class ReturnPortBaseIntReturnPort(IntReturnPort, ReturnPortBase):
-    pass
-
-class ReturnPortBaseDictReturnPort(DictReturnPort, ReturnPortBase):
-    pass
-ReturnPort = Union[ReturnPortBaseListReturnPort, ReturnPortBaseStructureReturnPort, ReturnPortBaseStringReturnPort, ReturnPortBaseIntReturnPort, ReturnPortBaseDictReturnPort, ReturnPortBase]
-
-class KwargPortBase(BaseModel):
-    key: Optional[str]
-    description: Optional[str]
-
-class KwargPortBaseDictKwargPort(DictKwargPort, KwargPortBase):
-    pass
-
-class KwargPortBaseBoolKwargPort(BoolKwargPort, KwargPortBase):
-    pass
-
-class KwargPortBaseIntKwargPort(IntKwargPort, KwargPortBase):
-    pass
-
-class KwargPortBaseListKwargPort(ListKwargPort, KwargPortBase):
-    pass
-
-class KwargPortBaseStringKwargPort(StringKwargPort, KwargPortBase):
-    pass
-KwargPort = Union[KwargPortBaseDictKwargPort, KwargPortBaseBoolKwargPort, KwargPortBaseIntKwargPort, KwargPortBaseListKwargPort, KwargPortBaseStringKwargPort, KwargPortBase]
-
-class ArgPortBase(BaseModel):
-    key: Optional[str]
-    description: Optional[str]
-
-class ArgPortBaseStringArgPort(StringArgPort, ArgPortBase):
-    pass
-
-class ArgPortBaseStructureArgPort(StructureArgPort, ArgPortBase):
-    pass
-
-class ArgPortBaseListArgPort(ListArgPort, ArgPortBase):
-    pass
-
-class ArgPortBaseIntArgPort(IntArgPort, ArgPortBase):
-    pass
-
-class ArgPortBaseDictArgPort(DictArgPort, ArgPortBase):
-    pass
-ArgPort = Union[ArgPortBaseStringArgPort, ArgPortBaseStructureArgPort, ArgPortBaseListArgPort, ArgPortBaseIntArgPort, ArgPortBaseDictArgPort, ArgPortBase]
-
-class ReserveParams(BaseModel):
-    typename: Optional[Literal['ReserveParams']] = Field(alias='__typename')
-    registries: Optional[List[Optional[str]]]
-    minimal_instances: Optional[int] = Field(alias='minimalInstances')
-    desired_instances: Optional[int] = Field(alias='desiredInstances')
-
-class ReservationNode(BaseModel):
-    typename: Optional[Literal['Node']] = Field(alias='__typename')
-    id: str
-    pure: bool
-
-class Reservation(BaseModel):
-    typename: Optional[Literal['Reservation']] = Field(alias='__typename')
-    id: str
-    statusmessage: str
-    status: ReservationStatus
-    node: Optional[ReservationNode]
-    params: Optional[ReserveParams]
-
-class Node(BaseModel):
-    typename: Optional[Literal['Node']] = Field(alias='__typename')
-    name: str
-    interface: str
-    package: str
-    description: str
-    type: NodeType
-    id: str
-    args: Optional[List[Optional[ArgPort]]]
-    kwargs: Optional[List[Optional[KwargPort]]]
-    returns: Optional[List[Optional[ReturnPort]]]
-
-class TemplateRegistryApp(BaseModel):
-    typename: Optional[Literal['LokApp']] = Field(alias='__typename')
-    name: str
-
-class TemplateRegistryUser(BaseModel):
-    typename: Optional[Literal['LokUser']] = Field(alias='__typename')
-    username: str
-
-class TemplateRegistry(BaseModel):
-    typename: Optional[Literal['Registry']] = Field(alias='__typename')
     name: Optional[str]
-    'DEPRECATED Will be replaced in the future: : None '
-    app: Optional[TemplateRegistryApp]
-    user: Optional[TemplateRegistryUser]
+    description: Optional[str]
+    interface: Optional[str]
+    kind: Optional[str]
+    implementation: Optional[str]
+    position: 'PositionInput'
+    extra: Optional[Dict]
 
-class Template(BaseModel):
-    typename: Optional[Literal['Template']] = Field(alias='__typename')
+class PositionInput(BaseModel):
+    x: float
+    y: float
+
+class Graph(BaseModel):
+    typename: Optional[Literal['Graph']] = Field(alias='__typename')
+    diagram: Optional[Dict]
     id: str
-    registry: TemplateRegistry
-    node: Node
+    template: Optional[str]
+    name: Optional[str]
 
-class TodosTodos(BaseModel):
-    typename: Optional[Literal['TodoEvent']] = Field(alias='__typename')
-    create: Optional[Assignation]
-    update: Optional[Assignation]
-    delete: Optional[str]
-
-class Todos(BaseModel):
-    todos: Optional[TodosTodos]
-
-    class Arguments(BaseModel):
-        identifier: str
-
-    class Meta:
-        document = 'fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent {\n    id\n  }\n  id\n  status\n  statusmessage\n}\n\nsubscription todos($identifier: ID!) {\n  todos(identifier: $identifier) {\n    create {\n      ...Assignation\n    }\n    update {\n      ...Assignation\n    }\n    delete\n  }\n}'
-
-class WaiterReservations(BaseModel):
-    typename: Optional[Literal['ReservationsEvent']] = Field(alias='__typename')
-    create: Optional[Reservation]
-    update: Optional[Reservation]
-    delete: Optional[str]
-
-class Waiter(BaseModel):
-    reservations: Optional[WaiterReservations]
-
-    class Arguments(BaseModel):
-        identifier: str
-
-    class Meta:
-        document = 'fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n}\n\nsubscription waiter($identifier: ID!) {\n  reservations(identifier: $identifier) {\n    create {\n      ...Reservation\n    }\n    update {\n      ...Reservation\n    }\n    delete\n  }\n}'
-
-class Todolist(BaseModel):
-    todolist: Optional[List[Optional[Assignation]]]
-
-    class Arguments(BaseModel):
-        app_group: Optional[str] = None
-
-    class Meta:
-        document = 'fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent {\n    id\n  }\n  id\n  status\n  statusmessage\n}\n\nquery todolist($appGroup: ID) {\n  todolist(appGroup: $appGroup) {\n    ...Assignation\n  }\n}'
-
-class Get_provisionProvisionTemplateNode(BaseModel):
-    typename: Optional[Literal['Node']] = Field(alias='__typename')
-    name: str
-
-class Get_provisionProvisionTemplateRegistryApp(BaseModel):
-    typename: Optional[Literal['LokApp']] = Field(alias='__typename')
-    name: str
-
-class Get_provisionProvisionTemplateRegistry(BaseModel):
-    typename: Optional[Literal['Registry']] = Field(alias='__typename')
-    app: Optional[Get_provisionProvisionTemplateRegistryApp]
-
-class Get_provisionProvisionTemplate(BaseModel):
-    typename: Optional[Literal['Template']] = Field(alias='__typename')
-    id: str
-    node: Get_provisionProvisionTemplateNode
-    registry: Get_provisionProvisionTemplateRegistry
-    extensions: Optional[List[Optional[str]]]
-
-class Get_provisionProvisionBoundRegistry(BaseModel):
-    typename: Optional[Literal['Registry']] = Field(alias='__typename')
+class ListGraph(BaseModel):
+    typename: Optional[Literal['Graph']] = Field(alias='__typename')
     id: str
     name: Optional[str]
-    'DEPRECATED Will be replaced in the future: : None '
+    template: Optional[str]
 
-class Get_provisionProvisionBound(BaseModel):
-    typename: Optional[Literal['Agent']] = Field(alias='__typename')
-    registry: Optional[Get_provisionProvisionBoundRegistry]
-    name: str
-    identifier: str
+class FlowArg(BaseModel):
+    typename: Optional[Literal['FlowArg']] = Field(alias='__typename')
+    key: str
+    type: Optional[str]
+    name: Optional[str]
+    label: Optional[str]
+    type: Optional[str]
+    description: Optional[str]
 
-class Get_provisionProvisionReservationsCreator(BaseModel):
-    typename: Optional[Literal['LokUser']] = Field(alias='__typename')
-    username: str
+class FlowKwarg(BaseModel):
+    typename: Optional[Literal['FlowKwarg']] = Field(alias='__typename')
+    key: str
+    type: Optional[str]
+    label: Optional[str]
+    name: Optional[str]
+    type: Optional[str]
+    description: Optional[str]
 
-class Get_provisionProvisionReservationsApp(BaseModel):
-    typename: Optional[Literal['LokApp']] = Field(alias='__typename')
-    name: str
+class FlowReturn(BaseModel):
+    typename: Optional[Literal['FlowReturn']] = Field(alias='__typename')
+    key: str
+    type: Optional[str]
+    name: Optional[str]
+    label: Optional[str]
+    type: Optional[str]
+    description: Optional[str]
 
-class Get_provisionProvisionReservations(BaseModel):
-    typename: Optional[Literal['Reservation']] = Field(alias='__typename')
+class FlowNodeCommonsBaseArgs(FlowArg, BaseModel):
+    typename: Optional[Literal['FlowArg']] = Field(alias='__typename')
+
+class FlowNodeCommonsBaseKwargs(FlowKwarg, BaseModel):
+    typename: Optional[Literal['FlowKwarg']] = Field(alias='__typename')
+
+class FlowNodeCommonsBaseReturns(FlowReturn, BaseModel):
+    typename: Optional[Literal['FlowReturn']] = Field(alias='__typename')
+
+class FlowNodeCommonsBase(BaseModel):
+    """Amazing other interface"""
+    args: Optional[List[Optional[FlowNodeCommonsBaseArgs]]]
+    kwargs: Optional[List[Optional[FlowNodeCommonsBaseKwargs]]]
+    returns: Optional[List[Optional[FlowNodeCommonsBaseReturns]]]
+
+class ArkitektNode(FlowNodeCommonsBase, BaseModel):
+    typename: Optional[Literal['ArkitektNode']] = Field(alias='__typename')
+    name: Optional[str]
+    description: Optional[str]
+    package: Optional[str]
+    interface: Optional[str]
+    kind: str
+
+class ReactiveNode(FlowNodeCommonsBase, BaseModel):
+    typename: Optional[Literal['ReactiveNode']] = Field(alias='__typename')
+    implementation: Optional[str]
+
+class ArgNode(FlowNodeCommonsBase, BaseModel):
+    typename: Optional[Literal['ArgNode']] = Field(alias='__typename')
+    extra: Optional[str]
+
+class KwargNode(FlowNodeCommonsBase, BaseModel):
+    typename: Optional[Literal['KwargNode']] = Field(alias='__typename')
+    extra: Optional[str]
+
+class ReturnNode(FlowNodeCommonsBase, BaseModel):
+    typename: Optional[Literal['ReturnNode']] = Field(alias='__typename')
+    extra: Optional[str]
+
+class FlowNodeBasePosition(BaseModel):
+    typename: Optional[Literal['Position']] = Field(alias='__typename')
+    x: int
+    y: int
+
+class FlowNodeBase(BaseModel):
     id: str
-    reference: str
-    creator: Optional[Get_provisionProvisionReservationsCreator]
-    app: Optional[Get_provisionProvisionReservationsApp]
+    position: FlowNodeBasePosition
 
-class Get_provisionProvision(BaseModel):
-    typename: Optional[Literal['Provision']] = Field(alias='__typename')
-    template: Optional[Get_provisionProvisionTemplate]
-    bound: Optional[Get_provisionProvisionBound]
-    reservations: List[Get_provisionProvisionReservations]
+class FlowNodeBaseArkitektNode(ArkitektNode, FlowNodeBase):
+    pass
 
-class Get_provision(BaseModel):
-    provision: Optional[Get_provisionProvision]
+class FlowNodeBaseReactiveNode(ReactiveNode, FlowNodeBase):
+    pass
 
-    class Arguments(BaseModel):
-        reference: str
+class FlowNodeBaseArgNode(ArgNode, FlowNodeBase):
+    pass
 
-    class Meta:
-        document = 'query get_provision($reference: ID!) {\n  provision(reference: $reference) {\n    template {\n      id\n      node {\n        name\n      }\n      registry {\n        app {\n          name\n        }\n      }\n      extensions\n    }\n    bound {\n      registry {\n        id\n        name\n      }\n      name\n      identifier\n    }\n    reservations {\n      id\n      reference\n      creator {\n        username\n      }\n      app {\n        name\n      }\n    }\n  }\n}'
+class FlowNodeBaseKwargNode(KwargNode, FlowNodeBase):
+    pass
 
-class Get_reservationReservationTemplateRegistryApp(BaseModel):
-    typename: Optional[Literal['LokApp']] = Field(alias='__typename')
+class FlowNodeBaseReturnNode(ReturnNode, FlowNodeBase):
+    pass
+FlowNode = Union[FlowNodeBaseArkitektNode, FlowNodeBaseReactiveNode, FlowNodeBaseArgNode, FlowNodeBaseKwargNode, FlowNodeBaseReturnNode, FlowNodeBase]
+
+class FlowEdgeCommonsBase(BaseModel):
+    """Amazing Interface"""
+    label: Optional[str]
+    'SUper intersting Interface field'
+
+class LabeledEdge(FlowEdgeCommonsBase, BaseModel):
+    typename: Optional[Literal['LabeledEdge']] = Field(alias='__typename')
+
+class FancyEdge(FlowEdgeCommonsBase, BaseModel):
+    typename: Optional[Literal['FancyEdge']] = Field(alias='__typename')
+
+class FlowEdgeBase(BaseModel):
     id: str
-    name: str
+    source: str
+    source_handle: str = Field(alias='sourceHandle')
+    target: str
+    target_handle: str = Field(alias='targetHandle')
 
-class Get_reservationReservationTemplateRegistryUser(BaseModel):
-    typename: Optional[Literal['LokUser']] = Field(alias='__typename')
+class FlowEdgeBaseLabeledEdge(LabeledEdge, FlowEdgeBase):
+    pass
+
+class FlowEdgeBaseFancyEdge(FancyEdge, FlowEdgeBase):
+    pass
+FlowEdge = Union[FlowEdgeBaseLabeledEdge, FlowEdgeBaseFancyEdge, FlowEdgeBase]
+
+class Flow(BaseModel):
+    typename: Optional[Literal['Flow']] = Field(alias='__typename')
+    name: Optional[str]
     id: str
-    email: str
+    nodes: Optional[List[Optional[FlowNode]]]
+    edges: Optional[List[Optional[FlowEdge]]]
 
-class Get_reservationReservationTemplateRegistry(BaseModel):
-    typename: Optional[Literal['Registry']] = Field(alias='__typename')
-    app: Optional[Get_reservationReservationTemplateRegistryApp]
-    user: Optional[Get_reservationReservationTemplateRegistryUser]
-
-class Get_reservationReservationTemplate(BaseModel):
-    typename: Optional[Literal['Template']] = Field(alias='__typename')
+class ListFlow(BaseModel):
+    typename: Optional[Literal['Flow']] = Field(alias='__typename')
     id: str
-    registry: Get_reservationReservationTemplateRegistry
+    name: Optional[str]
 
-class Get_reservationReservationProvisions(BaseModel):
-    typename: Optional[Literal['Provision']] = Field(alias='__typename')
-    id: str
-    status: ProvisionStatus
-
-class Get_reservationReservationNode(BaseModel):
-    typename: Optional[Literal['Node']] = Field(alias='__typename')
-    id: str
-    type: NodeType
-    name: str
-
-class Get_reservationReservation(BaseModel):
-    typename: Optional[Literal['Reservation']] = Field(alias='__typename')
-    id: str
-    template: Optional[Get_reservationReservationTemplate]
-    provisions: List[Get_reservationReservationProvisions]
-    title: Optional[str]
-    status: ReservationStatus
-    id: str
-    reference: str
-    node: Optional[Get_reservationReservationNode]
-
-class Get_reservation(BaseModel):
-    reservation: Optional[Get_reservationReservation]
-
-    class Arguments(BaseModel):
-        reference: str
-
-    class Meta:
-        document = 'query get_reservation($reference: ID!) {\n  reservation(reference: $reference) {\n    id\n    template {\n      id\n      registry {\n        app {\n          id\n          name\n        }\n        user {\n          id\n          email\n        }\n      }\n    }\n    provisions {\n      id\n      status\n    }\n    title\n    status\n    id\n    reference\n    node {\n      id\n      type\n      name\n    }\n  }\n}'
-
-class Waitlist(BaseModel):
-    waitlist: Optional[List[Optional[Reservation]]]
-
-    class Arguments(BaseModel):
-        app_group: Optional[str] = None
-
-    class Meta:
-        document = 'fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n}\n\nquery waitlist($appGroup: ID) {\n  waitlist(appGroup: $appGroup) {\n    ...Reservation\n  }\n}'
-
-class Find(BaseModel):
-    node: Optional[Node]
+class Get_graph(BaseModel):
+    graph: Optional[Graph]
 
     class Arguments(BaseModel):
         id: Optional[str] = None
-        package: Optional[str] = None
-        interface: Optional[str] = None
         template: Optional[str] = None
-        q: Optional[str] = None
 
     class Meta:
-        document = 'fragment IntReturnPort on IntReturnPort {\n  __typename\n  key\n}\n\nfragment StringKwargPort on StringKwargPort {\n  key\n  defaultString\n}\n\nfragment ListReturnPort on ListReturnPort {\n  key\n  child {\n    __typename\n    ... on StructureReturnPort {\n      __typename\n      identifier\n    }\n    ... on StringReturnPort {\n      __typename\n    }\n    ... on IntReturnPort {\n      __typename\n    }\n    ... on BoolReturnPort {\n      __typename\n    }\n  }\n}\n\nfragment StructureReturnPort on StructureReturnPort {\n  __typename\n  key\n  identifier\n}\n\nfragment BoolKwargPort on BoolKwargPort {\n  key\n  defaultBool\n}\n\nfragment IntArgPort on IntArgPort {\n  key\n}\n\nfragment IntKwargPort on IntKwargPort {\n  key\n  defaultInt\n}\n\nfragment DictReturnPort on DictReturnPort {\n  key\n  child {\n    __typename\n    ... on StructureReturnPort {\n      __typename\n      identifier\n    }\n    ... on StringReturnPort {\n      __typename\n    }\n    ... on IntReturnPort {\n      __typename\n    }\n    ... on BoolReturnPort {\n      __typename\n    }\n  }\n}\n\nfragment StringArgPort on StringArgPort {\n  key\n}\n\nfragment DictArgPort on DictArgPort {\n  key\n  child {\n    __typename\n    ... on StructureArgPort {\n      __typename\n      identifier\n    }\n    ... on IntArgPort {\n      __typename\n    }\n    ... on BoolArgPort {\n      __typename\n    }\n    ... on StringArgPort {\n      __typename\n    }\n  }\n}\n\nfragment StructureArgPort on StructureArgPort {\n  key\n  identifier\n}\n\nfragment StringReturnPort on StringReturnPort {\n  __typename\n  key\n}\n\nfragment ListArgPort on ListArgPort {\n  key\n  child {\n    __typename\n    ... on StructureArgPort {\n      __typename\n      identifier\n    }\n    ... on IntArgPort {\n      __typename\n    }\n    ... on BoolArgPort {\n      __typename\n    }\n    ... on StringArgPort {\n      __typename\n    }\n  }\n}\n\nfragment DictKwargPort on DictKwargPort {\n  key\n  defaultDict\n  child {\n    __typename\n    ... on StructureKwargPort {\n      __typename\n      identifier\n    }\n    ... on IntKwargPort {\n      __typename\n    }\n    ... on BoolKwargPort {\n      __typename\n    }\n    ... on StringKwargPort {\n      __typename\n    }\n  }\n}\n\nfragment ListKwargPort on ListKwargPort {\n  key\n  child {\n    __typename\n    ... on StructureKwargPort {\n      __typename\n      identifier\n    }\n    ... on IntKwargPort {\n      __typename\n    }\n    ... on BoolKwargPort {\n      __typename\n    }\n    ... on StringKwargPort {\n      __typename\n    }\n  }\n  defaultList\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  description\n  ...StringArgPort\n  ...StructureArgPort\n  ...ListArgPort\n  ...IntArgPort\n  ...DictArgPort\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  key\n  description\n  ...ListReturnPort\n  ...StructureReturnPort\n  ...StringReturnPort\n  ...IntReturnPort\n  ...DictReturnPort\n}\n\nfragment KwargPort on KwargPort {\n  __typename\n  key\n  description\n  ...DictKwargPort\n  ...BoolKwargPort\n  ...IntKwargPort\n  ...ListKwargPort\n  ...StringKwargPort\n}\n\nfragment Node on Node {\n  name\n  interface\n  package\n  description\n  type\n  id\n  args {\n    ...ArgPort\n  }\n  kwargs {\n    ...KwargPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nquery find($id: ID, $package: String, $interface: String, $template: ID, $q: QString) {\n  node(\n    id: $id\n    package: $package\n    interface: $interface\n    template: $template\n    q: $q\n  ) {\n    ...Node\n  }\n}'
+        document = 'fragment Graph on Graph {\n  diagram\n  id\n  template\n  name\n}\n\nquery get_graph($id: ID, $template: ID) {\n  graph(id: $id, template: $template) {\n    ...Graph\n  }\n}'
 
-class Get_template(BaseModel):
-    template: Optional[Template]
-
-    class Arguments(BaseModel):
-        id: str
-
-    class Meta:
-        document = 'fragment IntReturnPort on IntReturnPort {\n  __typename\n  key\n}\n\nfragment StringKwargPort on StringKwargPort {\n  key\n  defaultString\n}\n\nfragment ListReturnPort on ListReturnPort {\n  key\n  child {\n    __typename\n    ... on StructureReturnPort {\n      __typename\n      identifier\n    }\n    ... on StringReturnPort {\n      __typename\n    }\n    ... on IntReturnPort {\n      __typename\n    }\n    ... on BoolReturnPort {\n      __typename\n    }\n  }\n}\n\nfragment StructureReturnPort on StructureReturnPort {\n  __typename\n  key\n  identifier\n}\n\nfragment BoolKwargPort on BoolKwargPort {\n  key\n  defaultBool\n}\n\nfragment IntArgPort on IntArgPort {\n  key\n}\n\nfragment IntKwargPort on IntKwargPort {\n  key\n  defaultInt\n}\n\nfragment DictReturnPort on DictReturnPort {\n  key\n  child {\n    __typename\n    ... on StructureReturnPort {\n      __typename\n      identifier\n    }\n    ... on StringReturnPort {\n      __typename\n    }\n    ... on IntReturnPort {\n      __typename\n    }\n    ... on BoolReturnPort {\n      __typename\n    }\n  }\n}\n\nfragment StringArgPort on StringArgPort {\n  key\n}\n\nfragment DictArgPort on DictArgPort {\n  key\n  child {\n    __typename\n    ... on StructureArgPort {\n      __typename\n      identifier\n    }\n    ... on IntArgPort {\n      __typename\n    }\n    ... on BoolArgPort {\n      __typename\n    }\n    ... on StringArgPort {\n      __typename\n    }\n  }\n}\n\nfragment StructureArgPort on StructureArgPort {\n  key\n  identifier\n}\n\nfragment StringReturnPort on StringReturnPort {\n  __typename\n  key\n}\n\nfragment ListArgPort on ListArgPort {\n  key\n  child {\n    __typename\n    ... on StructureArgPort {\n      __typename\n      identifier\n    }\n    ... on IntArgPort {\n      __typename\n    }\n    ... on BoolArgPort {\n      __typename\n    }\n    ... on StringArgPort {\n      __typename\n    }\n  }\n}\n\nfragment DictKwargPort on DictKwargPort {\n  key\n  defaultDict\n  child {\n    __typename\n    ... on StructureKwargPort {\n      __typename\n      identifier\n    }\n    ... on IntKwargPort {\n      __typename\n    }\n    ... on BoolKwargPort {\n      __typename\n    }\n    ... on StringKwargPort {\n      __typename\n    }\n  }\n}\n\nfragment ListKwargPort on ListKwargPort {\n  key\n  child {\n    __typename\n    ... on StructureKwargPort {\n      __typename\n      identifier\n    }\n    ... on IntKwargPort {\n      __typename\n    }\n    ... on BoolKwargPort {\n      __typename\n    }\n    ... on StringKwargPort {\n      __typename\n    }\n  }\n  defaultList\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  key\n  description\n  ...ListReturnPort\n  ...StructureReturnPort\n  ...StringReturnPort\n  ...IntReturnPort\n  ...DictReturnPort\n}\n\nfragment KwargPort on KwargPort {\n  __typename\n  key\n  description\n  ...DictKwargPort\n  ...BoolKwargPort\n  ...IntKwargPort\n  ...ListKwargPort\n  ...StringKwargPort\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  description\n  ...StringArgPort\n  ...StructureArgPort\n  ...ListArgPort\n  ...IntArgPort\n  ...DictArgPort\n}\n\nfragment Node on Node {\n  name\n  interface\n  package\n  description\n  type\n  id\n  args {\n    ...ArgPort\n  }\n  kwargs {\n    ...KwargPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nfragment Template on Template {\n  id\n  registry {\n    name\n    app {\n      name\n    }\n    user {\n      username\n    }\n  }\n  node {\n    ...Node\n  }\n}\n\nquery get_template($id: ID!) {\n  template(id: $id) {\n    ...Template\n  }\n}'
-
-class Get_agentAgentRegistry(BaseModel):
-    typename: Optional[Literal['Registry']] = Field(alias='__typename')
-    id: str
-    name: Optional[str]
-    'DEPRECATED Will be replaced in the future: : None '
-
-class Get_agentAgent(BaseModel):
-    typename: Optional[Literal['Agent']] = Field(alias='__typename')
-    registry: Optional[Get_agentAgentRegistry]
-    name: str
-    identifier: str
-
-class Get_agent(BaseModel):
-    agent: Optional[Get_agentAgent]
-
-    class Arguments(BaseModel):
-        id: str
-
-    class Meta:
-        document = 'query get_agent($id: ID!) {\n  agent(id: $id) {\n    registry {\n      id\n      name\n    }\n    name\n    identifier\n  }\n}'
-
-class Assign(BaseModel):
-    assign: Optional[Assignation]
-
-    class Arguments(BaseModel):
-        reservation: str
-        args: List[Optional[Dict]]
-        kwargs: Optional[Dict] = None
-
-    class Meta:
-        document = 'fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent {\n    id\n  }\n  id\n  status\n  statusmessage\n}\n\nmutation assign($reservation: ID!, $args: [GenericScalar]!, $kwargs: GenericScalar) {\n  assign(reservation: $reservation, args: $args, kwargs: $kwargs) {\n    ...Assignation\n  }\n}'
-
-class Unassign(BaseModel):
-    unassign: Optional[Assignation]
-
-    class Arguments(BaseModel):
-        assignation: str
-
-    class Meta:
-        document = 'fragment Assignation on Assignation {\n  args\n  kwargs\n  id\n  parent {\n    id\n  }\n  id\n  status\n  statusmessage\n}\n\nmutation unassign($assignation: ID!) {\n  unassign(assignation: $assignation) {\n    ...Assignation\n  }\n}'
-
-class Negotiate(BaseModel):
-    negotiate: Optional[Transcript]
+class My_graphs(BaseModel):
+    mygraphs: Optional[List[Optional[ListGraph]]]
 
     class Arguments(BaseModel):
         pass
 
     class Meta:
-        document = 'fragment Transcript on Transcript {\n  postman {\n    type\n    kwargs\n  }\n}\n\nmutation negotiate {\n  negotiate {\n    ...Transcript\n  }\n}'
+        document = 'fragment ListGraph on Graph {\n  id\n  name\n  template\n}\n\nquery my_graphs {\n  mygraphs {\n    ...ListGraph\n  }\n}'
 
-class Reserve(BaseModel):
-    reserve: Optional[Reservation]
+class Get_flow(BaseModel):
+    flow: Optional[Flow]
 
     class Arguments(BaseModel):
-        node: Optional[str] = None
+        id: Optional[str] = None
+
+    class Meta:
+        document = 'fragment FlowKwarg on FlowKwarg {\n  key\n  type\n  label\n  name\n  type\n  description\n}\n\nfragment FlowArg on FlowArg {\n  key\n  type\n  name\n  label\n  type\n  description\n}\n\nfragment FlowReturn on FlowReturn {\n  key\n  type\n  name\n  label\n  type\n  description\n}\n\nfragment FlowNodeCommons on FlowNodeCommons {\n  args {\n    __typename\n    ...FlowArg\n  }\n  kwargs {\n    __typename\n    ...FlowKwarg\n  }\n  returns {\n    __typename\n    ...FlowReturn\n  }\n}\n\nfragment FlowEdgeCommons on FlowEdgeCommons {\n  label\n}\n\nfragment ReturnNode on ReturnNode {\n  ...FlowNodeCommons\n  __typename\n  extra\n}\n\nfragment ReactiveNode on ReactiveNode {\n  ...FlowNodeCommons\n  __typename\n  implementation\n}\n\nfragment FancyEdge on FancyEdge {\n  ...FlowEdgeCommons\n  __typename\n}\n\nfragment ArgNode on ArgNode {\n  ...FlowNodeCommons\n  __typename\n  extra\n}\n\nfragment ArkitektNode on ArkitektNode {\n  ...FlowNodeCommons\n  __typename\n  name\n  description\n  package\n  interface\n  kind\n}\n\nfragment LabeledEdge on LabeledEdge {\n  ...FlowEdgeCommons\n  __typename\n}\n\nfragment KwargNode on KwargNode {\n  ...FlowNodeCommons\n  __typename\n  extra\n}\n\nfragment FlowNode on FlowNode {\n  id\n  position {\n    x\n    y\n  }\n  type: __typename\n  ...ArkitektNode\n  ...ReactiveNode\n  ...ArgNode\n  ...KwargNode\n  ...ReturnNode\n}\n\nfragment FlowEdge on FlowEdge {\n  id\n  source\n  sourceHandle\n  target\n  targetHandle\n  type: __typename\n  ...LabeledEdge\n  ...FancyEdge\n}\n\nfragment Flow on Flow {\n  __typename\n  name\n  id\n  nodes {\n    ...FlowNode\n  }\n  edges {\n    ...FlowEdge\n  }\n}\n\nquery get_flow($id: ID) {\n  flow(id: $id) {\n    ...Flow\n  }\n}'
+
+class Graph(BaseModel):
+    graph: Optional[Graph]
+
+    class Arguments(BaseModel):
+        id: Optional[str] = None
         template: Optional[str] = None
-        params: Optional[ReserveParamsInput] = None
-        title: Optional[str] = None
-        callbacks: Optional[List[Optional[str]]] = None
-        creator: Optional[str] = None
-        app_group: Optional[str] = None
 
     class Meta:
-        document = 'fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n}\n\nmutation reserve($node: ID, $template: ID, $params: ReserveParamsInput, $title: String, $callbacks: [Callback], $creator: ID, $appGroup: ID) {\n  reserve(\n    node: $node\n    template: $template\n    params: $params\n    title: $title\n    callbacks: $callbacks\n    creator: $creator\n    appGroup: $appGroup\n  ) {\n    ...Reservation\n  }\n}'
+        document = 'fragment Graph on Graph {\n  diagram\n  id\n  template\n  name\n}\n\nquery Graph($id: ID, $template: ID) {\n  graph(id: $id, template: $template) {\n    ...Graph\n  }\n}'
 
-class Unreserve(BaseModel):
-    unreserve: Optional[Reservation]
+class Flow(BaseModel):
+    flow: Optional[Flow]
 
     class Arguments(BaseModel):
-        id: str
+        id: Optional[str] = None
 
     class Meta:
-        document = 'fragment ReserveParams on ReserveParams {\n  registries\n  minimalInstances\n  desiredInstances\n}\n\nfragment Reservation on Reservation {\n  id\n  statusmessage\n  status\n  node {\n    id\n    pure\n  }\n  params {\n    ...ReserveParams\n  }\n}\n\nmutation unreserve($id: ID!) {\n  unreserve(id: $id) {\n    ...Reservation\n  }\n}'
+        document = 'fragment FlowKwarg on FlowKwarg {\n  key\n  type\n  label\n  name\n  type\n  description\n}\n\nfragment FlowArg on FlowArg {\n  key\n  type\n  name\n  label\n  type\n  description\n}\n\nfragment FlowReturn on FlowReturn {\n  key\n  type\n  name\n  label\n  type\n  description\n}\n\nfragment FlowNodeCommons on FlowNodeCommons {\n  args {\n    __typename\n    ...FlowArg\n  }\n  kwargs {\n    __typename\n    ...FlowKwarg\n  }\n  returns {\n    __typename\n    ...FlowReturn\n  }\n}\n\nfragment FlowEdgeCommons on FlowEdgeCommons {\n  label\n}\n\nfragment ReturnNode on ReturnNode {\n  ...FlowNodeCommons\n  __typename\n  extra\n}\n\nfragment ReactiveNode on ReactiveNode {\n  ...FlowNodeCommons\n  __typename\n  implementation\n}\n\nfragment FancyEdge on FancyEdge {\n  ...FlowEdgeCommons\n  __typename\n}\n\nfragment ArgNode on ArgNode {\n  ...FlowNodeCommons\n  __typename\n  extra\n}\n\nfragment ArkitektNode on ArkitektNode {\n  ...FlowNodeCommons\n  __typename\n  name\n  description\n  package\n  interface\n  kind\n}\n\nfragment LabeledEdge on LabeledEdge {\n  ...FlowEdgeCommons\n  __typename\n}\n\nfragment KwargNode on KwargNode {\n  ...FlowNodeCommons\n  __typename\n  extra\n}\n\nfragment FlowNode on FlowNode {\n  id\n  position {\n    x\n    y\n  }\n  type: __typename\n  ...ArkitektNode\n  ...ReactiveNode\n  ...ArgNode\n  ...KwargNode\n  ...ReturnNode\n}\n\nfragment FlowEdge on FlowEdge {\n  id\n  source\n  sourceHandle\n  target\n  targetHandle\n  type: __typename\n  ...LabeledEdge\n  ...FancyEdge\n}\n\nfragment Flow on Flow {\n  __typename\n  name\n  id\n  nodes {\n    ...FlowNode\n  }\n  edges {\n    ...FlowEdge\n  }\n}\n\nquery Flow($id: ID) {\n  flow(id: $id) {\n    ...Flow\n  }\n}'
 
-class Create_node(BaseModel):
-    create_node: Optional[Node] = Field(alias='createNode')
+class MyGraphs(BaseModel):
+    mygraphs: Optional[List[Optional[ListGraph]]]
+
+    class Arguments(BaseModel):
+        pass
+
+    class Meta:
+        document = 'fragment ListGraph on Graph {\n  id\n  name\n  template\n}\n\nquery MyGraphs {\n  mygraphs {\n    ...ListGraph\n  }\n}'
+
+class MyFlows(BaseModel):
+    myflows: Optional[List[Optional[ListFlow]]]
+
+    class Arguments(BaseModel):
+        pass
+
+    class Meta:
+        document = 'fragment ListFlow on Flow {\n  id\n  name\n}\n\nquery MyFlows {\n  myflows {\n    ...ListFlow\n  }\n}'
+
+class Draw(BaseModel):
+    makeflow: Optional[Flow]
 
     class Arguments(BaseModel):
         name: str
-        interface: str
-        args: Optional[List[Optional[ArgPortInput]]] = None
+        nodes: Optional[List[Optional[NodeInput]]] = None
+        edges: Optional[List[Optional[EdgeInput]]] = None
 
     class Meta:
-        document = 'fragment IntReturnPort on IntReturnPort {\n  __typename\n  key\n}\n\nfragment StringKwargPort on StringKwargPort {\n  key\n  defaultString\n}\n\nfragment ListReturnPort on ListReturnPort {\n  key\n  child {\n    __typename\n    ... on StructureReturnPort {\n      __typename\n      identifier\n    }\n    ... on StringReturnPort {\n      __typename\n    }\n    ... on IntReturnPort {\n      __typename\n    }\n    ... on BoolReturnPort {\n      __typename\n    }\n  }\n}\n\nfragment StructureReturnPort on StructureReturnPort {\n  __typename\n  key\n  identifier\n}\n\nfragment BoolKwargPort on BoolKwargPort {\n  key\n  defaultBool\n}\n\nfragment IntArgPort on IntArgPort {\n  key\n}\n\nfragment IntKwargPort on IntKwargPort {\n  key\n  defaultInt\n}\n\nfragment DictReturnPort on DictReturnPort {\n  key\n  child {\n    __typename\n    ... on StructureReturnPort {\n      __typename\n      identifier\n    }\n    ... on StringReturnPort {\n      __typename\n    }\n    ... on IntReturnPort {\n      __typename\n    }\n    ... on BoolReturnPort {\n      __typename\n    }\n  }\n}\n\nfragment StringArgPort on StringArgPort {\n  key\n}\n\nfragment DictArgPort on DictArgPort {\n  key\n  child {\n    __typename\n    ... on StructureArgPort {\n      __typename\n      identifier\n    }\n    ... on IntArgPort {\n      __typename\n    }\n    ... on BoolArgPort {\n      __typename\n    }\n    ... on StringArgPort {\n      __typename\n    }\n  }\n}\n\nfragment StructureArgPort on StructureArgPort {\n  key\n  identifier\n}\n\nfragment StringReturnPort on StringReturnPort {\n  __typename\n  key\n}\n\nfragment ListArgPort on ListArgPort {\n  key\n  child {\n    __typename\n    ... on StructureArgPort {\n      __typename\n      identifier\n    }\n    ... on IntArgPort {\n      __typename\n    }\n    ... on BoolArgPort {\n      __typename\n    }\n    ... on StringArgPort {\n      __typename\n    }\n  }\n}\n\nfragment DictKwargPort on DictKwargPort {\n  key\n  defaultDict\n  child {\n    __typename\n    ... on StructureKwargPort {\n      __typename\n      identifier\n    }\n    ... on IntKwargPort {\n      __typename\n    }\n    ... on BoolKwargPort {\n      __typename\n    }\n    ... on StringKwargPort {\n      __typename\n    }\n  }\n}\n\nfragment ListKwargPort on ListKwargPort {\n  key\n  child {\n    __typename\n    ... on StructureKwargPort {\n      __typename\n      identifier\n    }\n    ... on IntKwargPort {\n      __typename\n    }\n    ... on BoolKwargPort {\n      __typename\n    }\n    ... on StringKwargPort {\n      __typename\n    }\n  }\n  defaultList\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  description\n  ...StringArgPort\n  ...StructureArgPort\n  ...ListArgPort\n  ...IntArgPort\n  ...DictArgPort\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  key\n  description\n  ...ListReturnPort\n  ...StructureReturnPort\n  ...StringReturnPort\n  ...IntReturnPort\n  ...DictReturnPort\n}\n\nfragment KwargPort on KwargPort {\n  __typename\n  key\n  description\n  ...DictKwargPort\n  ...BoolKwargPort\n  ...IntKwargPort\n  ...ListKwargPort\n  ...StringKwargPort\n}\n\nfragment Node on Node {\n  name\n  interface\n  package\n  description\n  type\n  id\n  args {\n    ...ArgPort\n  }\n  kwargs {\n    ...KwargPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nmutation create_node($name: String!, $interface: String!, $args: [ArgPortInput]) {\n  createNode(name: $name, interface: $interface, args: $args) {\n    ...Node\n  }\n}'
+        document = 'fragment FlowKwarg on FlowKwarg {\n  key\n  type\n  label\n  name\n  type\n  description\n}\n\nfragment FlowArg on FlowArg {\n  key\n  type\n  name\n  label\n  type\n  description\n}\n\nfragment FlowReturn on FlowReturn {\n  key\n  type\n  name\n  label\n  type\n  description\n}\n\nfragment FlowNodeCommons on FlowNodeCommons {\n  args {\n    __typename\n    ...FlowArg\n  }\n  kwargs {\n    __typename\n    ...FlowKwarg\n  }\n  returns {\n    __typename\n    ...FlowReturn\n  }\n}\n\nfragment FlowEdgeCommons on FlowEdgeCommons {\n  label\n}\n\nfragment ReturnNode on ReturnNode {\n  ...FlowNodeCommons\n  __typename\n  extra\n}\n\nfragment ReactiveNode on ReactiveNode {\n  ...FlowNodeCommons\n  __typename\n  implementation\n}\n\nfragment FancyEdge on FancyEdge {\n  ...FlowEdgeCommons\n  __typename\n}\n\nfragment ArgNode on ArgNode {\n  ...FlowNodeCommons\n  __typename\n  extra\n}\n\nfragment ArkitektNode on ArkitektNode {\n  ...FlowNodeCommons\n  __typename\n  name\n  description\n  package\n  interface\n  kind\n}\n\nfragment LabeledEdge on LabeledEdge {\n  ...FlowEdgeCommons\n  __typename\n}\n\nfragment KwargNode on KwargNode {\n  ...FlowNodeCommons\n  __typename\n  extra\n}\n\nfragment FlowNode on FlowNode {\n  id\n  position {\n    x\n    y\n  }\n  type: __typename\n  ...ArkitektNode\n  ...ReactiveNode\n  ...ArgNode\n  ...KwargNode\n  ...ReturnNode\n}\n\nfragment FlowEdge on FlowEdge {\n  id\n  source\n  sourceHandle\n  target\n  targetHandle\n  type: __typename\n  ...LabeledEdge\n  ...FancyEdge\n}\n\nfragment Flow on Flow {\n  __typename\n  name\n  id\n  nodes {\n    ...FlowNode\n  }\n  edges {\n    ...FlowEdge\n  }\n}\n\nmutation draw($name: String!, $nodes: [NodeInput], $edges: [EdgeInput]) {\n  makeflow(name: $name, nodes: $nodes, edges: $edges) {\n    ...Flow\n  }\n}'
 
-class Define(BaseModel):
-    define: Optional[Node]
-
-    class Arguments(BaseModel):
-        definition: DefinitionInput
-
-    class Meta:
-        document = 'fragment IntReturnPort on IntReturnPort {\n  __typename\n  key\n}\n\nfragment StringKwargPort on StringKwargPort {\n  key\n  defaultString\n}\n\nfragment ListReturnPort on ListReturnPort {\n  key\n  child {\n    __typename\n    ... on StructureReturnPort {\n      __typename\n      identifier\n    }\n    ... on StringReturnPort {\n      __typename\n    }\n    ... on IntReturnPort {\n      __typename\n    }\n    ... on BoolReturnPort {\n      __typename\n    }\n  }\n}\n\nfragment StructureReturnPort on StructureReturnPort {\n  __typename\n  key\n  identifier\n}\n\nfragment BoolKwargPort on BoolKwargPort {\n  key\n  defaultBool\n}\n\nfragment IntArgPort on IntArgPort {\n  key\n}\n\nfragment IntKwargPort on IntKwargPort {\n  key\n  defaultInt\n}\n\nfragment DictReturnPort on DictReturnPort {\n  key\n  child {\n    __typename\n    ... on StructureReturnPort {\n      __typename\n      identifier\n    }\n    ... on StringReturnPort {\n      __typename\n    }\n    ... on IntReturnPort {\n      __typename\n    }\n    ... on BoolReturnPort {\n      __typename\n    }\n  }\n}\n\nfragment StringArgPort on StringArgPort {\n  key\n}\n\nfragment DictArgPort on DictArgPort {\n  key\n  child {\n    __typename\n    ... on StructureArgPort {\n      __typename\n      identifier\n    }\n    ... on IntArgPort {\n      __typename\n    }\n    ... on BoolArgPort {\n      __typename\n    }\n    ... on StringArgPort {\n      __typename\n    }\n  }\n}\n\nfragment StructureArgPort on StructureArgPort {\n  key\n  identifier\n}\n\nfragment StringReturnPort on StringReturnPort {\n  __typename\n  key\n}\n\nfragment ListArgPort on ListArgPort {\n  key\n  child {\n    __typename\n    ... on StructureArgPort {\n      __typename\n      identifier\n    }\n    ... on IntArgPort {\n      __typename\n    }\n    ... on BoolArgPort {\n      __typename\n    }\n    ... on StringArgPort {\n      __typename\n    }\n  }\n}\n\nfragment DictKwargPort on DictKwargPort {\n  key\n  defaultDict\n  child {\n    __typename\n    ... on StructureKwargPort {\n      __typename\n      identifier\n    }\n    ... on IntKwargPort {\n      __typename\n    }\n    ... on BoolKwargPort {\n      __typename\n    }\n    ... on StringKwargPort {\n      __typename\n    }\n  }\n}\n\nfragment ListKwargPort on ListKwargPort {\n  key\n  child {\n    __typename\n    ... on StructureKwargPort {\n      __typename\n      identifier\n    }\n    ... on IntKwargPort {\n      __typename\n    }\n    ... on BoolKwargPort {\n      __typename\n    }\n    ... on StringKwargPort {\n      __typename\n    }\n  }\n  defaultList\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  description\n  ...StringArgPort\n  ...StructureArgPort\n  ...ListArgPort\n  ...IntArgPort\n  ...DictArgPort\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  key\n  description\n  ...ListReturnPort\n  ...StructureReturnPort\n  ...StringReturnPort\n  ...IntReturnPort\n  ...DictReturnPort\n}\n\nfragment KwargPort on KwargPort {\n  __typename\n  key\n  description\n  ...DictKwargPort\n  ...BoolKwargPort\n  ...IntKwargPort\n  ...ListKwargPort\n  ...StringKwargPort\n}\n\nfragment Node on Node {\n  name\n  interface\n  package\n  description\n  type\n  id\n  args {\n    ...ArgPort\n  }\n  kwargs {\n    ...KwargPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nmutation define($definition: DefinitionInput!) {\n  define(definition: $definition) {\n    ...Node\n  }\n}'
-
-class Reset_repositoryResetrepository(BaseModel):
-    typename: Optional[Literal['ResetRepositoryReturn']] = Field(alias='__typename')
+class ResetFlussReset(BaseModel):
+    typename: Optional[Literal['ResetReturn']] = Field(alias='__typename')
     ok: Optional[bool]
 
-class Reset_repository(BaseModel):
-    reset_repository: Optional[Reset_repositoryResetrepository] = Field(alias='resetRepository')
+class ResetFluss(BaseModel):
+    reset: Optional[ResetFlussReset]
 
     class Arguments(BaseModel):
         pass
 
     class Meta:
-        document = 'mutation reset_repository {\n  resetRepository {\n    ok\n  }\n}'
+        document = 'mutation ResetFluss {\n  reset {\n    ok\n  }\n}'
 
-class Create_template(BaseModel):
-    create_template: Optional[Template] = Field(alias='createTemplate')
-
-    class Arguments(BaseModel):
-        node: str
-        params: Optional[Dict] = None
-        extensions: Optional[List[Optional[str]]] = None
-        version: Optional[str] = None
-
-    class Meta:
-        document = 'fragment IntReturnPort on IntReturnPort {\n  __typename\n  key\n}\n\nfragment StringKwargPort on StringKwargPort {\n  key\n  defaultString\n}\n\nfragment ListReturnPort on ListReturnPort {\n  key\n  child {\n    __typename\n    ... on StructureReturnPort {\n      __typename\n      identifier\n    }\n    ... on StringReturnPort {\n      __typename\n    }\n    ... on IntReturnPort {\n      __typename\n    }\n    ... on BoolReturnPort {\n      __typename\n    }\n  }\n}\n\nfragment StructureReturnPort on StructureReturnPort {\n  __typename\n  key\n  identifier\n}\n\nfragment BoolKwargPort on BoolKwargPort {\n  key\n  defaultBool\n}\n\nfragment IntArgPort on IntArgPort {\n  key\n}\n\nfragment IntKwargPort on IntKwargPort {\n  key\n  defaultInt\n}\n\nfragment DictReturnPort on DictReturnPort {\n  key\n  child {\n    __typename\n    ... on StructureReturnPort {\n      __typename\n      identifier\n    }\n    ... on StringReturnPort {\n      __typename\n    }\n    ... on IntReturnPort {\n      __typename\n    }\n    ... on BoolReturnPort {\n      __typename\n    }\n  }\n}\n\nfragment StringArgPort on StringArgPort {\n  key\n}\n\nfragment DictArgPort on DictArgPort {\n  key\n  child {\n    __typename\n    ... on StructureArgPort {\n      __typename\n      identifier\n    }\n    ... on IntArgPort {\n      __typename\n    }\n    ... on BoolArgPort {\n      __typename\n    }\n    ... on StringArgPort {\n      __typename\n    }\n  }\n}\n\nfragment StructureArgPort on StructureArgPort {\n  key\n  identifier\n}\n\nfragment StringReturnPort on StringReturnPort {\n  __typename\n  key\n}\n\nfragment ListArgPort on ListArgPort {\n  key\n  child {\n    __typename\n    ... on StructureArgPort {\n      __typename\n      identifier\n    }\n    ... on IntArgPort {\n      __typename\n    }\n    ... on BoolArgPort {\n      __typename\n    }\n    ... on StringArgPort {\n      __typename\n    }\n  }\n}\n\nfragment DictKwargPort on DictKwargPort {\n  key\n  defaultDict\n  child {\n    __typename\n    ... on StructureKwargPort {\n      __typename\n      identifier\n    }\n    ... on IntKwargPort {\n      __typename\n    }\n    ... on BoolKwargPort {\n      __typename\n    }\n    ... on StringKwargPort {\n      __typename\n    }\n  }\n}\n\nfragment ListKwargPort on ListKwargPort {\n  key\n  child {\n    __typename\n    ... on StructureKwargPort {\n      __typename\n      identifier\n    }\n    ... on IntKwargPort {\n      __typename\n    }\n    ... on BoolKwargPort {\n      __typename\n    }\n    ... on StringKwargPort {\n      __typename\n    }\n  }\n  defaultList\n}\n\nfragment ReturnPort on ReturnPort {\n  __typename\n  key\n  description\n  ...ListReturnPort\n  ...StructureReturnPort\n  ...StringReturnPort\n  ...IntReturnPort\n  ...DictReturnPort\n}\n\nfragment KwargPort on KwargPort {\n  __typename\n  key\n  description\n  ...DictKwargPort\n  ...BoolKwargPort\n  ...IntKwargPort\n  ...ListKwargPort\n  ...StringKwargPort\n}\n\nfragment ArgPort on ArgPort {\n  __typename\n  key\n  description\n  ...StringArgPort\n  ...StructureArgPort\n  ...ListArgPort\n  ...IntArgPort\n  ...DictArgPort\n}\n\nfragment Node on Node {\n  name\n  interface\n  package\n  description\n  type\n  id\n  args {\n    ...ArgPort\n  }\n  kwargs {\n    ...KwargPort\n  }\n  returns {\n    ...ReturnPort\n  }\n}\n\nfragment Template on Template {\n  id\n  registry {\n    name\n    app {\n      name\n    }\n    user {\n      username\n    }\n  }\n  node {\n    ...Node\n  }\n}\n\nmutation create_template($node: ID!, $params: GenericScalar, $extensions: [String], $version: String) {\n  createTemplate(\n    node: $node\n    params: $params\n    extensions: $extensions\n    version: $version\n  ) {\n    ...Template\n  }\n}'
-
-def todos(identifier: str) -> Iterator[Optional[TodosTodos]]:
-    """todos 
-
-
-
-Arguments:
-    identifier (str): identifier
-
-Returns:
-    Optional[TodosTodos]"""
-    for event in query(Todos, {'identifier': identifier}):
-        yield event.todos
-
-def waiter(identifier: str) -> Iterator[Optional[WaiterReservations]]:
-    """waiter 
-
-
-
-Arguments:
-    identifier (str): identifier
-
-Returns:
-    Optional[WaiterReservations]"""
-    for event in query(Waiter, {'identifier': identifier}):
-        yield event.reservations
-
-def todolist(app_group: Optional[str]=None) -> Optional[List[Optional[Assignation]]]:
-    """todolist 
-
-
-
-Arguments:
-    app_group (Optional[str], optional): appGroup. 
-
-Returns:
-    Optional[List[Optional[Assignation]]]"""
-    return query(Todolist, {'appGroup': app_group}).todolist
-
-def get_provision(reference: str) -> Optional[Get_provisionProvision]:
-    """get_provision 
-
-
-
-Arguments:
-    reference (str): reference
-
-Returns:
-    Optional[Get_provisionProvision]"""
-    return query(Get_provision, {'reference': reference}).provision
-
-def get_reservation(reference: str) -> Optional[Get_reservationReservation]:
-    """get_reservation 
-
-
-
-Arguments:
-    reference (str): reference
-
-Returns:
-    Optional[Get_reservationReservation]"""
-    return query(Get_reservation, {'reference': reference}).reservation
-
-def waitlist(app_group: Optional[str]=None) -> Optional[List[Optional[Reservation]]]:
-    """waitlist 
-
-
-
-Arguments:
-    app_group (Optional[str], optional): appGroup. 
-
-Returns:
-    Optional[List[Optional[Reservation]]]"""
-    return query(Waitlist, {'appGroup': app_group}).waitlist
-
-def find(id: Optional[str]=None, package: Optional[str]=None, interface: Optional[str]=None, template: Optional[str]=None, q: Optional[str]=None) -> Optional[Node]:
-    """find 
+def get_graph(id: Optional[str]=None, template: Optional[str]=None) -> Optional[Graph]:
+    """get_graph 
 
 
 
 Arguments:
     id (Optional[str], optional): id. 
-    package (Optional[str], optional): package. 
-    interface (Optional[str], optional): interface. 
     template (Optional[str], optional): template. 
-    q (Optional[str], optional): q. 
 
 Returns:
-    Optional[Node]"""
-    return query(Find, {'id': id, 'package': package, 'interface': interface, 'template': template, 'q': q}).node
+    Optional[Graph]"""
+    return query(Get_graph, {'id': id, 'template': template}).graph
 
-def get_template(id: str) -> Optional[Template]:
-    """get_template 
-
-
-
-Arguments:
-    id (str): id
-
-Returns:
-    Optional[Template]"""
-    return query(Get_template, {'id': id}).template
-
-def get_agent(id: str) -> Optional[Get_agentAgent]:
-    """get_agent 
-
-
-
-Arguments:
-    id (str): id
-
-Returns:
-    Optional[Get_agentAgent]"""
-    return query(Get_agent, {'id': id}).agent
-
-async def aassign(reservation: str, args: List[Optional[Dict]], kwargs: Optional[Dict]=None) -> Optional[Assignation]:
-    """assign 
-
-
-
-Arguments:
-    reservation (str): reservation
-    args (List[Optional[Dict]]): args
-    kwargs (Optional[Dict], optional): kwargs. 
-
-Returns:
-    Optional[Assignation]"""
-    return (await query(Assign, {'reservation': reservation, 'args': args, 'kwargs': kwargs})).assign
-
-async def aunassign(assignation: str) -> Optional[Assignation]:
-    """unassign 
-
-
-
-Arguments:
-    assignation (str): assignation
-
-Returns:
-    Optional[Assignation]"""
-    return (await query(Unassign, {'assignation': assignation})).unassign
-
-async def anegotiate() -> Optional[Transcript]:
-    """negotiate 
+def my_graphs() -> Optional[List[Optional[ListGraph]]]:
+    """my_graphs 
 
 
 
 Arguments:
 
 Returns:
-    Optional[Transcript]"""
-    return (await query(Negotiate, {})).negotiate
+    Optional[List[Optional[ListGraph]]]"""
+    return query(My_graphs, {}).mygraphs
 
-async def areserve(node: Optional[str]=None, template: Optional[str]=None, params: Optional[ReserveParamsInput]=None, title: Optional[str]=None, callbacks: Optional[List[Optional[str]]]=None, creator: Optional[str]=None, app_group: Optional[str]=None) -> Optional[Reservation]:
-    """reserve 
+def get_flow(id: Optional[str]=None) -> Optional[Flow]:
+    """get_flow 
 
 
 
 Arguments:
-    node (Optional[str], optional): node. 
+    id (Optional[str], optional): id. 
+
+Returns:
+    Optional[Flow]"""
+    return query(Get_flow, {'id': id}).flow
+
+def graph(id: Optional[str]=None, template: Optional[str]=None) -> Optional[Graph]:
+    """Graph 
+
+
+
+Arguments:
+    id (Optional[str], optional): id. 
     template (Optional[str], optional): template. 
-    params (Optional[ReserveParamsInput], optional): params. 
-    title (Optional[str], optional): title. 
-    callbacks (Optional[List[Optional[str]]], optional): callbacks. 
-    creator (Optional[str], optional): creator. 
-    app_group (Optional[str], optional): appGroup. 
 
 Returns:
-    Optional[Reservation]"""
-    return (await query(Reserve, {'node': node, 'template': template, 'params': params, 'title': title, 'callbacks': callbacks, 'creator': creator, 'appGroup': app_group})).reserve
+    Optional[Graph]"""
+    return query(Graph, {'id': id, 'template': template}).graph
 
-async def aunreserve(id: str) -> Optional[Reservation]:
-    """unreserve 
+def flow(id: Optional[str]=None) -> Optional[Flow]:
+    """Flow 
 
 
 
 Arguments:
-    id (str): id
+    id (Optional[str], optional): id. 
 
 Returns:
-    Optional[Reservation]"""
-    return (await query(Unreserve, {'id': id})).unreserve
+    Optional[Flow]"""
+    return query(Flow, {'id': id}).flow
 
-async def acreate_node(name: str, interface: str, args: Optional[List[Optional[ArgPortInput]]]=None) -> Optional[Node]:
-    """create_node 
+def my_graphs() -> Optional[List[Optional[ListGraph]]]:
+    """MyGraphs 
+
+
+
+Arguments:
+
+Returns:
+    Optional[List[Optional[ListGraph]]]"""
+    return query(MyGraphs, {}).mygraphs
+
+def my_flows() -> Optional[List[Optional[ListFlow]]]:
+    """MyFlows 
+
+
+
+Arguments:
+
+Returns:
+    Optional[List[Optional[ListFlow]]]"""
+    return query(MyFlows, {}).myflows
+
+async def adraw(name: str, nodes: Optional[List[Optional[NodeInput]]]=None, edges: Optional[List[Optional[EdgeInput]]]=None) -> Optional[Flow]:
+    """draw 
 
 
 
 Arguments:
     name (str): name
-    interface (str): interface
-    args (Optional[List[Optional[ArgPortInput]]], optional): args. 
+    nodes (Optional[List[Optional[NodeInput]]], optional): nodes. 
+    edges (Optional[List[Optional[EdgeInput]]], optional): edges. 
 
 Returns:
-    Optional[Node]"""
-    return (await query(Create_node, {'name': name, 'interface': interface, 'args': args})).create_node
+    Optional[Flow]"""
+    return (await query(Draw, {'name': name, 'nodes': nodes, 'edges': edges})).makeflow
 
-async def adefine(definition: DefinitionInput) -> Optional[Node]:
-    """define 
-
-
-
-Arguments:
-    definition (DefinitionInput): definition
-
-Returns:
-    Optional[Node]"""
-    return (await query(Define, {'definition': definition})).define
-
-async def areset_repository() -> Optional[Reset_repositoryResetrepository]:
-    """reset_repository 
+async def areset_fluss() -> Optional[ResetFlussReset]:
+    """ResetFluss 
 
 
 
 Arguments:
 
 Returns:
-    Optional[Reset_repositoryResetrepository]"""
-    return (await query(Reset_repository, {})).reset_repository
-
-async def acreate_template(node: str, params: Optional[Dict]=None, extensions: Optional[List[Optional[str]]]=None, version: Optional[str]=None) -> Optional[Template]:
-    """create_template 
-
-
-
-Arguments:
-    node (str): node
-    params (Optional[Dict], optional): params. 
-    extensions (Optional[List[Optional[str]]], optional): extensions. 
-    version (Optional[str], optional): version. 
-
-Returns:
-    Optional[Template]"""
-    return (await query(Create_template, {'node': node, 'params': params, 'extensions': extensions, 'version': version})).create_template
-ArgPortInput.update_forward_refs()
-ReturnPortInput.update_forward_refs()
-KwargPortInput.update_forward_refs()
-DefinitionInput.update_forward_refs()
+    Optional[ResetFlussReset]"""
+    return (await query(ResetFluss, {})).reset
+NodeInput.update_forward_refs()

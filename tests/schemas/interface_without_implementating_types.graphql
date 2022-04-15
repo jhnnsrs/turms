@@ -1,8 +1,11 @@
+"This is foo"
 type Foo {
+    "This is a forward ref"
     forward: Ref
 }
-
+"THis is an interface"
 interface Ref {
+  "THis is a field"
   id: ID
 }
 
