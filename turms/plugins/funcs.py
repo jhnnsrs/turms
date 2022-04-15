@@ -44,6 +44,8 @@ from turms.utils import (
     NoDocumentsFoundError,
     parse_documents,
     parse_value_node,
+    recurse_outputtype_annotation,
+    recurse_outputtype_label,
     recurse_type_annotation,
     recurse_type_label,
     target_from_node,
@@ -110,22 +112,6 @@ def generate_sync_func_name(
 ):
 
     return f"{plugin_config.prepend_sync}{camel_to_snake(o.name.value)}"
-
-
-wanted_definition = {
-    OperationType.MUTATION: {
-        "async": "asyncfunction",
-        "sync": "function",
-    },
-    OperationType.QUERY: {
-        "async": "asyncfunction",
-        "sync": "function",
-    },
-    OperationType.SUBSCRIPTION: {
-        "async": "asynciterator",
-        "sync": "iterator",
-    },
-}
 
 
 def get_extra_args_for_onode(
@@ -298,13 +284,13 @@ def generate_document_arg(o: OperationDefinitionNode, registry: ClassRegistry):
 def get_operation_class_name(o: OperationDefinitionNode, registry: ClassRegistry):
 
     if o.operation == OperationType.QUERY:
-        o_name = registry.style_query_class(o.name.value)
+        return registry.style_query_class(o.name.value)
     if o.operation == OperationType.MUTATION:
-        o_name = registry.style_mutation_class(o.name.value)
+        return registry.style_mutation_class(o.name.value)
     if o.operation == OperationType.SUBSCRIPTION:
-        o_name = registry.style_subscription_class(o.name.value)
+        return registry.style_subscription_class(o.name.value)
 
-    return o_name
+    raise Exception("Incorrect Operation Type ")
 
 
 def get_return_type_annotation(
@@ -312,41 +298,37 @@ def get_return_type_annotation(
     client_schema: GraphQLSchema,
     registry: ClassRegistry,
     collapse: bool = True,
-) -> Tuple[ast.AST, bool]:
+) -> ast.AST:
 
     o_name = get_operation_class_name(o, registry)
-
-    if len(o.selection_set.selections) == 0:
-        raise NotImplementedError(
-            "No operation specified. If you see this you probably didn't check the validities of your document."
-        )
-
     root = get_operation_root_type(client_schema, o)
 
-    if len(o.selection_set.selections) == 1 and collapse is True:
-        potential_return_field = o.selection_set.selections[0]
-        potential_return_type = get_field_def(
-            client_schema, root, potential_return_field
-        )
-        if potential_return_field.selection_set is None:  # Dealing with a scalar type
-            return recurse_type_annotation(potential_return_type, registry)
+    if collapse is True:
+        collapsable_field = o.selection_set.selections[0]
+        field_definition = get_field_def(client_schema, root, collapsable_field)
+
+        if collapsable_field.selection_set is None:
+            return recurse_outputtype_annotation(field_definition.type, registry)
 
         if (
-            len(potential_return_field.selection_set.selections) == 1
+            len(collapsable_field.selection_set.selections) == 1
         ):  # Dealing with one Element
-            collapsable_field = potential_return_field.selection_set.selections[0]
-
+            collapsable_fragment_field = collapsable_field.selection_set.selections[0]
             if isinstance(
-                collapsable_field, FragmentSpreadNode
+                collapsable_fragment_field, FragmentSpreadNode
             ):  # Dealing with a on element fragment
-                return registry.reference_fragment(
-                    collapsable_field.name.value, "", allow_forward=False
+                return recurse_outputtype_annotation(
+                    field_definition.type,
+                    registry,
+                    overwrite_final=registry.reference_fragment(
+                        collapsable_fragment_field.name.value, "", allow_forward=False
+                    ).id,
                 )
 
-        return recurse_type_annotation(
-            potential_return_type,
+        return recurse_outputtype_annotation(
+            field_definition.type,
             registry,
-            overwrite_final=f"{o_name}{potential_return_field.name.value.capitalize()}",
+            overwrite_final=f"{o_name}{collapsable_field.name.value.capitalize()}",
         )
 
     return ast.Name(
@@ -364,21 +346,16 @@ def get_return_type_string(
 
     o_name = get_operation_class_name(o, registry)
 
-    if len(o.selection_set.selections) == 0:
-        raise NotImplementedError(
-            "No operation specified. If you see this you probably didn't check the validities of your document."
-        )
-
     root = get_operation_root_type(client_schema, o)
 
-    if len(o.selection_set.selections) == 1 and collapse == True:
+    if collapse is True:
         potential_return_field = o.selection_set.selections[0]
         potential_return_type = get_field_def(
             client_schema, root, potential_return_field
         )
 
         if potential_return_field.selection_set is None:  # Dealing with a scalar type
-            return recurse_type_label(potential_return_type, registry)
+            return recurse_outputtype_label(potential_return_type.type, registry)
 
         if (
             len(potential_return_field.selection_set.selections) == 1
@@ -388,12 +365,16 @@ def get_return_type_string(
             if isinstance(
                 collapsable_field, FragmentSpreadNode
             ):  # Dealing with a on element fragment
-                return registry.reference_fragment(
-                    collapsable_field.name.value, "", allow_forward=False
-                ).id
+                return recurse_outputtype_label(
+                    potential_return_type.type,
+                    registry,
+                    overwrite_final=registry.reference_fragment(
+                        collapsable_field.name.value, "", allow_forward=False
+                    ).id,
+                )
 
-        return recurse_type_label(
-            potential_return_type,
+        return recurse_outputtype_label(
+            potential_return_type.type,
             registry,
             overwrite_final=f"{o_name}{potential_return_field.name.value.capitalize()}",
         )
@@ -461,7 +442,6 @@ def generate_query_doc(
 
 def genereate_async_call(
     definition: FunctionDefinition,
-    o_name: str,
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
@@ -486,7 +466,7 @@ def genereate_async_call(
                         definition, plugin_config
                     )
                     + [
-                        generate_document_arg(o_name),
+                        generate_document_arg(o, registry),
                         generate_variable_dict(o, registry),
                     ],
                 )
@@ -509,7 +489,7 @@ def genereate_async_call(
                             definition, plugin_config
                         )
                         + [
-                            generate_document_arg(o_name),
+                            generate_document_arg(o, registry),
                             generate_variable_dict(o, registry),
                         ],
                     )
@@ -544,7 +524,7 @@ def genereate_sync_call(
                 ),
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
-                    generate_document_arg(o),
+                    generate_document_arg(o, registry),
                     generate_variable_dict(o, registry),
                 ],
             )
@@ -708,6 +688,11 @@ def genereate_sync_iterator(
         )
 
 
+def is_collapsable(o: OperationDefinitionNode):
+    assert o.selection_set is not None, "Operation needs to have at least a selection"
+    return len(o.selection_set.selections) == 1
+
+
 def generate_operation_func(
     definition: FunctionDefinition,
     o: OperationDefinitionNode,
@@ -718,11 +703,12 @@ def generate_operation_func(
 ):
     tree = []
 
-    collapse = plugin_config.collapse_lonely
+    collapse = plugin_config.collapse_lonely and is_collapsable(o)
 
     return_type = get_return_type_annotation(
         o, client_schema, registry, collapse=collapse
     )
+    print(return_type, o.selection_set.selections[0].name.value)
 
     doc = generate_query_doc(
         definition, o, client_schema, config, plugin_config, registry, collapse

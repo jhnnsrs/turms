@@ -261,11 +261,6 @@ def generate_fragment(
         )
         return tree
 
-    else:
-        raise NotImplementedError(
-            "Neither Interface nor Object Fragment. That should not happen"
-        )
-
 
 class FragmentsPlugin(Plugin):
     config: FragmentsPluginConfig = Field(default_factory=FragmentsPluginConfig)

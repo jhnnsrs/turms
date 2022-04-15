@@ -46,12 +46,22 @@ generated_ast = generate_ast(
                 definitions=(
                     [
                         FunctionDefinition(
-                            type="mutation",
+                            type="query",
                             use="tests.mocks.query",
                             is_async=False,
-                        )
+                        ),
+                        FunctionDefinition(
+                            type="mutation",
+                            use="tests.mocks.query",
+                            is_async=True,
+                        ),
+                        FunctionDefinition(
+                            type="subscription",
+                            use="tests.mocks.query",
+                            is_async=False,
+                        ),
                     ]
-                )
+                ),
             ),
         ),
     ],
@@ -66,5 +76,3 @@ unit_test_with(generated_ast, "WidgetInput(typename='oisnoisn')")
 unit_test_with(
     generated_ast, "ReturnPortInput(child=ReturnPortInput(bound=BoundTypeInput.AGENT))"
 )
-unit_test_with(generated_ast, "SliderWidget()")
-unit_test_with(generated_ast, "StringArgPort()")

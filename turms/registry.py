@@ -3,6 +3,7 @@ from typing import List
 from turms.config import GeneratorConfig
 from keyword import iskeyword
 from turms.errors import (
+    NoEnumFound,
     NoInputTypeFound,
     NoScalarFound,
     RegistryError,
@@ -156,7 +157,7 @@ class ClassRegistry(object):
         classname = self.style_enum_class(typename)
         if typename not in self.enum_class_map or parent == classname:
             if not allow_forward:
-                raise RegistryError(
+                raise NoEnumFound(
                     f"Input type {typename} is not yet defined but referenced by {parent}. And we dont allow forward references"
                 )
             self.forward_references.add(parent)
