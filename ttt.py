@@ -3,6 +3,7 @@ import ast
 import pytest
 from tests.utils import build_relative_glob, unit_test_with
 from turms.config import GeneratorConfig
+from turms.plugins.funcs import FuncsPlugin, FuncsPluginConfig, FunctionDefinition
 from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
@@ -39,6 +40,19 @@ generated_ast = generate_ast(
         InputsPlugin(),
         FragmentsPlugin(),
         OperationsPlugin(),
+        FuncsPlugin(
+            config=FuncsPluginConfig(
+                definitions=(
+                    [
+                        FunctionDefinition(
+                            type="mutation",
+                            use="tests.mocks.query",
+                            is_async=False,
+                        )
+                    ]
+                )
+            ),
+        ),
     ],
 )
 

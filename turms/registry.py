@@ -2,7 +2,11 @@ import ast
 from typing import List
 from turms.config import GeneratorConfig
 from keyword import iskeyword
-from turms.errors import NoScalarEquivalentFound, RegistryError
+from turms.errors import (
+    NoInputTypeFound,
+    NoScalarFound,
+    RegistryError,
+)
 from turms.stylers.base import Styler
 from rich import get_console
 
@@ -71,6 +75,9 @@ class ClassRegistry(object):
         self._imports = set()
         self._builtins = set()
         self.config = config
+
+        self.scalar_map = {**SCALAR_DEFAULTS, **config.scalar_definitions}
+
         self.fragment_document_map = {}
 
         self.enum_class_map = {}
@@ -111,7 +118,7 @@ class ClassRegistry(object):
         classname = self.style_inputtype_class(typename)
         if typename not in self.inputtype_class_map or parent == classname:
             if not allow_forward:
-                raise RegistryError(
+                raise NoInputTypeFound(
                     f"Input type {typename} is not yet defined but referenced by {parent}. And we dont allow forward references"
                 )
             self.forward_references.add(parent)
@@ -411,21 +418,20 @@ class ClassRegistry(object):
     def get_fragment_document(self, typename: str):
         return self.fragment_document_map[typename]
 
-    def get_scalar_equivalent(self, scalar_type: str):
-
-        updated_dict = {**SCALAR_DEFAULTS, **self.config.scalar_definitions}
-
-        try:
-            scalar_type = updated_dict[scalar_type]
-            if "." in scalar_type:
+    def reference_scalar(self, scalar_type: str):
+        if scalar_type in self.scalar_map:
+            python_type = self.scalar_map[scalar_type]
+            if "." in python_type:
                 # We make the assumption that the scalar type is a fully qualified class name
-                self.register_import(scalar_type)
-        except KeyError as e:
-            raise NoScalarEquivalentFound(
-                f"No python equivalent found for {scalar_type}. Please define in scalar_definitions"
-            )
+                self.register_import(python_type)
 
-        return scalar_type.split(".")[-1]
+            return ast.Name(
+                id=python_type.split(".")[-1], ctx=ast.Load()
+            )  # That results only in the class name (also in the case of a builtin)
+
+        raise NoScalarFound(
+            f"No python equivalent found for {scalar_type}. Please define in scalar_definitions"
+        )
 
     def warn(self, message):
         self.console.print("[r]" + message)

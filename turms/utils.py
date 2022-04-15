@@ -1,11 +1,27 @@
 import glob
 import re
-from typing import Dict, List, Set
+from typing import Dict, List, Optional, Set, Union
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.language.ast import DocumentNode, FieldNode
 from graphql.error.graphql_error import GraphQLError
 from graphql import (
+    BooleanValueNode,
+    FloatValueNode,
+    GraphQLEnumType,
+    GraphQLField,
+    GraphQLInputType,
+    GraphQLScalarType,
+    IntValueNode,
+    ListTypeNode,
+    NamedTypeNode,
+    NonNullTypeNode,
+    NullValueNode,
+    OperationDefinitionNode,
+    StringValueNode,
+    ValueNode,
+    VariableDefinitionNode,
+    is_wrapping_type,
     parse,
     validate,
     build_client_schema,
@@ -13,6 +29,12 @@ from graphql import (
 )
 import ast
 from turms.registry import ClassRegistry
+from turms.errors import (
+    NoEnumFound,
+    NoInputTypeFound,
+    NoScalarFound,
+    RegistryError,
+)
 
 
 class FragmentNotFoundError(Exception):
@@ -185,3 +207,142 @@ def interface_is_extended_by_other_interfaces(
         for nested_interface in other_interface.interfaces
     }
     return interface in interfaces_implemented_by_other_interfaces
+
+
+def recurse_type_annotation(
+    type: NamedTypeNode,
+    registry: ClassRegistry,
+    optional=True,
+    overwrite_final: Optional[str] = None,
+):
+
+    if isinstance(type, NonNullTypeNode):
+        return recurse_type_annotation(
+            type.type, registry, optional=False, overwrite_final=overwrite_final
+        )
+
+    if isinstance(type, ListTypeNode):
+        if optional:
+            return ast.Subscript(
+                value=ast.Name(id="Optional", ctx=ast.Load()),
+                slice=ast.Subscript(
+                    value=ast.Name(id="List", ctx=ast.Load()),
+                    slice=recurse_type_annotation(
+                        type.type, registry, overwrite_final=overwrite_final
+                    ),
+                ),
+            )
+
+        return ast.Subscript(
+            value=ast.Name(id="List", ctx=ast.Load()),
+            slice=recurse_type_annotation(type.type, registry),
+        )
+
+    if isinstance(type, NamedTypeNode):
+        if overwrite_final is not None:
+            x = ast.Name(id=overwrite_final, ctx=ast.Load())
+        else:
+            try:
+                x = registry.reference_scalar(type.name.value)
+            except NoScalarFound:
+                try:
+                    x = registry.reference_inputtype(
+                        type.name.value, "", allow_forward=False
+                    )
+                except NoInputTypeFound:
+                    try:
+                        x = registry.reference_enum(
+                            type.name.value, "", allow_forward=False
+                        )
+                    except NoEnumFound:
+                        raise NotImplementedError("Not implemented")
+
+            if optional:
+                return ast.Subscript(
+                    value=ast.Name(id="Optional", ctx=ast.Load()),
+                    slice=x,
+                )
+
+        return x
+
+
+def recurse_type_label(
+    type: NamedTypeNode,
+    registry: ClassRegistry,
+    optional=True,
+    overwrite_final: Optional[str] = None,
+):
+
+    if isinstance(type, NonNullTypeNode):
+        return recurse_type_annotation(
+            type.type, registry, optional=False, overwrite_final=overwrite_final
+        )
+
+    if isinstance(type, ListTypeNode):
+        if optional:
+            return (
+                "Optional[List["
+                + recurse_type_annotation(
+                    type.type, registry, overwrite_final=overwrite_final
+                )
+                + "]]"
+            )
+
+        return (
+            "List["
+            + recurse_type_annotation(
+                type.type, registry, overwrite_final=overwrite_final
+            )
+            + "]"
+        )
+
+    if isinstance(type, NamedTypeNode):
+        if overwrite_final is not None:
+            x = ast.Name(id=overwrite_final, ctx=ast.Load())
+        else:
+            try:
+                x = registry.reference_scalar(type.name.value)
+            except NoScalarFound:
+                try:
+                    x = registry.reference_inputtype(
+                        type.name.value, "", allow_forward=False
+                    )
+                except NoInputTypeFound:
+                    try:
+                        x = registry.reference_enum(
+                            type.name.value, "", allow_forward=False
+                        )
+                    except NoEnumFound:
+                        raise NotImplementedError("Not implemented")
+
+            if optional:
+                return "Optional[" + x.id + "]"
+
+        return x.id
+
+
+def parse_value_node(value_node: ValueNode) -> Union[None, str, int, float, bool]:
+    """Parses a Value Node into a Python value
+    using standard types
+
+    Args:
+        value_node (ValueNode): The Argument Value Node
+
+    Raises:
+        NotImplementedError: If the Value Node is not supported
+
+    Returns:
+        Union[None, str, int, float, bool]: The parsed value
+    """
+    if isinstance(value_node, IntValueNode):
+        return int(value_node.value)
+    elif isinstance(value_node, FloatValueNode):
+        return float(value_node.value)
+    elif isinstance(value_node, StringValueNode):
+        return value_node.value
+    elif isinstance(value_node, BooleanValueNode):
+        return value_node.value == "true"
+    elif isinstance(value_node, NullValueNode):
+        return None
+    else:
+        raise NotImplementedError(f"Cannot parse {value_node}")
