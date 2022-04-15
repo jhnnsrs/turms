@@ -61,7 +61,7 @@ def target_from_node(node: FieldNode) -> str:
     )
 
 
-def generate_typename_field(typename, registry: ClassRegistry):
+def generate_typename_field(typename: str, registry: ClassRegistry):
 
     registry.register_import("pydantic.Field")
     registry.register_import("typing.Optional")

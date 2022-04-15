@@ -4,7 +4,6 @@ import pytest
 
 from .utils import (
     build_relative_glob,
-    generated_module_is_executable,
     unit_test_with,
 )
 from turms.config import GeneratorConfig

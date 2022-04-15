@@ -34,19 +34,3 @@ def unit_test_with(generated_ast: List[ast.AST], test_string: str):
         else:
             # If the supbrocess failed we can break out of the sandbox and just return the actual error
             raise ExecuteError(f"Failed with: {s.stderr.decode().strip()}")
-
-
-def generated_module_is_executable(module: str) -> bool:
-    exec_locals = {}
-    exec_globals = {}
-
-    imports = [line for line in module.split("\n") if line.startswith("from")]
-    for import_ in imports:
-        exec(import_, exec_globals, exec_locals)
-    exec_globals.update(exec_locals)
-
-    try:
-        exec(module, exec_globals)
-    except:
-        return False
-    return True

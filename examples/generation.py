@@ -1,6 +1,4 @@
 import ast
-
-import pytest
 from tests.utils import build_relative_glob, unit_test_with
 from turms.config import GeneratorConfig
 from turms.plugins.funcs import FuncsPlugin, FuncsPluginConfig, FunctionDefinition
@@ -8,15 +6,11 @@ from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
 from turms.plugins.funcs import FuncsPlugin, FuncsPluginConfig, FunctionDefinition
-from turms.plugins.objects import ObjectsPlugin
-from turms.plugins.fragments import FragmentsPlugin, FragmentsPluginConfig
+from turms.plugins.fragments import FragmentsPlugin
 from turms.plugins.operations import OperationsPlugin
-from turms.stylers.appender import AppenderStyler, AppenderStylerConfig
 from turms.stylers.snake_case import SnakeCaseStyler
 from turms.stylers.capitalize import CapitalizeStyler
 from turms.helpers import build_schema_from_glob
-from turms.processors.black import BlackProcessor
-from turms.processors.isort import IsortProcessor
 
 
 config = GeneratorConfig(
@@ -69,10 +63,5 @@ generated_ast = generate_ast(
 
 md = ast.Module(body=generated_ast, type_ignores=[])
 generated = ast.unparse(ast.fix_missing_locations(md))
-with open("sdfsdf.py", "w") as f:
+with open("generated.py", "w") as f:
     f.write(generated)
-
-unit_test_with(
-    generated_ast,
-    "assert FlowNodeBaseReactiveNode(id='soinosins', position={'x': 3, 'y': 3}).id, 'Needs to be not nown'",
-)
