@@ -13,7 +13,7 @@ def build_relative_glob(path):
     return DIR_NAME + path
 
 
-class ExecuteException(Exception):
+class ExecuteError(Exception):
     pass
 
 
@@ -25,25 +25,17 @@ def unit_test_with(generated_ast: List[ast.AST], test_string: str):
 
     # We need to unparse before otherwise there might be complaints with missing lineno
     parsed_code = ast.unparse(ast.fix_missing_locations(md))
-    compiled_code = compile(parsed_code, "test", mode="exec")
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         print("created temporary directory", tmpdirname)
 
         filename = write_code_to_file(parsed_code, tmpdirname, "minimal.py")
-        s = subprocess.run([sys.executable, filename])
+        s = subprocess.run([sys.executable, filename], capture_output=True)
         if s.returncode == 0:
             return True
         else:
             # If the supbrocess failed we can break out of the sandbox and just return the actual error
-            try:
-                exec(compiled_code, globals(), globals())
-            except Exception as e:
-                raise e from ExecuteException(
-                    f"Code: \n\n{parsed_code} \n\n failed with: \n {test_string}"
-                )
-
-            raise Exception("This should not be called")
+            raise ExecuteError(f"Failed with: {s.stderr.decode().strip()}")
 
 
 def generated_module_is_executable(module: str) -> bool:

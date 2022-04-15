@@ -290,19 +290,19 @@ def generate_variable_dict(o: OperationDefinitionNode, registry: ClassRegistry):
     return ast.Dict(keys=keys, values=values)
 
 
-def generate_document_arg(o_name):
+def generate_document_arg(o: OperationDefinitionNode, registry: ClassRegistry):
 
-    return ast.Name(id=o_name, ctx=ast.Load())
+    return ast.Name(id=get_operation_class_name(o, registry), ctx=ast.Load())
 
 
 def get_operation_class_name(o: OperationDefinitionNode, registry: ClassRegistry):
 
     if o.operation == OperationType.QUERY:
-        o_name = registry.generate_query_classname(o.name.value)
+        o_name = registry.style_query_class(o.name.value)
     if o.operation == OperationType.MUTATION:
-        o_name = registry.generate_mutation_classname(o.name.value)
+        o_name = registry.style_mutation_class(o.name.value)
     if o.operation == OperationType.SUBSCRIPTION:
-        o_name = registry.generate_subscription_classname(o.name.value)
+        o_name = registry.style_subscription_class(o.name.value)
 
     return o_name
 
@@ -346,7 +346,7 @@ def get_return_type_annotation(
         return recurse_type_annotation(
             potential_return_type,
             registry,
-            overwrite_type=f"{o_name}{potential_return_field.name.value.capitalize()}",
+            overwrite_final=f"{o_name}{potential_return_field.name.value.capitalize()}",
         )
 
     return ast.Name(
@@ -378,7 +378,7 @@ def get_return_type_string(
         )
 
         if potential_return_field.selection_set is None:  # Dealing with a scalar type
-            return recurse_type_annotation(potential_return_type, registry)
+            return recurse_type_label(potential_return_type, registry)
 
         if (
             len(potential_return_field.selection_set.selections) == 1
@@ -395,11 +395,11 @@ def get_return_type_string(
         return recurse_type_label(
             potential_return_type,
             registry,
-            overwrite_type=f"{o_name}{potential_return_field.name.value.capitalize()}",
+            overwrite_final=f"{o_name}{potential_return_field.name.value.capitalize()}",
         )
 
     else:
-        return o_name, False
+        return o_name
 
 
 def generate_query_doc(
@@ -417,34 +417,20 @@ def generate_query_doc(
 
     o_name = get_operation_class_name(o, registry)
 
-    return_type, collapsed = get_return_type_string(
-        o, client_schema, registry, collapse
-    )
+    return_type = get_return_type_string(o, client_schema, registry, collapse)
 
     header = f"{o.name.value} \n\n"
 
-    if collapsed:
-        field = o.selection_set.selections[0]
-        field_definition = get_field_def(client_schema, x, field)
-        description = (
-            header + field_definition.description
-            if field_definition.description
-            else header
-        )
+    op_descriptions = []
 
-    else:
-        query_descriptions = []
+    for field in o.selection_set.selections:
+        if isinstance(field, FieldNode):
+            target = target_from_node(field)
+            field_definition = get_field_def(client_schema, x, field)
+            if field_definition.description:
+                o.append(f"{target}: {field_definition.description}\n")
 
-        for field in o.selection_set.selections:
-            if isinstance(field, FieldNode):
-                target = target_from_node(field)
-                field_definition = get_field_def(client_schema, x, field)
-                if field_definition.description:
-                    query_descriptions.append(
-                        f"{target}: {field_definition.description}"
-                    )
-
-        description = "\n ".join([header] + query_descriptions)
+    description = "\n ".join([header] + op_descriptions)
 
     description += "\n\nArguments:\n"
 
@@ -455,11 +441,11 @@ def generate_query_doc(
 
     for v in o.variable_definitions:
         if isinstance(v.type, NonNullTypeNode) and not v.default_value:
-            description += f"    {registry.generate_parameter_name(v.variable.name.value)} ({recurse_variable_label(v, registry)}): {v.variable.name.value}\n"
+            description += f"    {registry.generate_parameter_name(v.variable.name.value)} ({recurse_type_label(v.type, registry)}): {v.variable.name.value}\n"
 
     for v in o.variable_definitions:
         if not isinstance(v.type, NonNullTypeNode) or v.default_value:
-            description += f"    {registry.generate_parameter_name(v.variable.name.value)} ({recurse_variable_label(v, registry)}, optional): {v.variable.name.value}. {'' if not v.default_value else  'Defaults to ' + str(v.default_value.value)}\n"
+            description += f"    {registry.generate_parameter_name(v.variable.name.value)} ({recurse_type_label(v.type, registry)}, optional): {v.variable.name.value}. {'' if not v.default_value else  'Defaults to ' + str(v.default_value.value)}\n"
 
     extra_kwargs = get_extra_kwargs_for_onode(definition, plugin_config)
     for kwarg in extra_kwargs:
@@ -538,7 +524,6 @@ def genereate_async_call(
 
 def genereate_sync_call(
     definition: FunctionDefinition,
-    o_name: str,
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
@@ -559,7 +544,7 @@ def genereate_sync_call(
                 ),
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
-                    generate_document_arg(o_name),
+                    generate_document_arg(o),
                     generate_variable_dict(o, registry),
                 ],
             )
@@ -579,7 +564,7 @@ def genereate_sync_call(
                         definition, plugin_config
                     )
                     + [
-                        generate_document_arg(o_name),
+                        generate_document_arg(o, registry),
                         generate_variable_dict(o, registry),
                     ],
                 ),
@@ -593,7 +578,6 @@ def genereate_sync_call(
 
 def genereate_async_iterator(
     definition: FunctionDefinition,
-    o_name: str,
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
@@ -615,7 +599,7 @@ def genereate_async_iterator(
                 ),
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
-                    generate_document_arg(o_name),
+                    generate_document_arg(o, registry),
                     generate_variable_dict(o, registry),
                 ],
             ),
@@ -637,7 +621,7 @@ def genereate_async_iterator(
                 ),
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
-                    generate_document_arg(o_name),
+                    generate_document_arg(o, registry),
                     generate_variable_dict(o, registry),
                 ],
             ),
@@ -660,7 +644,6 @@ def genereate_async_iterator(
 
 def genereate_sync_iterator(
     definition: FunctionDefinition,
-    o_name: str,
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
@@ -682,7 +665,7 @@ def genereate_sync_iterator(
                 ),
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
-                    generate_document_arg(o_name),
+                    generate_document_arg(o, registry),
                     generate_variable_dict(o, registry),
                 ],
             ),
@@ -704,7 +687,7 @@ def genereate_sync_iterator(
                 ),
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
-                    generate_document_arg(o_name),
+                    generate_document_arg(o, registry),
                     generate_variable_dict(o, registry),
                 ],
             ),
@@ -735,13 +718,6 @@ def generate_operation_func(
 ):
     tree = []
 
-    if o.operation == OperationType.QUERY:
-        o_name = registry.generate_query_classname(o.name.value)
-    if o.operation == OperationType.MUTATION:
-        o_name = registry.generate_mutation_classname(o.name.value)
-    if o.operation == OperationType.SUBSCRIPTION:
-        o_name = registry.generate_subscription_classname(o.name.value)
-
     collapse = plugin_config.collapse_lonely
 
     return_type = get_return_type_annotation(
@@ -770,7 +746,6 @@ def generate_operation_func(
                     doc,
                     genereate_async_call(
                         definition,
-                        o_name,
                         o,
                         client_schema,
                         config,
@@ -781,7 +756,6 @@ def generate_operation_func(
                     if definition.type != OperationType.SUBSCRIPTION
                     else genereate_async_iterator(
                         definition,
-                        o_name,
                         o,
                         client_schema,
                         config,
@@ -818,7 +792,6 @@ def generate_operation_func(
                     doc,
                     genereate_sync_call(
                         definition,
-                        o_name,
                         o,
                         client_schema,
                         config,
@@ -829,7 +802,6 @@ def generate_operation_func(
                     if definition.type != OperationType.SUBSCRIPTION
                     else genereate_sync_iterator(
                         definition,
-                        o_name,
                         o,
                         client_schema,
                         config,

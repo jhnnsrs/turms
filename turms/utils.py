@@ -30,6 +30,7 @@ from graphql import (
 import ast
 from turms.registry import ClassRegistry
 from turms.errors import (
+    GenerationError,
     NoEnumFound,
     NoInputTypeFound,
     NoScalarFound,
@@ -107,10 +108,10 @@ def generate_config_class(config: GeneratorConfig):
         return []
 
 
-def parse_documents(
-    client_schema: GraphQLSchema, scan_glob="g/*/**.graphql"
-) -> DocumentNode:
+def parse_documents(client_schema: GraphQLSchema, scan_glob) -> DocumentNode:
     """ """
+    if not scan_glob:
+        raise GenerationError("Couldnt find documents glob")
 
     x = glob.glob(scan_glob, recursive=True)
 
@@ -223,6 +224,8 @@ def recurse_type_annotation(
 
     if isinstance(type, ListTypeNode):
         if optional:
+            registry.register_import("typing.List")
+            registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name(id="Optional", ctx=ast.Load()),
                 slice=ast.Subscript(
@@ -233,6 +236,7 @@ def recurse_type_annotation(
                 ),
             )
 
+        registry.register_import("typing.List")
         return ast.Subscript(
             value=ast.Name(id="List", ctx=ast.Load()),
             slice=recurse_type_annotation(type.type, registry),
@@ -257,11 +261,12 @@ def recurse_type_annotation(
                     except NoEnumFound:
                         raise NotImplementedError("Not implemented")
 
-            if optional:
-                return ast.Subscript(
-                    value=ast.Name(id="Optional", ctx=ast.Load()),
-                    slice=x,
-                )
+        if optional:
+            registry.register_import("typing.Optional")
+            return ast.Subscript(
+                value=ast.Name(id="Optional", ctx=ast.Load()),
+                slice=x,
+            )
 
         return x
 
@@ -274,7 +279,7 @@ def recurse_type_label(
 ):
 
     if isinstance(type, NonNullTypeNode):
-        return recurse_type_annotation(
+        return recurse_type_label(
             type.type, registry, optional=False, overwrite_final=overwrite_final
         )
 
@@ -282,7 +287,7 @@ def recurse_type_label(
         if optional:
             return (
                 "Optional[List["
-                + recurse_type_annotation(
+                + recurse_type_label(
                     type.type, registry, overwrite_final=overwrite_final
                 )
                 + "]]"
@@ -290,9 +295,7 @@ def recurse_type_label(
 
         return (
             "List["
-            + recurse_type_annotation(
-                type.type, registry, overwrite_final=overwrite_final
-            )
+            + recurse_type_label(type.type, registry, overwrite_final=overwrite_final)
             + "]"
         )
 
@@ -315,8 +318,8 @@ def recurse_type_label(
                     except NoEnumFound:
                         raise NotImplementedError("Not implemented")
 
-            if optional:
-                return "Optional[" + x.id + "]"
+        if optional:
+            return "Optional[" + x.id + "]"
 
         return x.id
 

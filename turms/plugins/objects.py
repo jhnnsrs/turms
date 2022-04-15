@@ -10,6 +10,7 @@ from graphql import (
     GraphQLUnionType,
     is_wrapping_type,
 )
+from turms.errors import GenerationError
 from turms.plugins.base import Plugin, PluginConfig
 import ast
 from typing import Dict, List
@@ -238,6 +239,7 @@ def generate_types(
             classname = registry.generate_objecttype(key)
         if isinstance(object_type, GraphQLInterfaceType):
             classname = registry.generate_interface(key)
+            interface_base_map[key] = classname
 
         for interface in object_type.interfaces:
             # Populate the Union_classed
@@ -348,6 +350,26 @@ def generate_types(
                 ),
             )
         )
+
+    unimplemented_interfaces = {
+        interface: baseclass
+        for interface, baseclass in interface_base_map.items()
+        if interface not in interface_map
+    }
+    if unimplemented_interfaces:
+        if config.always_resolve_interfaces:
+            raise GenerationError(
+                f"Interfaces {unimplemented_interfaces.keys()} have no types implementing it. And we have set always_resolve_interfaces to true. Make sure your schema is correct"
+            )
+
+        for interface, baseclass in unimplemented_interfaces.items():
+            registry.warn(f"Interface {interface} has no types implementing it")
+            tree.append(
+                ast.Assign(
+                    targets=[ast.Name(id=interface, ctx=ast.Store())],
+                    value=ast.Name(baseclass, ctx=ast.Load()),
+                )
+            )
 
     return tree
 
