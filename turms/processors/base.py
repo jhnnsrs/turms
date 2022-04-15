@@ -15,4 +15,4 @@ class Processor(BaseModel):
 
     @abstractmethod
     def run(gen_file: str):
-        ...
+        ...  # pragma: no cover

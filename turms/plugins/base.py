@@ -29,4 +29,4 @@ class Plugin(BaseModel):
         client_schema: GraphQLSchema,
         registry,
     ) -> List[ast.AST]:
-        ...
+        ...  # pragma: no cover

@@ -18,11 +18,6 @@ def arkitekt_schema():
     return build_schema_from_glob(build_relative_glob("/schemas/arkitekt.graphql"))
 
 
-@pytest.fixture()
-def beasts_schema():
-    return build_schema_from_glob(build_relative_glob("/schemas/beasts.graphql"))
-
-
 def test_extra_arguments(arkitekt_schema):
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/arkitekt/**/*.graphql"),
