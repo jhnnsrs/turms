@@ -3,7 +3,6 @@ from typing import List, Optional
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.language.ast import OperationDefinitionNode, OperationType
-from turms.plugins.funcs import get_input_type_annotation, parse_value_node
 from turms.recurse import type_field_node
 from turms.plugins.base import Plugin, PluginConfig
 from pydantic import Field
@@ -23,7 +22,9 @@ from turms.utils import (
     NoDocumentsFoundError,
     generate_config_class,
     parse_documents,
+    recurse_type_annotation,
     replace_iteratively,
+    parse_value_node,
 )
 import logging
 
@@ -152,6 +153,7 @@ def generate_operation(
     tree = []
     assert o.name.value, "Operation names are required"
 
+    # Generation means creating a class for the operation
     if o.operation == OperationType.MUTATION:
         class_name = registry.generate_mutation(o.name.value)
         extra_bases = get_mutation_bases(config, plugin_config, registry)
@@ -166,7 +168,6 @@ def generate_operation(
     class_body_fields = []
 
     for field_node in o.selection_set.selections:
-
         field_node: FieldNode = field_node
         field_definition = get_field_def(client_schema, x, field_node)
         assert field_definition, "Couldn't find field definition"
@@ -184,8 +185,6 @@ def generate_operation(
         ]
 
     query_document = language.print_ast(o)
-    z = fragment_searcher.findall(query_document)
-
     merged_document = replace_iteratively(query_document, registry)
 
     if plugin_config.create_arguments:
@@ -200,9 +199,7 @@ def generate_operation(
                             id=registry.generate_parameter_name(v.variable.name.value),
                             ctx=ast.Store(),
                         ),
-                        annotation=get_input_type_annotation(
-                            v.type.type, config, registry, optional=False
-                        ),
+                        annotation=recurse_type_annotation(v.type, registry),
                         simple=1,
                     )
                 ]
@@ -214,8 +211,9 @@ def generate_operation(
                             id=registry.generate_parameter_name(v.variable.name.value),
                             ctx=ast.Store(),
                         ),
-                        annotation=get_input_type_annotation(
-                            v.type, config, registry, optional=True
+                        annotation=recurse_type_annotation(
+                            v.type,
+                            registry,
                         ),
                         value=ast.Constant(
                             value=parse_value_node(v.default_value)

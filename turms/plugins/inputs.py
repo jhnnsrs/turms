@@ -41,16 +41,10 @@ def generate_input_annotation(
             registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
-                slice=ast.Name(
-                    id=registry.get_scalar_equivalent(type.name), ctx=ast.Load()
-                ),
-                ctx=ast.Load(),
+                slice=registry.reference_scalar(type.name),
             )
-        else:
-            return ast.Name(
-                id=registry.get_scalar_equivalent(type.name),
-                ctx=ast.Load(),
-            )
+
+        return registry.reference_scalar(type.name)
 
     if isinstance(type, GraphQLInputObjectType):
         if is_optional:

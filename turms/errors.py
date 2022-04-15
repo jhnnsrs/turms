@@ -1,7 +1,16 @@
-class NoScalarEquivalentFound(Exception):
+class RegistryError(Exception):
     pass
 
-class RegistryError(Exception):
+
+class NoScalarFound(RegistryError):
+    pass
+
+
+class NoInputTypeFound(RegistryError):
+    pass
+
+
+class NoEnumFound(RegistryError):
     pass
 
 

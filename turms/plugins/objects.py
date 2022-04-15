@@ -49,16 +49,11 @@ def generate_object_field_annotation(
             registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
-                slice=ast.Name(
-                    id=registry.get_scalar_equivalent(graphql_type.name), ctx=ast.Load()
-                ),
+                slice=registry.reference_scalar(graphql_type.name),
                 ctx=ast.Load(),
             )
-        else:
-            return ast.Name(
-                id=registry.get_scalar_equivalent(graphql_type.name),
-                ctx=ast.Load(),
-            )
+
+        return registry.reference_scalar(graphql_type.name)
 
     if isinstance(graphql_type, GraphQLInterfaceType):
         if is_optional:
@@ -68,6 +63,7 @@ def generate_object_field_annotation(
                 slice=registry.reference_interface(graphql_type.name, parent),
                 ctx=ast.Load(),
             )
+
         return registry.reference_interface(graphql_type.name, parent)
 
     if isinstance(graphql_type, GraphQLObjectType):

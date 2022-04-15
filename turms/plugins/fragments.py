@@ -76,7 +76,10 @@ def generate_fragment(
     fields = []
     type = client_schema.get_type(f.type_condition.name.value)
     name = registry.generate_fragment(f.name.value)
-    registry.register_fragment_document(f.name.value, language.print_ast(f))
+
+    registry.register_fragment_document(
+        f.name.value, language.print_ast(f)
+    )  # TODO: Check if typename is being referenced? so that we can check between the elements of the interface
 
     if isinstance(type, GraphQLInterfaceType):
         mother_class_fields = []

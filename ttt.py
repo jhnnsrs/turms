@@ -3,6 +3,7 @@ import ast
 import pytest
 from tests.utils import build_relative_glob, unit_test_with
 from turms.config import GeneratorConfig
+from turms.plugins.funcs import FuncsPlugin, FuncsPluginConfig, FunctionDefinition
 from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
