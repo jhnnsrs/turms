@@ -67,7 +67,7 @@ def build_schema_from_introspect_url(
     except Exception as e:
         raise GenerationError(f"Failed to fetch schema from {schema_url}")
 
-    if "errors" in x:
+    if "errors" in x:  # pragma: no cover
         raise GenerationError(
             f"Failed to fetch schema from {schema_url} Graphql error: {x['errors']}"
         )
@@ -91,7 +91,7 @@ def build_schema_from_glob(glob_string: str):
     if not dsl_string and not introspection_string:
         raise GenerationError(f"No schema files found in {glob_string}")
 
-    if dsl_string != "" and introspection_string != "":
+    if dsl_string != "" and introspection_string != "":  # pragma: no cover
         raise GenerationError("We cannot have both dsl and introspection files")
     if dsl_string != "":
         return build_ast_schema(parse(dsl_string))

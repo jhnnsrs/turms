@@ -17,16 +17,7 @@
     {
       "type": "shell",
       "label": "Autoflake",
-      "command": "${command:python.interpreterPath}",
-      "args": [
-        "-m",
-        "autoflake",
-        "-i",
-        "--remove-all-unused-imports",
-        "-r",
-        "turms",
-        "tests"
-      ],
+      "command": "source venv/bin/activate && python -m autoflake -i --remove-all-unused-imports -r turms tests",
       "problemMatcher": []
     },
     {

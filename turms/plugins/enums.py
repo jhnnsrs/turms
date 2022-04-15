@@ -47,7 +47,8 @@ def generate_enums(
         if plugin_config.skip_underscore and key.startswith("_"):
             continue
 
-        name = registry.generate_enum_classname(key)
+        classname = registry.generate_enum(key)
+
         fields = (
             [ast.Expr(value=ast.Constant(value=type.description))]
             if type.description
@@ -55,9 +56,6 @@ def generate_enums(
         )
 
         for value_key, value in type.values.items():
-
-            if keyword.iskeyword(value_key):
-                value_key = f"{value_key}_"
 
             assign = ast.Assign(
                 targets=[ast.Name(id=str(value_key), ctx=ast.Store())],
@@ -79,10 +77,9 @@ def generate_enums(
             else:
                 fields += [assign]
 
-        registry.register_enum_class(key, name)
         tree.append(
             ast.ClassDef(
-                name,
+                classname,
                 bases=[
                     ast.Name(id="str", ctx=ast.Load()),
                     ast.Name(id="Enum", ctx=ast.Load()),

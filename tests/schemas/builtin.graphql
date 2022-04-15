@@ -1,0 +1,6 @@
+
+
+type X {
+    nana: __TypeKind
+    t: __DirectiveLocation
+}

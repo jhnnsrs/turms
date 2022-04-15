@@ -11,7 +11,6 @@ def parsable_configs():
 
 
 def test_create_file(tmp_path, parsable_configs):
-
     for config in parsable_configs:
         gen(config, overwrite_path=tmp_path)
 

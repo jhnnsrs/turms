@@ -2,7 +2,11 @@ import ast
 
 import pytest
 
-from tests.utils import build_relative_glob, generated_module_is_executable
+from .utils import (
+    build_relative_glob,
+    generated_module_is_executable,
+    unit_test_with,
+)
 from turms.config import GeneratorConfig
 from turms.helpers import build_schema_from_glob
 from turms.plugins.objects import ObjectsPlugin
@@ -29,6 +33,4 @@ def test_generation(forward_reference_to_interface_schema):
         ],
     )
 
-    md = ast.Module(body=generated_ast, type_ignores=[])
-    generated = ast.unparse(ast.fix_missing_locations(md))
-    assert generated_module_is_executable(generated)
+    unit_test_with(generated_ast, "")

@@ -5,3 +5,7 @@ type Foo {
 interface Ref {
   id: ID
 }
+
+type X implements Ref {
+  x: ID
+}

@@ -138,9 +138,29 @@ def scan_folder_for_single_config(folder_path: str = None) -> List[str]:
     return configs[0]
 
 
+def write_code_to_file(code: str, outdir: str, filepath: str):
+
+    if not os.path.isdir(outdir):  # pragma: no cover
+        os.makedirs(outdir)
+
+    generated_file = os.path.join(
+        outdir,
+        filepath,
+    )
+
+    with open(
+        generated_file,
+        "w",
+        encoding="utf-8",
+    ) as file:
+        file.write(code)
+
+    return generated_file
+
+
 def gen(
     filepath: Optional[str] = None,
-    project: Optional[str] = None,
+    project_name: Optional[str] = None,
     strict: bool = False,
     overwrite_path: Optional[str] = None,
 ):
@@ -154,7 +174,7 @@ def gen(
     if filepath is None:
         filepath = scan_folder_for_single_config()
 
-    projects = load_projects_from_configpath(filepath, project)
+    projects = load_projects_from_configpath(filepath, project_name)
 
     for key, project in projects.items():
         try:
@@ -164,24 +184,11 @@ def gen(
 
             generated_code = generate(project)
 
-            outdir = (
-                project.extensions.turms.out_dir
-                if not overwrite_path
-                else overwrite_path
+            write_code_to_file(
+                generated_code,
+                overwrite_path or project.extensions.turms.out_dir,
+                project.extensions.turms.generated_name,
             )
-
-            if not os.path.isdir(outdir):
-                os.makedirs(outdir)
-
-            with open(
-                os.path.join(
-                    outdir,
-                    project.extensions.turms.generated_name,
-                ),
-                "w",
-                encoding="utf-8",
-            ) as file:
-                file.write(generated_code)
 
             get_console().print("Sucessfull!! :right-facing_fist::left-facing_fist:")
         except Exception as e:
@@ -320,7 +327,10 @@ def generate_ast(
             raise GenerationError(f"Plugin:{plugin} failed!") from e
 
     global_tree = (
-        registry.generate_imports() + registry.generate_builtins() + global_tree
+        registry.generate_imports()
+        + registry.generate_builtins()
+        + global_tree
+        + registry.generate_forward_refs()
     )
 
     return global_tree

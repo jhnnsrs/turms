@@ -1,0 +1,18 @@
+interface A { 
+  foo: String!
+}
+
+interface B implements A { 
+  foo: String!
+  bar: String!
+ }
+
+type ThisWorks implements B & A { 
+  foo: String!
+  bar: String!
+}
+
+type ThisDoesnt implements A & B { 
+  foo: String!
+  bar: String!
+}

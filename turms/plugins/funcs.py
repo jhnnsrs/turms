@@ -13,8 +13,10 @@ from graphql import (
     FloatValueNode,
     FragmentSpreadNode,
     GraphQLField,
+    GraphQLInputType,
     GraphQLNamedType,
     GraphQLNonNull,
+    GraphQLObjectType,
     GraphQLScalarType,
     IntValueNode,
     NamedTypeNode,
@@ -22,6 +24,7 @@ from graphql import (
     StringValueNode,
     ValueNode,
     VariableDefinitionNode,
+    is_wrapping_type,
 )
 from graphql.language.ast import (
     FieldNode,
@@ -36,10 +39,18 @@ from graphql.utilities.get_operation_root_type import get_operation_root_type
 from graphql.utilities.type_info import get_field_def
 from pydantic import BaseModel, Field
 from turms.config import GeneratorConfig
-from turms.errors import NoScalarEquivalentFound
 from turms.plugins.base import Plugin, PluginConfig
 from turms.registry import ClassRegistry
-from turms.utils import NoDocumentsFoundError, parse_documents, target_from_node
+from turms.utils import (
+    NoDocumentsFoundError,
+    parse_documents,
+    parse_value_node,
+    recurse_outputtype_annotation,
+    recurse_outputtype_label,
+    recurse_type_annotation,
+    recurse_type_label,
+    target_from_node,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -104,75 +115,6 @@ def generate_sync_func_name(
     return f"{plugin_config.prepend_sync}{camel_to_snake(o.name.value)}"
 
 
-def get_input_type_annotation(
-    input_type: NamedTypeNode,
-    config: GeneratorConfig,
-    registry: ClassRegistry,
-    optional=True,
-):
-
-    if isinstance(input_type, NamedTypeNode):
-        try:
-            type_name = registry.get_scalar_equivalent(input_type.name.value)
-        except NoScalarEquivalentFound as e:
-            type_name = registry.get_inputtype_class(input_type.name.value)
-
-        if optional:
-            registry.register_import("typing.Optional")
-            return ast.Subscript(
-                value=ast.Name(id="Optional", ctx=ast.Load()),
-                slice=ast.Name(
-                    id=type_name,
-                    ctx=ast.Load(),
-                ),
-            )
-
-        return ast.Name(
-            id=type_name,
-            ctx=ast.Load(),
-        )
-
-    elif isinstance(input_type, ListTypeNode):
-        registry.register_import("typing.List")
-
-        if optional:
-            registry.register_import("typing.Optional")
-            return ast.Subscript(
-                value=ast.Name(id="Optional", ctx=ast.Load()),
-                slice=ast.Subscript(
-                    value=ast.Name(id="List", ctx=ast.Load()),
-                    slice=get_input_type_annotation(input_type.type, config, registry),
-                ),
-            )
-        return ast.Subscript(
-            value=ast.Name(id="List", ctx=ast.Load()),
-            slice=get_input_type_annotation(input_type.type, config, registry),
-        )
-
-    elif isinstance(input_type, NonNullTypeNode):
-        return get_input_type_annotation(
-            input_type.type, config, registry, optional=False
-        )
-
-    raise NotImplementedError()
-
-
-wanted_definition = {
-    OperationType.MUTATION: {
-        "async": "asyncfunction",
-        "sync": "function",
-    },
-    OperationType.QUERY: {
-        "async": "asyncfunction",
-        "sync": "function",
-    },
-    OperationType.SUBSCRIPTION: {
-        "async": "asynciterator",
-        "sync": "iterator",
-    },
-}
-
-
 def get_extra_args_for_onode(
     definition: FunctionDefinition,
     plugin_config: FuncsPluginConfig,
@@ -212,33 +154,6 @@ def get_extra_kwargs_for_onode(
     return kwargs + definition.extra_kwargs
 
 
-def parse_value_node(value_node: ValueNode) -> Union[None, str, int, float, bool]:
-    """Parses a Value Node into a Python value
-    using standard types
-
-    Args:
-        value_node (ValueNode): The Argument Value Node
-
-    Raises:
-        NotImplementedError: If the Value Node is not supported
-
-    Returns:
-        Union[None, str, int, float, bool]: The parsed value
-    """
-    if isinstance(value_node, IntValueNode):
-        return int(value_node.value)
-    elif isinstance(value_node, FloatValueNode):
-        return float(value_node.value)
-    elif isinstance(value_node, StringValueNode):
-        return value_node.value
-    elif isinstance(value_node, BooleanValueNode):
-        return value_node.value == "true"
-    elif isinstance(value_node, NullValueNode):
-        return None
-    else:
-        raise NotImplementedError(f"Cannot parse {value_node}")
-
-
 def get_definitions_for_onode(
     operation_definition: OperationDefinitionNode,
     plugin_config: FuncsPluginConfig,
@@ -263,7 +178,7 @@ def get_definitions_for_onode(
     return definitions
 
 
-def generate_query_args(
+def generate_parameters(
     definition: FunctionDefinition,
     operation_definition: OperationDefinitionNode,
     config: GeneratorConfig,
@@ -286,31 +201,40 @@ def generate_query_args(
             )
         )
 
-    for v in operation_definition.variable_definitions:
-        if isinstance(v.type, NonNullTypeNode) and not v.default_value:
-            pos_args.append(
-                ast.arg(
-                    arg=registry.generate_parameter_name(v.variable.name.value),
-                    annotation=get_input_type_annotation(v.type.type, config, registry),
-                )
+    arg_variables = [
+        v
+        for v in operation_definition.variable_definitions
+        if isinstance(v.type, NonNullTypeNode) and not v.default_value
+    ]
+    kwarg_variables = [
+        v
+        for v in operation_definition.variable_definitions
+        if not isinstance(v.type, NonNullTypeNode) or v.default_value
+    ]
+
+    for v in arg_variables:
+        pos_args.append(
+            ast.arg(
+                arg=registry.generate_parameter_name(v.variable.name.value),
+                annotation=recurse_type_annotation(v.type, registry),
             )
+        )
 
     kw_args = []
     kw_values = []
 
-    for v in operation_definition.variable_definitions:
-        if not isinstance(v.type, NonNullTypeNode) or v.default_value:
-            kw_args.append(
-                ast.arg(
-                    arg=registry.generate_parameter_name(v.variable.name.value),
-                    annotation=get_input_type_annotation(v.type, config, registry),
-                )
+    for v in kwarg_variables:
+        kw_args.append(
+            ast.arg(
+                arg=registry.generate_parameter_name(v.variable.name.value),
+                annotation=recurse_type_annotation(v.type, registry),
             )
-            kw_values.append(
-                ast.Constant(
-                    value=parse_value_node(v.default_value) if v.default_value else None
-                )
+        )
+        kw_values.append(
+            ast.Constant(
+                value=parse_value_node(v.default_value) if v.default_value else None
             )
+        )
 
     extra_kwargs = get_extra_kwargs_for_onode(definition, plugin_config)
 
@@ -336,7 +260,7 @@ def generate_query_args(
     )
 
 
-def generate_query_dict(o: OperationDefinitionNode, registry: ClassRegistry):
+def generate_variable_dict(o: OperationDefinitionNode, registry: ClassRegistry):
 
     keys = []
     values = []
@@ -353,173 +277,21 @@ def generate_query_dict(o: OperationDefinitionNode, registry: ClassRegistry):
     return ast.Dict(keys=keys, values=values)
 
 
-def generate_document_arg(o_name):
+def generate_document_arg(o: OperationDefinitionNode, registry: ClassRegistry):
 
-    return ast.Name(id=o_name, ctx=ast.Load())
-
-
-def recurse_variable_annotation(
-    v: VariableDefinitionNode, registry: ClassRegistry, optional=True
-):
-
-    if isinstance(v.type, NamedTypeNode):
-        try:
-            x = registry.get_scalar_equivalent(v.type.name.value)
-        except NoScalarEquivalentFound:
-            x = registry.get_inputtype_class(v.type.name.value)
-        if optional:
-            return "Optional[" + x + "]"
-        else:
-            return x
-
-    elif isinstance(v.type, NonNullTypeNode):
-        return recurse_variable_annotation(v.type, registry, optional=False)
-
-    elif isinstance(v.type, ListTypeNode):
-        if optional:
-            return (
-                "Optional[List[" + recurse_variable_annotation(v.type, registry) + "]]"
-            )
-        return "List[" + recurse_variable_annotation(v.type, registry) + "]"
-
-    raise NotImplementedError()
+    return ast.Name(id=get_operation_class_name(o, registry), ctx=ast.Load())
 
 
 def get_operation_class_name(o: OperationDefinitionNode, registry: ClassRegistry):
 
     if o.operation == OperationType.QUERY:
-        o_name = registry.generate_query_classname(o.name.value)
+        return registry.style_query_class(o.name.value)
     if o.operation == OperationType.MUTATION:
-        o_name = registry.generate_mutation_classname(o.name.value)
+        return registry.style_mutation_class(o.name.value)
     if o.operation == OperationType.SUBSCRIPTION:
-        o_name = registry.generate_subscription_classname(o.name.value)
+        return registry.style_subscription_class(o.name.value)
 
-    return o_name
-
-
-class FieldModifier(str, Enum):
-    OPTIONAL = "OPTIONAL"
-    LIST = "LIST"
-
-
-def formalize_type(
-    field_definition: FieldDefinitionNode,
-    registry: ClassRegistry,
-    modifiers=None,
-    next_is_optional=True,
-):
-    if modifiers is None:
-        modifiers = []
-
-    if isinstance(field_definition, GraphQLNonNull):
-        return formalize_type(
-            field_definition.of_type,
-            registry,
-            modifiers=modifiers,
-            next_is_optional=False,
-        )
-
-    modifiers = modifiers + [FieldModifier.OPTIONAL] if next_is_optional else modifiers
-
-    if isinstance(field_definition, GraphQLList):
-        return formalize_type(
-            field_definition.of_type,
-            registry,
-            modifiers=modifiers + [FieldModifier.LIST],
-            next_is_optional=True,
-        )
-
-    if isinstance(field_definition, GraphQLScalarType):
-        x = registry.get_scalar_equivalent(field_definition.name)
-        return x, modifiers
-
-    if isinstance(field_definition, GraphQLNamedType):
-        try:
-            x = registry.get_scalar_equivalent(field_definition.name)
-        except NoScalarEquivalentFound as e:
-            x = registry.get_inputtype_class(field_definition.name)
-
-        return x, modifiers
-
-    raise NotImplementedError(f"Cannot Handle this type of Node {field_definition}")
-
-
-def build_type_annotation_for_field(
-    field: GraphQLField, registry: ClassRegistry, overwrite_type: str = None
-) -> ast.AST:
-    """For a given field, build the type annotation for the field.
-
-    This is used to build the type annotation for the field in the generated ast
-    Graph. It first formalizes the type into the type.class and its modifiers
-    as a list of Modifiers and then generates an annotation for this type
-
-
-    Args:
-        field (GraphQLField): The field to build the type annotation for
-        registry (ClassRegistry): The class registry to use
-        overwrite_type (str, optional): Overwrite the type. Defaults to None.
-
-    Returns:
-        ast.AST: The generated Annotation
-    """
-
-    end_type, modifiers = formalize_type(field.type, registry)
-    end_type = overwrite_type if overwrite_type else end_type
-
-    def recurse_annotate(modifiers):
-        if len(modifiers) == 0:
-            return ast.Name(id=end_type, ctx=ast.Load())
-        else:
-            this_modifier = modifiers[0]
-            rest_modifiers = modifiers[1:]
-
-            if this_modifier == FieldModifier.OPTIONAL:
-                value = ast.Name(id="Optional", ctx=ast.Load())
-            if this_modifier == FieldModifier.LIST:
-                value = ast.Name(id="List", ctx=ast.Load())
-
-            return ast.Subscript(
-                value=value,
-                slice=recurse_annotate(rest_modifiers),
-            )
-
-    return recurse_annotate(modifiers)
-
-
-def build_type_annotation_str_for_field(
-    field: GraphQLField, registry: ClassRegistry, overwrite_type: str = None
-) -> str:
-    """For a given field, build the type annotation string for the field.
-
-    This is used to build the type annotation for the field in the documentatoin
-
-    Args:
-        field (GraphQLField): The field to build the type annotation for
-        registry (ClassRegistry): The class registry to use
-        overwrite_type (str, optional): Overwrite the type. Defaults to None.
-
-    Returns:
-        str: The type anotation string
-    """
-
-    end_type, modifiers = formalize_type(field.type, registry)
-    end_type = overwrite_type if overwrite_type else end_type
-
-    def recurse_annotate(modifiers):
-        if len(modifiers) == 0:
-            return end_type
-        else:
-            this_modifier = modifiers[0]
-            rest_modifiers = modifiers[1:]
-
-            if this_modifier == FieldModifier.OPTIONAL:
-                value = "Optional"
-            if this_modifier == FieldModifier.LIST:
-                value = "List"
-
-            return f"{value}[{recurse_annotate(rest_modifiers)}]"
-
-    return recurse_annotate(modifiers)
+    raise Exception("Incorrect Operation Type ")  # pragma: no cover
 
 
 def get_return_type_annotation(
@@ -527,63 +299,42 @@ def get_return_type_annotation(
     client_schema: GraphQLSchema,
     registry: ClassRegistry,
     collapse: bool = True,
-) -> Tuple[ast.AST, bool]:
+) -> ast.AST:
 
     o_name = get_operation_class_name(o, registry)
-
-    if len(o.selection_set.selections) == 0:
-        raise NotImplementedError(
-            "No operation specified. If you see this you probably didn't check the validities of your document."
-        )
-
     root = get_operation_root_type(client_schema, o)
 
-    if len(o.selection_set.selections) == 1 and collapse is True:
-        potential_return_field = o.selection_set.selections[0]
-        potential_return_type = get_field_def(
-            client_schema, root, potential_return_field
-        )
+    if collapse is True:
+        collapsable_field = o.selection_set.selections[0]
+        field_definition = get_field_def(client_schema, root, collapsable_field)
 
-        if potential_return_field.selection_set is None:  # Dealing with a scalar type
-            return (
-                build_type_annotation_for_field(potential_return_type, registry),
-                False,
-            )
+        if collapsable_field.selection_set is None:  # pragma: no cover
+            return recurse_outputtype_annotation(field_definition.type, registry)
 
         if (
-            len(potential_return_field.selection_set.selections) == 1
+            len(collapsable_field.selection_set.selections) == 1
         ):  # Dealing with one Element
+            collapsable_fragment_field = collapsable_field.selection_set.selections[0]
             if isinstance(
-                potential_return_field.selection_set.selections[0], FragmentSpreadNode
+                collapsable_fragment_field, FragmentSpreadNode
             ):  # Dealing with a on element fragment
-                return (
-                    ast.Name(
-                        id=registry.get_fragment_class(
-                            potential_return_field.selection_set.selections[
-                                0
-                            ].name.value
-                        ),
-                        ctx=ast.Load(),
-                    ),
-                    True,
+                return recurse_outputtype_annotation(
+                    field_definition.type,
+                    registry,
+                    overwrite_final=registry.reference_fragment(
+                        collapsable_fragment_field.name.value, "", allow_forward=False
+                    ).id,
                 )
 
-        # is a subseleciton of maybe multiple fragments or just a normal selection
-        return (
-            build_type_annotation_for_field(
-                potential_return_type,
-                registry,
-                overwrite_type=f"{o_name}{o.selection_set.selections[0].name.value.capitalize()}",
-            ),
-            True,
+        return recurse_outputtype_annotation(
+            field_definition.type,
+            registry,
+            overwrite_final=f"{o_name}{collapsable_field.name.value.capitalize()}",
         )
 
-    return (
-        ast.Name(
-            id=o_name,
-            ctx=ast.Load(),
-        ),
-        False,
+    return ast.Name(
+        id=o_name,
+        ctx=ast.Load(),
     )
 
 
@@ -596,53 +347,43 @@ def get_return_type_string(
 
     o_name = get_operation_class_name(o, registry)
 
-    if len(o.selection_set.selections) == 0:
-        raise NotImplementedError(
-            "No operation specified. If you see this you probably didn't check the validities of your document."
-        )
-
     root = get_operation_root_type(client_schema, o)
 
-    if len(o.selection_set.selections) == 1 and collapse == True:
+    if collapse is True:
         potential_return_field = o.selection_set.selections[0]
         potential_return_type = get_field_def(
             client_schema, root, potential_return_field
         )
 
-        if potential_return_field.selection_set is None:  # Dealing with a scalar type
-            return (
-                build_type_annotation_str_for_field(potential_return_type, registry),
-                False,
-            )
+        if (
+            potential_return_field.selection_set is None
+        ):  # Dealing with a scalar type  # pragma: no cover
+            return recurse_outputtype_label(potential_return_type.type, registry)
 
         if (
             len(potential_return_field.selection_set.selections) == 1
         ):  # Dealing with one Element
+            collapsable_field = potential_return_field.selection_set.selections[0]
+
             if isinstance(
-                potential_return_field.selection_set.selections[0], FragmentSpreadNode
+                collapsable_field, FragmentSpreadNode
             ):  # Dealing with a on element fragment
-                return (
-                    registry.get_fragment_class(
-                        potential_return_field.selection_set.selections[0].name.value
-                    ),
-                    True,
+                return recurse_outputtype_label(
+                    potential_return_type.type,
+                    registry,
+                    overwrite_final=registry.reference_fragment(
+                        collapsable_field.name.value, "", allow_forward=False
+                    ).id,
                 )
 
-            else:
-                return (
-                    build_type_annotation_str_for_field(
-                        potential_return_type,
-                        registry,
-                        overwrite_type=f"{o_name}{o.selection_set.selections[0].name.value.capitalize()}",
-                    ),
-                    True,
-                )
-
-        else:
-            return o_name, False
+        return recurse_outputtype_label(
+            potential_return_type.type,
+            registry,
+            overwrite_final=f"{o_name}{potential_return_field.name.value.capitalize()}",
+        )
 
     else:
-        return o_name, False
+        return o_name
 
 
 def generate_query_doc(
@@ -660,34 +401,22 @@ def generate_query_doc(
 
     o_name = get_operation_class_name(o, registry)
 
-    return_type, collapsed = get_return_type_string(
-        o, client_schema, registry, collapse
-    )
+    return_type = get_return_type_string(o, client_schema, registry, collapse)
 
     header = f"{o.name.value} \n\n"
 
-    if collapsed:
-        field = o.selection_set.selections[0]
-        field_definition = get_field_def(client_schema, x, field)
-        description = (
-            header + field_definition.description
-            if field_definition.description
-            else header
-        )
+    op_descriptions = []
 
-    else:
-        query_descriptions = []
+    for field in o.selection_set.selections:
+        if isinstance(field, FieldNode):
+            target = target_from_node(field)
+            operation_type = get_field_def(client_schema, x, field).type
+            while is_wrapping_type(operation_type):
+                operation_type = operation_type.of_type
+            if operation_type.description:
+                op_descriptions.append(f"{target}: {operation_type.description}\n")
 
-        for field in o.selection_set.selections:
-            if isinstance(field, FieldNode):
-                target = target_from_node(field)
-                field_definition = get_field_def(client_schema, x, field)
-                if field_definition.description:
-                    query_descriptions.append(
-                        f"{target}: {field_definition.description}"
-                    )
-
-        description = "\n ".join([header] + query_descriptions)
+    description = "\n ".join([header] + op_descriptions)
 
     description += "\n\nArguments:\n"
 
@@ -698,11 +427,11 @@ def generate_query_doc(
 
     for v in o.variable_definitions:
         if isinstance(v.type, NonNullTypeNode) and not v.default_value:
-            description += f"    {registry.generate_parameter_name(v.variable.name.value)} ({recurse_variable_annotation(v, registry)}): {v.variable.name.value}\n"
+            description += f"    {registry.generate_parameter_name(v.variable.name.value)} ({recurse_type_label(v.type, registry)}): {v.variable.name.value}\n"
 
     for v in o.variable_definitions:
         if not isinstance(v.type, NonNullTypeNode) or v.default_value:
-            description += f"    {registry.generate_parameter_name(v.variable.name.value)} ({recurse_variable_annotation(v, registry)}, optional): {v.variable.name.value}. {'' if not v.default_value else  'Defaults to ' + str(v.default_value.value)}\n"
+            description += f"    {registry.generate_parameter_name(v.variable.name.value)} ({recurse_type_label(v.type, registry)}, optional): {v.variable.name.value}. {'' if not v.default_value else  'Defaults to ' + str(v.default_value.value)}\n"
 
     extra_kwargs = get_extra_kwargs_for_onode(definition, plugin_config)
     for kwarg in extra_kwargs:
@@ -718,7 +447,6 @@ def generate_query_doc(
 
 def genereate_async_call(
     definition: FunctionDefinition,
-    o_name: str,
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
@@ -727,6 +455,7 @@ def genereate_async_call(
     collapse=False,
 ):
     registry.register_import(definition.use)
+
     if not collapse:
         return ast.Return(
             value=ast.Await(
@@ -742,8 +471,8 @@ def genereate_async_call(
                         definition, plugin_config
                     )
                     + [
-                        generate_document_arg(o_name),
-                        generate_query_dict(o, registry),
+                        generate_document_arg(o, registry),
+                        generate_variable_dict(o, registry),
                     ],
                 )
             )
@@ -765,8 +494,8 @@ def genereate_async_call(
                             definition, plugin_config
                         )
                         + [
-                            generate_document_arg(o_name),
-                            generate_query_dict(o, registry),
+                            generate_document_arg(o, registry),
+                            generate_variable_dict(o, registry),
                         ],
                     )
                 ),
@@ -780,7 +509,6 @@ def genereate_async_call(
 
 def genereate_sync_call(
     definition: FunctionDefinition,
-    o_name: str,
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
@@ -801,8 +529,8 @@ def genereate_sync_call(
                 ),
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
-                    generate_document_arg(o_name),
-                    generate_query_dict(o, registry),
+                    generate_document_arg(o, registry),
+                    generate_variable_dict(o, registry),
                 ],
             )
         )
@@ -821,8 +549,8 @@ def genereate_sync_call(
                         definition, plugin_config
                     )
                     + [
-                        generate_document_arg(o_name),
-                        generate_query_dict(o, registry),
+                        generate_document_arg(o, registry),
+                        generate_variable_dict(o, registry),
                     ],
                 ),
                 attr=registry.generate_node_name(
@@ -835,7 +563,6 @@ def genereate_sync_call(
 
 def genereate_async_iterator(
     definition: FunctionDefinition,
-    o_name: str,
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
@@ -857,8 +584,8 @@ def genereate_async_iterator(
                 ),
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
-                    generate_document_arg(o_name),
-                    generate_query_dict(o, registry),
+                    generate_document_arg(o, registry),
+                    generate_variable_dict(o, registry),
                 ],
             ),
             body=[
@@ -879,8 +606,8 @@ def genereate_async_iterator(
                 ),
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
-                    generate_document_arg(o_name),
-                    generate_query_dict(o, registry),
+                    generate_document_arg(o, registry),
+                    generate_variable_dict(o, registry),
                 ],
             ),
             body=[
@@ -902,7 +629,6 @@ def genereate_async_iterator(
 
 def genereate_sync_iterator(
     definition: FunctionDefinition,
-    o_name: str,
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
@@ -924,8 +650,8 @@ def genereate_sync_iterator(
                 ),
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
-                    generate_document_arg(o_name),
-                    generate_query_dict(o, registry),
+                    generate_document_arg(o, registry),
+                    generate_variable_dict(o, registry),
                 ],
             ),
             body=[
@@ -946,8 +672,8 @@ def genereate_sync_iterator(
                 ),
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
-                    generate_document_arg(o_name),
-                    generate_query_dict(o, registry),
+                    generate_document_arg(o, registry),
+                    generate_variable_dict(o, registry),
                 ],
             ),
             body=[
@@ -967,6 +693,11 @@ def genereate_sync_iterator(
         )
 
 
+def is_collapsable(o: OperationDefinitionNode):
+    assert o.selection_set is not None, "Operation needs to have at least a selection"
+    return len(o.selection_set.selections) == 1
+
+
 def generate_operation_func(
     definition: FunctionDefinition,
     o: OperationDefinitionNode,
@@ -977,16 +708,9 @@ def generate_operation_func(
 ):
     tree = []
 
-    if o.operation == OperationType.QUERY:
-        o_name = registry.generate_query_classname(o.name.value)
-    if o.operation == OperationType.MUTATION:
-        o_name = registry.generate_mutation_classname(o.name.value)
-    if o.operation == OperationType.SUBSCRIPTION:
-        o_name = registry.generate_subscription_classname(o.name.value)
+    collapse = plugin_config.collapse_lonely and is_collapsable(o)
 
-    collapse = plugin_config.collapse_lonely
-
-    returns, collapsed = get_return_type_annotation(
+    return_type = get_return_type_annotation(
         o, client_schema, registry, collapse=collapse
     )
 
@@ -1001,7 +725,7 @@ def generate_operation_func(
         tree.append(
             ast.AsyncFunctionDef(
                 name=generate_async_func_name(o, plugin_config, config, registry),
-                args=generate_query_args(
+                args=generate_parameters(
                     definition,
                     o,
                     config,
@@ -1012,7 +736,6 @@ def generate_operation_func(
                     doc,
                     genereate_async_call(
                         definition,
-                        o_name,
                         o,
                         client_schema,
                         config,
@@ -1023,7 +746,6 @@ def generate_operation_func(
                     if definition.type != OperationType.SUBSCRIPTION
                     else genereate_async_iterator(
                         definition,
-                        o_name,
                         o,
                         client_schema,
                         config,
@@ -1033,10 +755,11 @@ def generate_operation_func(
                     ),
                 ],
                 decorator_list=[],
-                returns=returns
+                returns=return_type
                 if definition.type != OperationType.SUBSCRIPTION
                 else ast.Subscript(
-                    value=ast.Name(id="AsyncIterator", ctx=ast.Load()), slice=returns
+                    value=ast.Name(id="AsyncIterator", ctx=ast.Load()),
+                    slice=return_type,
                 ),
             )
         )
@@ -1048,7 +771,7 @@ def generate_operation_func(
         tree.append(
             ast.FunctionDef(
                 name=generate_sync_func_name(o, plugin_config, config, registry),
-                args=generate_query_args(
+                args=generate_parameters(
                     definition,
                     o,
                     config,
@@ -1059,7 +782,6 @@ def generate_operation_func(
                     doc,
                     genereate_sync_call(
                         definition,
-                        o_name,
                         o,
                         client_schema,
                         config,
@@ -1070,7 +792,6 @@ def generate_operation_func(
                     if definition.type != OperationType.SUBSCRIPTION
                     else genereate_sync_iterator(
                         definition,
-                        o_name,
                         o,
                         client_schema,
                         config,
@@ -1080,10 +801,10 @@ def generate_operation_func(
                     ),
                 ],
                 decorator_list=[],
-                returns=returns
+                returns=return_type
                 if definition.type != OperationType.SUBSCRIPTION
                 else ast.Subscript(
-                    value=ast.Name(id="Iterator", ctx=ast.Load()), slice=returns
+                    value=ast.Name(id="Iterator", ctx=ast.Load()), slice=return_type
                 ),
             )
         )
@@ -1092,7 +813,7 @@ def generate_operation_func(
 
 
 class FuncsPlugin(Plugin):
-    config: FuncsPluginConfig = Field(default_facotry=FuncsPluginConfig)
+    config: FuncsPluginConfig = Field(default_factory=FuncsPluginConfig)
 
     def generate_ast(
         self,

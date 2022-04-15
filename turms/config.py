@@ -1,3 +1,4 @@
+import builtins
 from pydantic import AnyHttpUrl, BaseModel, BaseSettings, Field, validator
 from typing import Dict, List, Optional, Union
 from turms.helpers import import_string
@@ -8,6 +9,20 @@ class ConfigProxy(BaseModel):
 
     class Config:
         extra = "allow"
+
+
+class PythonScalar(str):
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v):
+        if not isinstance(v, str):
+            raise TypeError("string required")
+        if v not in dir(builtins):
+            assert "." in v, "You need to point to a module if its not a builtin type"
+        return cls(v)
 
 
 class GeneratorConfig(BaseSettings):
@@ -21,9 +36,10 @@ class GeneratorConfig(BaseSettings):
     interface_bases: Optional[List[str]] = None
     always_resolve_interfaces: bool = True
 
-    scalar_definitions = {}
+    scalar_definitions: Dict[str, PythonScalar] = {}
     freeze: bool = False
     additional_bases = {}
+    force_plugin_order: bool = True
 
     parsers: List[ConfigProxy] = []
     plugins: List[ConfigProxy] = []

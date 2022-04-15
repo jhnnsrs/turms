@@ -15,45 +15,42 @@ class Styler(BaseModel):
 
     @abstractmethod
     def style_subscription_name(self, name: str) -> str:
-        raise NotImplementedError("Plugin must overrwrite this")
+        raise NotImplementedError("Plugin must overrwrite this")  # pragma: no cover
 
     @abstractmethod
     def style_mutation_name(self, name: str) -> str:
-        raise NotImplementedError("Plugin must overrwrite this")
+        raise NotImplementedError("Plugin must overrwrite this")  # pragma: no cover
 
     @abstractmethod
     def style_query_name(self, name: str) -> str:
-        raise NotImplementedError("Plugin must overrwrite this")
+        raise NotImplementedError("Plugin must overrwrite this")  # pragma: no cover
 
     @abstractmethod
     def style_enum_name(self, name: str) -> str:
-        raise NotImplementedError("Plugin must overrwrite this")
+        raise NotImplementedError("Plugin must overrwrite this")  # pragma: no cover
 
     @abstractmethod
     def style_fragment_name(self, name: str) -> str:
-        raise NotImplementedError("Plugin must overrwrite this")
+        raise NotImplementedError("Plugin must overrwrite this")  # pragma: no cover
 
     @abstractmethod
     def style_node_name(self, name: str) -> str:
-        raise NotImplementedError("Plugin must overrwrite this")
+        raise NotImplementedError("Plugin must overrwrite this")  # pragma: no cover
 
     @abstractmethod
     def style_parameter_name(self, name: str) -> str:
-        raise NotImplementedError("Plugin must overrwrite this")
+        raise NotImplementedError("Plugin must overrwrite this")  # pragma: no cover
 
     @abstractmethod
     def style_input_name(self, name: str) -> str:
-        raise NotImplementedError("Plugin must overrwrite this")
+        raise NotImplementedError("Plugin must overrwrite this")  # pragma: no cover
 
     @abstractmethod
     def style_object_name(self, name: str) -> str:
-        raise NotImplementedError("Plugin must overrwrite this")
+        raise NotImplementedError("Plugin must overrwrite this")  # pragma: no cover
 
 
 class BaseStyler(Styler):
-    def style_operation_name(self, name: str) -> str:
-        return name
-
     def style_query_name(self, name: str) -> str:
         return name
 

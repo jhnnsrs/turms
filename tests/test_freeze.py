@@ -22,9 +22,9 @@ def countries_schema():
     return build_schema_from_introspect_url("https://countries.trevorblades.com/")
 
 
-def test_complex_operations(countries_schema):
+def test_freeze_classes(countries_schema):
     config = GeneratorConfig(
-        documents=build_relative_glob("/documents/countries/**.graphql"),
+        documents=build_relative_glob("/documents/countries/**.graphql"), freeze=True
     )
 
     generated_ast = generate_ast(
@@ -41,5 +41,5 @@ def test_complex_operations(countries_schema):
 
     md = ast.Module(body=generated_ast, type_ignores=[])
     generated = ast.unparse(ast.fix_missing_locations(md))
-    unit_test_with(generated_ast, "Countries(countries=[])")
+    unit_test_with(generated_ast, "x = Countries(countries=[])")
     assert "from enum import Enum" in generated, "EnumPlugin not working"

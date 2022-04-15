@@ -67,7 +67,4 @@ class PolyfillParser(Parser):
         if self.config.python_version == "3.7":
             return polyfill_python_seven(asts, self.config)
 
-        return asts
-
-    def __str__(self) -> str:
-        return self.__class__.__name__
+        return asts  # pragma: no cover

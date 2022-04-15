@@ -17,8 +17,8 @@ type Beast {
 
 type Query {
   beasts: [Beast]
-  beast(id: ID!): Beast
-  calledBy(commonName: String!): [Beast]
+  beast(id: ID!): Beast!
+  calledBy(commonName: String!): [Beast]!
 }
 
 type Mutation {

@@ -1,0 +1,7 @@
+
+
+type X {
+    "From field"
+    from: String!
+    assert: String!
+}

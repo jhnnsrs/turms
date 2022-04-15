@@ -1,11 +1,32 @@
 import glob
 import re
-from typing import Dict, List, Set
+from typing import Dict, List, Optional, Set, Union
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.language.ast import DocumentNode, FieldNode
 from graphql.error.graphql_error import GraphQLError
 from graphql import (
+    BooleanValueNode,
+    FloatValueNode,
+    GraphQLEnumType,
+    GraphQLField,
+    GraphQLInputType,
+    GraphQLList,
+    GraphQLNamedOutputType,
+    GraphQLNonNull,
+    GraphQLObjectType,
+    GraphQLOutputType,
+    GraphQLScalarType,
+    IntValueNode,
+    ListTypeNode,
+    NamedTypeNode,
+    NonNullTypeNode,
+    NullValueNode,
+    OperationDefinitionNode,
+    StringValueNode,
+    ValueNode,
+    VariableDefinitionNode,
+    is_wrapping_type,
     parse,
     validate,
     build_client_schema,
@@ -13,6 +34,13 @@ from graphql import (
 )
 import ast
 from turms.registry import ClassRegistry
+from turms.errors import (
+    GenerationError,
+    NoEnumFound,
+    NoInputTypeFound,
+    NoScalarFound,
+    RegistryError,
+)
 
 
 class FragmentNotFoundError(Exception):
@@ -33,10 +61,6 @@ def target_from_node(node: FieldNode) -> str:
     )
 
 
-def build_schema(introspection_query: Dict[str, str]):
-    return build_client_schema(introspection_query)
-
-
 def generate_typename_field(typename, registry: ClassRegistry):
 
     registry.register_import("pydantic.Field")
@@ -50,7 +74,9 @@ def generate_typename_field(typename, registry: ClassRegistry):
             slice=ast.Subscript(
                 value=ast.Name("Literal", ctx=ast.Load()),
                 slice=ast.Constant(value=typename),
+                ctx=ast.Load(),
             ),
+            ctx=ast.Load(),
         ),
         value=ast.Call(
             func=ast.Name(id="Field", ctx=ast.Load()),
@@ -87,10 +113,10 @@ def generate_config_class(config: GeneratorConfig):
         return []
 
 
-def parse_documents(
-    client_schema: GraphQLSchema, scan_glob="g/*/**.graphql"
-) -> DocumentNode:
+def parse_documents(client_schema: GraphQLSchema, scan_glob) -> DocumentNode:
     """ """
+    if not scan_glob:
+        raise GenerationError("Couldnt find documents glob")
 
     x = glob.glob(scan_glob, recursive=True)
 
@@ -178,11 +204,291 @@ def get_interface_bases(config: GeneratorConfig, registry: ClassRegistry):
         ]
 
 
-def interface_is_extended_by_other_interfaces(interface: GraphQLInterfaceType,
-                                              other_interfaces: Set[GraphQLInterfaceType]) -> bool:
+def interface_is_extended_by_other_interfaces(
+    interface: GraphQLInterfaceType, other_interfaces: Set[GraphQLInterfaceType]
+) -> bool:
     interfaces_implemented_by_other_interfaces = {
         nested_interface
         for other_interface in other_interfaces
         for nested_interface in other_interface.interfaces
     }
     return interface in interfaces_implemented_by_other_interfaces
+
+
+def recurse_type_annotation(
+    type: NamedTypeNode,
+    registry: ClassRegistry,
+    optional=True,
+    overwrite_final: Optional[str] = None,
+):
+
+    if isinstance(type, NonNullTypeNode):
+        return recurse_type_annotation(
+            type.type, registry, optional=False, overwrite_final=overwrite_final
+        )
+
+    if isinstance(type, ListTypeNode):
+        if optional:
+            registry.register_import("typing.List")
+            registry.register_import("typing.Optional")
+            return ast.Subscript(
+                value=ast.Name(id="Optional", ctx=ast.Load()),
+                slice=ast.Subscript(
+                    value=ast.Name(id="List", ctx=ast.Load()),
+                    slice=recurse_type_annotation(
+                        type.type, registry, overwrite_final=overwrite_final
+                    ),
+                ),
+            )
+
+        registry.register_import("typing.List")
+        return ast.Subscript(
+            value=ast.Name(id="List", ctx=ast.Load()),
+            slice=recurse_type_annotation(
+                type.type, registry, overwrite_final=overwrite_final
+            ),
+        )
+
+    if isinstance(type, NamedTypeNode):
+        x = None
+        if overwrite_final is not None:
+            x = ast.Name(id=overwrite_final, ctx=ast.Load())
+        else:
+            try:
+                x = registry.reference_scalar(type.name.value)
+            except NoScalarFound:
+                try:
+                    x = registry.reference_inputtype(
+                        type.name.value, "", allow_forward=False
+                    )
+                except NoInputTypeFound:
+                    try:
+                        x = registry.reference_enum(
+                            type.name.value, "", allow_forward=False
+                        )
+                    except NoEnumFound:
+                        raise NotImplementedError("Not implemented")
+
+        if not x:
+            raise Exception(f"Could not set value for {type}")
+
+        if optional:
+            registry.register_import("typing.Optional")
+            return ast.Subscript(
+                value=ast.Name(id="Optional", ctx=ast.Load()),
+                slice=x,
+            )
+
+        return x
+
+    raise NotImplementedError("oisnosin")
+
+
+def recurse_outputtype_annotation(
+    type: GraphQLOutputType,
+    registry: ClassRegistry,
+    optional=True,
+    overwrite_final: Optional[str] = None,
+):
+    if isinstance(type, GraphQLNonNull):
+        return recurse_outputtype_annotation(
+            type.of_type, registry, optional=False, overwrite_final=overwrite_final
+        )
+
+    if isinstance(type, GraphQLList):
+        if optional:
+            registry.register_import("typing.List")
+            registry.register_import("typing.Optional")
+            return ast.Subscript(
+                value=ast.Name(id="Optional", ctx=ast.Load()),
+                slice=ast.Subscript(
+                    value=ast.Name(id="List", ctx=ast.Load()),
+                    slice=recurse_outputtype_annotation(
+                        type.of_type, registry, overwrite_final=overwrite_final
+                    ),
+                ),
+            )
+
+        registry.register_import("typing.List")
+        return ast.Subscript(
+            value=ast.Name(id="List", ctx=ast.Load()),
+            slice=recurse_outputtype_annotation(
+                type.of_type, registry, overwrite_final=overwrite_final
+            ),
+        )
+
+    if isinstance(type, GraphQLEnumType):
+        if optional:
+            registry.register_import("typing.Optional")
+            return ast.Subscript(
+                value=ast.Name(id="Optional", ctx=ast.Load()),
+                slice=registry.reference_enum(type.name, "", allow_forward=False),
+            )
+
+        return registry.reference_enum(type.name, "", allow_forward=False)
+
+    if isinstance(type, GraphQLScalarType):
+
+        if optional:
+            registry.register_import("typing.Optional")
+            return ast.Subscript(
+                value=ast.Name("Optional", ctx=ast.Load()),
+                slice=registry.reference_scalar(type.name),
+            )
+
+        else:
+            return registry.reference_scalar(type.name)
+
+    if isinstance(type, GraphQLObjectType) or isinstance(type, GraphQLInterfaceType):
+
+        assert overwrite_final, "Needs to be set"
+        if optional:
+            registry.register_import("typing.Optional")
+            return ast.Subscript(
+                value=ast.Name("Optional", ctx=ast.Load()),
+                slice=ast.Name(id=overwrite_final, ctx=ast.Load()),
+            )
+
+        else:
+            return (ast.Name(id=overwrite_final, ctx=ast.Load()),)
+
+    raise NotImplementedError("oisnosin")  # pragma: no cover
+
+
+def recurse_outputtype_label(
+    type: GraphQLOutputType,
+    registry: ClassRegistry,
+    optional=True,
+    overwrite_final: Optional[str] = None,
+):
+    if isinstance(type, GraphQLNonNull):  # pragma: no cover
+        return recurse_outputtype_label(
+            type.of_type, registry, optional=False, overwrite_final=overwrite_final
+        )
+
+    if isinstance(type, GraphQLList):
+        if optional:
+            return (
+                "Optional[List["
+                + recurse_outputtype_label(
+                    type.of_type, registry, overwrite_final=overwrite_final
+                )
+                + "]]"
+            )
+
+        return (
+            "List["
+            + recurse_outputtype_label(
+                type.of_type, registry, overwrite_final=overwrite_final
+            )
+            + "]"
+        )
+
+    if isinstance(type, GraphQLEnumType):
+        if optional:
+            return (
+                "Optional["
+                + registry.reference_enum(type.name, "", allow_forward=False).id
+                + "]"
+            )
+
+        return registry.reference_enum(type.name, "", allow_forward=False).id
+
+    if isinstance(type, GraphQLScalarType):
+
+        if optional:
+            return "Optional[" + registry.reference_scalar(type.name).id + "]"
+
+        else:
+            return registry.reference_scalar(type.name).id
+
+    if isinstance(type, GraphQLObjectType) or isinstance(type, GraphQLInterfaceType):
+
+        assert overwrite_final, "Needs to be set"
+        if optional:
+            return "Optional[" + overwrite_final + "]"
+
+        else:
+            return overwrite_final
+
+    raise NotImplementedError("oisnosin")
+
+
+def recurse_type_label(
+    type: NamedTypeNode,
+    registry: ClassRegistry,
+    optional=True,
+    overwrite_final: Optional[str] = None,
+):
+
+    if isinstance(type, NonNullTypeNode):
+        return recurse_type_label(
+            type.type, registry, optional=False, overwrite_final=overwrite_final
+        )
+
+    if isinstance(type, ListTypeNode):
+        if optional:
+            return (
+                "Optional[List["
+                + recurse_type_label(
+                    type.type, registry, overwrite_final=overwrite_final
+                )
+                + "]]"
+            )
+
+        return (
+            "List["
+            + recurse_type_label(type.type, registry, overwrite_final=overwrite_final)
+            + "]"
+        )
+
+    if isinstance(type, NamedTypeNode):
+        if overwrite_final is not None:
+            x = ast.Name(id=overwrite_final, ctx=ast.Load())
+        else:
+            try:
+                x = registry.reference_scalar(type.name.value)
+            except NoScalarFound:
+                try:
+                    x = registry.reference_inputtype(
+                        type.name.value, "", allow_forward=False
+                    )
+                except NoInputTypeFound:
+                    try:
+                        x = registry.reference_enum(
+                            type.name.value, "", allow_forward=False
+                        )
+                    except NoEnumFound:
+                        raise NotImplementedError("Not implemented")
+
+        if optional:
+            return "Optional[" + x.id + "]"
+
+        return x.id
+
+
+def parse_value_node(value_node: ValueNode) -> Union[None, str, int, float, bool]:
+    """Parses a Value Node into a Python value
+    using standard types
+
+    Args:
+        value_node (ValueNode): The Argument Value Node
+
+    Raises:
+        NotImplementedError: If the Value Node is not supported
+
+    Returns:
+        Union[None, str, int, float, bool]: The parsed value
+    """
+    if isinstance(value_node, IntValueNode):
+        return int(value_node.value)
+    elif isinstance(value_node, FloatValueNode):
+        return float(value_node.value)
+    elif isinstance(value_node, StringValueNode):
+        return value_node.value
+    elif isinstance(value_node, BooleanValueNode):
+        return value_node.value == "true"
+    elif isinstance(value_node, NullValueNode):
+        return None
+    else:
+        raise NotImplementedError(f"Cannot parse {value_node}")
