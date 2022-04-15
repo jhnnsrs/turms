@@ -27,8 +27,6 @@ def unit_test_with(generated_ast: List[ast.AST], test_string: str):
     parsed_code = ast.unparse(ast.fix_missing_locations(md))
 
     with tempfile.TemporaryDirectory() as tmpdirname:
-        print("created temporary directory", tmpdirname)
-
         filename = write_code_to_file(parsed_code, tmpdirname, "minimal.py")
         s = subprocess.run([sys.executable, filename], capture_output=True)
         if s.returncode == 0:
