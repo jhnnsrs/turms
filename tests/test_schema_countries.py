@@ -10,6 +10,7 @@ from turms.stylers.default import DefaultStyler
 from turms.helpers import build_schema_from_introspect_url
 from .utils import unit_test_with
 
+
 @pytest.fixture()
 def countries_schema():
     return build_schema_from_introspect_url("https://countries.trevorblades.com/")
@@ -33,6 +34,5 @@ def test_complex_operations(countries_schema):
 
     md = ast.Module(body=generated_ast, type_ignores=[])
     generated = ast.unparse(ast.fix_missing_locations(md))
-    print(generated)
     assert "from enum import Enum" in generated, "EnumPlugin not working"
     assert "class Query(BaseModel)" in generated, "No Query was detected"

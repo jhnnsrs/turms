@@ -253,7 +253,6 @@ def recurse_type_annotation(
         x = None
         if overwrite_final is not None:
             x = ast.Name(id=overwrite_final, ctx=ast.Load())
-            print("OVerwirten final", x)
         else:
             try:
                 x = registry.reference_scalar(type.name.value)
