@@ -105,6 +105,9 @@ class ClassRegistry(object):
         self.inputtype_class_map[typename] = classname
         return classname
 
+    def get_inputtype_class(self, typename) -> str:
+        return self.inputtype_class_map[typename]
+
     def reference_inputtype(
         self, typename: str, parent: str, allow_forward=True
     ) -> ast.AST:
@@ -132,6 +135,9 @@ class ClassRegistry(object):
         classname = self.style_enum_class(typename)
         self.enum_class_map[typename] = classname
         return classname
+
+    def get_enum_class(self, typename) -> str:
+        return self.enum_class_map[typename]
 
     def reference_enum(self, typename: str, parent: str, allow_forward=True) -> ast.AST:
         if typename in built_in_map:

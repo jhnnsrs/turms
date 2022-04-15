@@ -6,6 +6,7 @@ from turms.config import GeneratorConfig
 from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
+from turms.plugins.funcs import FuncsPlugin, FuncsPluginConfig, FunctionDefinition
 from turms.plugins.objects import ObjectsPlugin
 from turms.plugins.fragments import FragmentsPlugin, FragmentsPluginConfig
 from turms.plugins.operations import OperationsPlugin
@@ -39,6 +40,19 @@ generated_ast = generate_ast(
         InputsPlugin(),
         FragmentsPlugin(),
         OperationsPlugin(),
+        FuncsPlugin(
+            config=FuncsPluginConfig(
+                definitions=(
+                    [
+                        FunctionDefinition(
+                            type="mutation",
+                            use="tests.mocks.query",
+                            is_async=False,
+                        )
+                    ]
+                )
+            ),
+        ),
     ],
 )
 

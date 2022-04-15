@@ -451,6 +451,7 @@ def formalize_type(
         return x, modifiers
 
     if isinstance(field_definition, GraphQLNamedType):
+
         try:
             x = registry.get_scalar_equivalent(field_definition.name)
         except NoScalarEquivalentFound as e:
@@ -574,10 +575,13 @@ def get_return_type_annotation(
             if isinstance(
                 potential_return_field.selection_set.selections[0], FragmentSpreadNode
             ):  # Dealing with a on element fragment
-                return registry.reference_fragment(
-                    potential_return_field.selection_set.selections[0].name.value,
-                    "",
-                    allow_forward=False,
+                return (
+                    registry.reference_fragment(
+                        potential_return_field.selection_set.selections[0].name.value,
+                        "",
+                        allow_forward=False,
+                    ),
+                    True,
                 )
         # is a subseleciton of maybe multiple fragments or just a normal selection
         return (
@@ -633,8 +637,10 @@ def get_return_type_string(
                 potential_return_field.selection_set.selections[0], FragmentSpreadNode
             ):  # Dealing with a on element fragment
                 return (
-                    registry.get_fragment_class(
-                        potential_return_field.selection_set.selections[0].name.value
+                    registry.reference_fragment(
+                        potential_return_field.selection_set.selections[0].name.value,
+                        "",
+                        allow_forward=False,
                     ),
                     True,
                 )
@@ -1102,7 +1108,7 @@ def generate_operation_func(
 
 
 class FuncsPlugin(Plugin):
-    config: FuncsPluginConfig = Field(default_facotry=FuncsPluginConfig)
+    config: FuncsPluginConfig = Field(default_factory=FuncsPluginConfig)
 
     def generate_ast(
         self,
