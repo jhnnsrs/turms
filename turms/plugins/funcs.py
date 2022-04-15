@@ -24,6 +24,7 @@ from graphql import (
     StringValueNode,
     ValueNode,
     VariableDefinitionNode,
+    is_wrapping_type,
 )
 from graphql.language.ast import (
     FieldNode,
@@ -290,7 +291,7 @@ def get_operation_class_name(o: OperationDefinitionNode, registry: ClassRegistry
     if o.operation == OperationType.SUBSCRIPTION:
         return registry.style_subscription_class(o.name.value)
 
-    raise Exception("Incorrect Operation Type ")
+    raise Exception("Incorrect Operation Type ")  # pragma: no cover
 
 
 def get_return_type_annotation(
@@ -307,7 +308,7 @@ def get_return_type_annotation(
         collapsable_field = o.selection_set.selections[0]
         field_definition = get_field_def(client_schema, root, collapsable_field)
 
-        if collapsable_field.selection_set is None:
+        if collapsable_field.selection_set is None:  # pragma: no cover
             return recurse_outputtype_annotation(field_definition.type, registry)
 
         if (
@@ -354,7 +355,9 @@ def get_return_type_string(
             client_schema, root, potential_return_field
         )
 
-        if potential_return_field.selection_set is None:  # Dealing with a scalar type
+        if (
+            potential_return_field.selection_set is None
+        ):  # Dealing with a scalar type  # pragma: no cover
             return recurse_outputtype_label(potential_return_type.type, registry)
 
         if (
@@ -407,9 +410,11 @@ def generate_query_doc(
     for field in o.selection_set.selections:
         if isinstance(field, FieldNode):
             target = target_from_node(field)
-            field_definition = get_field_def(client_schema, x, field)
-            if field_definition.description:
-                o.append(f"{target}: {field_definition.description}\n")
+            operation_type = get_field_def(client_schema, x, field).type
+            while is_wrapping_type(operation_type):
+                operation_type = operation_type.of_type
+            if operation_type.description:
+                op_descriptions.append(f"{target}: {operation_type.description}\n")
 
     description = "\n ".join([header] + op_descriptions)
 

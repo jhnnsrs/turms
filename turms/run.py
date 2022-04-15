@@ -140,13 +140,13 @@ def scan_folder_for_single_config(folder_path: str = None) -> List[str]:
 
 def write_code_to_file(code: str, outdir: str, filepath: str):
 
-    if not os.path.isdir(outdir):
+    if not os.path.isdir(outdir):  # pragma: no cover
         os.makedirs(outdir)
 
     generated_file = os.path.join(
-            outdir,
-            filepath,
-        )
+        outdir,
+        filepath,
+    )
 
     with open(
         generated_file,
@@ -156,8 +156,6 @@ def write_code_to_file(code: str, outdir: str, filepath: str):
         file.write(code)
 
     return generated_file
-
-
 
 
 def gen(
@@ -186,9 +184,12 @@ def gen(
 
             generated_code = generate(project)
 
-            write_code_to_file(generated_code, overwrite_path or project.extensions.turms.out_dir, project.extensions.turms.generated_name )
+            write_code_to_file(
+                generated_code,
+                overwrite_path or project.extensions.turms.out_dir,
+                project.extensions.turms.generated_name,
+            )
 
-            
             get_console().print("Sucessfull!! :right-facing_fist::left-facing_fist:")
         except Exception as e:
             get_console().print(
@@ -326,6 +327,10 @@ def generate_ast(
             raise GenerationError(f"Plugin:{plugin} failed!") from e
 
     global_tree = (
-        registry.generate_imports() + registry.generate_builtins() + global_tree + registry.generate_forward_refs())
+        registry.generate_imports()
+        + registry.generate_builtins()
+        + global_tree
+        + registry.generate_forward_refs()
+    )
 
     return global_tree

@@ -8,7 +8,7 @@ from turms.plugins.objects import ObjectsPlugin
 from turms.run import generate_ast
 from turms.stylers.default import DefaultStyler
 
-from tests.utils import (
+from .utils import (
     build_relative_glob,
     unit_test_with,
 )

@@ -2,7 +2,7 @@ import ast
 
 import pytest
 
-from tests.utils import (
+from .utils import (
     build_relative_glob,
     generated_module_is_executable,
     unit_test_with,

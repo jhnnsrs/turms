@@ -227,7 +227,8 @@ def generate_fragment(
             if field.name.value == "__typename":
                 continue
 
-            if isinstance(field, FragmentDefinitionNode):
+            if isinstance(field, FragmentDefinitionNode):  # pragma: no cover
+
                 continue
 
             if isinstance(field, FragmentSpreadNode):

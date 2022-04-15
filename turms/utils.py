@@ -292,7 +292,7 @@ def recurse_outputtype_annotation(
 ):
     if isinstance(type, GraphQLNonNull):
         return recurse_outputtype_annotation(
-            type.type, registry, optional=False, overwrite_final=overwrite_final
+            type.of_type, registry, optional=False, overwrite_final=overwrite_final
         )
 
     if isinstance(type, GraphQLList):
@@ -352,7 +352,7 @@ def recurse_outputtype_annotation(
         else:
             return (ast.Name(id=overwrite_final, ctx=ast.Load()),)
 
-    raise NotImplementedError("oisnosin")
+    raise NotImplementedError("oisnosin")  # pragma: no cover
 
 
 def recurse_outputtype_label(
@@ -361,7 +361,7 @@ def recurse_outputtype_label(
     optional=True,
     overwrite_final: Optional[str] = None,
 ):
-    if isinstance(type, GraphQLNonNull):
+    if isinstance(type, GraphQLNonNull):  # pragma: no cover
         return recurse_outputtype_label(
             type.of_type, registry, optional=False, overwrite_final=overwrite_final
         )
@@ -397,11 +397,7 @@ def recurse_outputtype_label(
     if isinstance(type, GraphQLScalarType):
 
         if optional:
-            return (
-                "Optional["
-                + registry.reference_scalar(type.name, "", allow_forward=False).id
-                + "]"
-            )
+            return "Optional[" + registry.reference_scalar(type.name).id + "]"
 
         else:
             return registry.reference_scalar(type.name).id

@@ -38,15 +38,38 @@ def test_multi_interface_funcs(multi_interface_schema):
             OperationsPlugin(),
             FuncsPlugin(
                 config=FuncsPluginConfig(
-                    definitions=(
-                        [
-                            FunctionDefinition(
-                                type="mutation",
-                                use="tests.mocks.query",
-                                is_async=False,
-                            )
-                        ]
-                    )
+                    definitions=[
+                        FunctionDefinition(
+                            type="query",
+                            use="tests.mocks.query",
+                            is_async=False,
+                        ),
+                        FunctionDefinition(
+                            type="query",
+                            use="tests.mocks.query",
+                            is_async=True,
+                        ),
+                        FunctionDefinition(
+                            type="mutation",
+                            use="tests.mocks.aquery",
+                            is_async=False,
+                        ),
+                        FunctionDefinition(
+                            type="mutation",
+                            use="tests.mocks.aquery",
+                            is_async=True,
+                        ),
+                        FunctionDefinition(
+                            type="subscription",
+                            use="tests.mocks.subscribe",
+                            is_async=False,
+                        ),
+                        FunctionDefinition(
+                            type="subscription",
+                            use="tests.mocks.asubscribe",
+                            is_async=True,
+                        ),
+                    ]
                 ),
             ),
         ],

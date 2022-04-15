@@ -128,7 +128,7 @@ def generate_inputs(
 
     for key, type in inputobjects_type.items():
 
-        if plugin_config.skip_underscore and key.startswith("_"):
+        if plugin_config.skip_underscore and key.startswith("_"):  # pragma: no cover
             continue
 
         additional_bases = get_additional_bases_for_type(type.name, config, registry)
