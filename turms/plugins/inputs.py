@@ -105,7 +105,7 @@ def generate_input_annotation(
             ctx=ast.Load(),
         )
 
-    raise NotImplementedError(f"Unknown input type {type}")
+    raise NotImplementedError(f"Unknown input type {type}")  # pragma: no cover
 
 
 def generate_inputs(
@@ -183,7 +183,7 @@ def generate_inputs(
             potential_comment = (
                 value.description
                 if not value.deprecation_reason
-                else f"DEPRECATED: {value.description}"
+                else f"DEPRECATED: {value.deprecation_reason}"
             )
 
             if potential_comment:
