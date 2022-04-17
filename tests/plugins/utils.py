@@ -1,6 +1,7 @@
 import ast
 import re
-from typing import List
+from enum import Enum
+from typing import List, Union
 
 from graphql import GraphQLSchema, build_ast_schema, parse, DEFAULT_DEPRECATION_REASON
 from pydantic import BaseModel
@@ -38,16 +39,23 @@ def re_token_can_be_forward_reference(string: str) -> str:
     return fr"(?:\'{string}\'|{string})"
 
 
+class GeneratedTestCaseFlavour(str, Enum):
+    INPUT_OBJECT_TYPE = "input"
+    OBJECT_TYPE = "type"
+
+
 class TestCaseGenerator:
-    def __init__(self, gql_type_identifier: str):
+    def __init__(self, gql_type_identifier: GeneratedTestCaseFlavour):
         assert gql_type_identifier in ["type", "input"]
         self.gql_type_identifier = gql_type_identifier
 
     @staticmethod
-    def _format_list_for_parametrize(test_cases: List[TestCase]) -> List[List[TestCase]]:
+    def _format_list_for_parametrize(test_cases: Union[TestCase, List[TestCase]]) -> List[List[TestCase]]:
+        if not isinstance(test_cases, list):
+            test_cases = [test_cases]
         return [[case] for case in test_cases]
 
-    def make_test_cases_primitive_field_types(self):
+    def make_test_cases_primitive_field_value(self):
         test_cases = [
             TestCase(
                 sdl="""
@@ -118,7 +126,51 @@ class TestCaseGenerator:
         ]
         return self._format_list_for_parametrize(test_cases)
 
-    def make_test_cases_nested_field_types(self) -> List[List[TestCase]]:
+    def make_test_cases_enum_field_value(self):
+        test_cases = [
+            TestCase(
+                sdl="""
+                enum Foo {
+                  bar
+                  baz
+                }
+
+                %s EnumField {
+                  foo: Foo!
+                }
+                """ % self.gql_type_identifier,
+                expected_re_patterns=[
+                    r"class Foo\(str, Enum\):",
+                    r"bar = \'bar\'",
+                    r"baz = \'baz\'",
+                    r"class EnumField",
+                    fr"foo: {re_token_can_be_forward_reference('Foo')}",
+                ]
+            ),
+
+            TestCase(
+                sdl="""
+                enum Foo {
+                  bar
+                  baz
+                }
+
+                %s OptionalEnumField {
+                  foo: Foo
+                }
+                """ % self.gql_type_identifier,
+                expected_re_patterns=[
+                    r"class Foo\(str, Enum\):",
+                    r"bar = \'bar\'",
+                    r"baz = \'baz\'",
+                    r"class OptionalEnumField",
+                    fr"foo: Optional\[{re_token_can_be_forward_reference('Foo')}\]",
+                ]
+            )
+        ]
+        return self._format_list_for_parametrize(test_cases)
+
+    def make_test_cases_nested_field_value(self) -> List[List[TestCase]]:
         test_cases = [
             TestCase(
                 sdl="""
@@ -257,36 +309,49 @@ class TestCaseGenerator:
         ]
         return self._format_list_for_parametrize(test_cases)
 
-    def make_test_cases_skip_underscore(self, skip: bool):
+    def make_test_cases_skip_underscore(self, should_skip: bool):
         on_skip_patterns = ["^$"]  # empty string
         on_generated_patterns = [
             r"class _SkipUnderscore",
             r"test: Optional\[str\]",
         ]
-        test_cases = [
+        return self._format_list_for_parametrize(
             TestCase(
                 sdl="""
-                       %s _SkipUnderscore {
-                         test: String
-                       }""" % self.gql_type_identifier,
-                expected_re_patterns=on_skip_patterns if skip else on_generated_patterns
-            ),
-        ]
-        return self._format_list_for_parametrize(test_cases)
+                %s _SkipUnderscore {
+                  test: String
+                }""" % self.gql_type_identifier,
+                expected_re_patterns=on_skip_patterns if should_skip else on_generated_patterns
+            )
+        )
 
-    def make_test_cases_skip_double_underscore(self, skip: bool):
+    def make_test_cases_skip_double_underscore(self, should_skip: bool):
         on_skip_patterns = ["^$"]  # empty string
         on_generated_patterns = [
             r"class __SkipDoubleUnderscore",
             r"test: Optional\[str\]",
         ]
-        test_cases = [
+        return self._format_list_for_parametrize(
             TestCase(
                 sdl="""
-                       %s __SkipDoubleUnderscore {
-                         test: String
-                       }""" % self.gql_type_identifier,
-                expected_re_patterns=on_skip_patterns if skip else on_generated_patterns
-            ),
-        ]
-        return self._format_list_for_parametrize(test_cases)
+                %s __SkipDoubleUnderscore {
+                 test: String
+                }""" % self.gql_type_identifier,
+                expected_re_patterns=on_skip_patterns if should_skip else on_generated_patterns
+            )
+        )
+
+    def make_test_cases_is_keyword(self):
+        return self._format_list_for_parametrize(
+            TestCase(
+                sdl="""
+                %s FieldIsKeyword {
+                  from: Int!
+                }
+                """ % self.gql_type_identifier,
+                expected_re_patterns=[
+                    r"class FieldIsKeyword",
+                    r"from_: int = Field\(alias='from'\)"
+                ]
+            )
+        )
