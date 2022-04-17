@@ -306,7 +306,7 @@ def generate_types(
             potential_comment = (
                 value.description
                 if not value.deprecation_reason
-                else f"DEPRECATED: {value.description}"
+                else f"DEPRECATED: {value.deprecation_reason}"
             )
 
             if potential_comment:
