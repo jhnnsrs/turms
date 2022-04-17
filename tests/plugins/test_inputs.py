@@ -260,6 +260,15 @@ def make_test_cases_for_parametrize() -> List[List[TestCase]]:
                 fr"\'DEPRECATED: {DEFAULT_DEPRECATION_REASON}\'"
             ]
         ),
+        TestCase(
+            sdl="""
+            input _SkipType {
+              test: String
+            }""",
+            expected_re_patterns=[
+                "^$"  # empty string
+            ]
+        )
     ]
     return [[case] for case in test_cases]
 
