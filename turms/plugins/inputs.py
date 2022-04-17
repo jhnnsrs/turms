@@ -97,12 +97,12 @@ class InputsPlugin(Plugin):
             body.append(self._generate_type_description_ast(gql_type))
 
         for field_name, field_value in gql_type.fields.items():
-            body.append(self._generate_input_field_ast(gql_type.name, field_name, field_value, config, registry))
+            body.append(self._generate_input_field_attribute_ast(gql_type.name, field_name, field_value, config, registry))
             if self._input_field_has_description(field_value):
                 body.append(self._generate_input_field_description_ast(field_value))
         return body
 
-    def _generate_input_field_ast(
+    def _generate_input_field_attribute_ast(
             self,
             parent_name: str,
             field_name: str,
@@ -110,18 +110,18 @@ class InputsPlugin(Plugin):
             config: GeneratorConfig,
             registry: ClassRegistry
     ) -> ast.AnnAssign:
-        name = self._generate_attribute_name(field_name, registry)
-        annotation = self._generate_attribute_annotation(parent_name, field_value, config, registry)
-        if name != field_name:
-            alias = self._generate_attribute_alias(field_name, registry)
+        attribute_name = self._generate_attribute_name(field_name, registry)
+        annotation = self._generate_attribute_annotation_ast(parent_name, field_value, config, registry)
+        if attribute_name != field_name:
+            alias = self._generate_attribute_alias_ast(field_name, registry)
         else:
             alias = None
-        return AstGenerator.generate_attribute(name, annotation, alias)
+        return AstGenerator.generate_attribute(attribute_name, annotation, alias)
 
     def _generate_attribute_name(self, field_name: str, registry: ClassRegistry) -> str:
         return registry.generate_node_name(field_name)
 
-    def _generate_attribute_annotation(
+    def _generate_attribute_annotation_ast(
             self,
             parent_name: str,
             field_value: GraphQLInputField,
@@ -137,7 +137,7 @@ class InputsPlugin(Plugin):
             is_optional=True
         )
 
-    def _generate_attribute_alias(self, original_name: str, registry: ClassRegistry) -> ast.Call:
+    def _generate_attribute_alias_ast(self, original_name: str, registry: ClassRegistry) -> ast.Call:
         registry.register_import("pydantic.Field")
         return AstGenerator.generate_field_alias(original_name)
 
@@ -153,6 +153,30 @@ class InputsPlugin(Plugin):
         return AstGenerator.generate_field_description(comment)
 
 
+class AnnotationAstGenerator:
+    @staticmethod
+    def reference(typename: str) -> ast.Name:
+        return ast.Name(id=typename, ctx=ast.Load())
+
+    @staticmethod
+    def forward_reference(typename: str) -> ast.Constant:
+        return ast.Constant(id=typename, ctx=ast.Load())
+
+    @staticmethod
+    def optional(value: ast.AST) -> ast.Subscript:
+        return AnnotationAstGenerator._wrap("Optional", value)
+
+    @staticmethod
+    def list(value: ast.AST) -> ast.Subscript:
+        return AnnotationAstGenerator._wrap("List", value)
+
+    @staticmethod
+    def _wrap(outside: str, inside: ast.AST):
+        return ast.Subscript(value=ast.Name(outside, ctx=ast.Load()),
+                             slice=inside,
+                             ctx=ast.Load())
+
+
 def generate_input_annotation(
         type: GraphQLInputType,
         parent: str,
@@ -160,74 +184,38 @@ def generate_input_annotation(
         plugin_config: InputsPluginConfig,
         registry: ClassRegistry,
         is_optional=True,
-):
+) -> ast.AST:
     if isinstance(type, GraphQLScalarType):
-        if is_optional:
-            registry.register_import("typing.Optional")
-            return ast.Subscript(
-                value=ast.Name("Optional", ctx=ast.Load()),
-                slice=registry.reference_scalar(type.name),
-            )
+        annotation = registry.reference_scalar(type.name)
 
-        return registry.reference_scalar(type.name)
+    elif isinstance(type, GraphQLInputObjectType):
+        annotation = registry.reference_inputtype(type.name, parent)
 
-    if isinstance(type, GraphQLInputObjectType):
-        if is_optional:
-            registry.register_import("typing.Optional")
-            return ast.Subscript(
-                value=ast.Name("Optional", ctx=ast.Load()),
-                slice=registry.reference_inputtype(type.name, parent),
-                ctx=ast.Load(),
-            )
-        return registry.reference_inputtype(type.name, parent)
+    elif isinstance(type, GraphQLEnumType):
+        annotation = registry.reference_enum(type.name, parent, allow_forward=not config.force_plugin_order)
 
-    if isinstance(type, GraphQLEnumType):
-        if is_optional:
-            registry.register_import("typing.Optional")
-            return ast.Subscript(
-                value=ast.Name("Optional", ctx=ast.Load()),
-                slice=registry.reference_enum(
-                    type.name, parent, allow_forward=not config.force_plugin_order
-                ),
-                ctx=ast.Load(),
-            )
-        return registry.reference_enum(
-            type.name, parent, allow_forward=not config.force_plugin_order
-        )
-
-    if isinstance(type, GraphQLNonNull):
-        return generate_input_annotation(
+    elif isinstance(type, GraphQLNonNull):
+        annotation = generate_input_annotation(
             type.of_type, parent, config, plugin_config, registry, is_optional=False
         )
+        is_optional = False
 
-    if isinstance(type, GraphQLList):
-        if is_optional:
-            registry.register_import("typing.Optional")
-            registry.register_import("typing.List")
-            return ast.Subscript(
-                value=ast.Name("Optional", ctx=ast.Load()),
-                slice=ast.Subscript(
-                    value=ast.Name("List", ctx=ast.Load()),
-                    slice=generate_input_annotation(
-                        type.of_type,
-                        parent,
-                        config,
-                        plugin_config,
-                        registry,
-                        is_optional=True,
-                    ),
-                    ctx=ast.Load(),
-                ),
-                ctx=ast.Load(),
-            )
-
+    elif isinstance(type, GraphQLList):
         registry.register_import("typing.List")
-        return ast.Subscript(
-            value=ast.Name("List", ctx=ast.Load()),
-            slice=generate_input_annotation(
-                type.of_type, parent, config, plugin_config, registry, is_optional=True
-            ),
-            ctx=ast.Load(),
+        annotation = AnnotationAstGenerator.list(
+            generate_input_annotation(
+                type.of_type,
+                parent,
+                config,
+                plugin_config,
+                registry,
+                is_optional=True,
+            )
         )
+    else:
+        raise NotImplementedError(f"Unknown input type {type}")  # pragma: no cover
 
-    raise NotImplementedError(f"Unknown input type {type}")  # pragma: no cover
+    if is_optional:
+        registry.register_import("typing.Optional")
+        annotation = AnnotationAstGenerator.optional(annotation)
+    return annotation
