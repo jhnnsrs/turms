@@ -7,15 +7,16 @@ from graphql import (
     GraphQLList,
     GraphQLNonNull,
     GraphQLScalarType,
+    GraphQLEnumType,
+    GraphQLNamedType,
+    GraphQLInputField,
+    GraphQLSchema,
 )
-from graphql.type.definition import (
-    GraphQLEnumType, GraphQLNamedType, GraphQLInputField,
-)
-from graphql.utilities.build_client_schema import GraphQLSchema
 from pydantic import Field
 
+from turms.ast_generators import AnnotationAstGenerator, InputTypeAstGenerator
 from turms.config import GeneratorConfig
-from turms.plugins.base import Plugin, PluginConfig, AstGenerator
+from turms.plugins.base import Plugin, PluginConfig
 from turms.registry import ClassRegistry
 
 
@@ -61,7 +62,7 @@ class InputsPlugin(Plugin):
         classname = self._generate_classname(typename, registry)
         base_classes = self._generate_base_classes(gql_type, config, registry)
         input_body = self._generate_input_body(gql_type, config, registry)
-        return AstGenerator.generate_class_definition(classname, base_classes, input_body)
+        return InputTypeAstGenerator.generate_class_definition(classname, base_classes, input_body)
 
     def _generate_classname(self, typename: str, registry: ClassRegistry):
         return registry.generate_inputtype(typename)
@@ -97,7 +98,8 @@ class InputsPlugin(Plugin):
             body.append(self._generate_type_description_ast(gql_type))
 
         for field_name, field_value in gql_type.fields.items():
-            body.append(self._generate_input_field_attribute_ast(gql_type.name, field_name, field_value, config, registry))
+            body.append(
+                self._generate_input_field_attribute_ast(gql_type.name, field_name, field_value, config, registry))
             if self._input_field_has_description(field_value):
                 body.append(self._generate_input_field_description_ast(field_value))
         return body
@@ -116,7 +118,7 @@ class InputsPlugin(Plugin):
             alias = self._generate_attribute_alias_ast(field_name, registry)
         else:
             alias = None
-        return AstGenerator.generate_attribute(attribute_name, annotation, alias)
+        return InputTypeAstGenerator.generate_attribute(attribute_name, annotation, alias)
 
     def _generate_attribute_name(self, field_name: str, registry: ClassRegistry) -> str:
         return registry.generate_node_name(field_name)
@@ -139,10 +141,9 @@ class InputsPlugin(Plugin):
 
     def _generate_attribute_alias_ast(self, original_name: str, registry: ClassRegistry) -> ast.Call:
         registry.register_import("pydantic.Field")
-        return AstGenerator.generate_field_alias(original_name)
+        return InputTypeAstGenerator.generate_field_alias(original_name)
 
     def _input_field_has_description(self, field: GraphQLInputField):
-        # What about deprecation?
         return field.description is not None or field.deprecation_reason is not None
 
     def _generate_input_field_description_ast(self, field: GraphQLInputField) -> ast.AST:
@@ -150,31 +151,7 @@ class InputsPlugin(Plugin):
             comment = field.description
         else:
             comment = f"DEPRECATED: {field.deprecation_reason}"
-        return AstGenerator.generate_field_description(comment)
-
-
-class AnnotationAstGenerator:
-    @staticmethod
-    def reference(typename: str) -> ast.Name:
-        return ast.Name(id=typename, ctx=ast.Load())
-
-    @staticmethod
-    def forward_reference(typename: str) -> ast.Constant:
-        return ast.Constant(id=typename, ctx=ast.Load())
-
-    @staticmethod
-    def optional(value: ast.AST) -> ast.Subscript:
-        return AnnotationAstGenerator._wrap("Optional", value)
-
-    @staticmethod
-    def list(value: ast.AST) -> ast.Subscript:
-        return AnnotationAstGenerator._wrap("List", value)
-
-    @staticmethod
-    def _wrap(outside: str, inside: ast.AST):
-        return ast.Subscript(value=ast.Name(outside, ctx=ast.Load()),
-                             slice=inside,
-                             ctx=ast.Load())
+        return InputTypeAstGenerator.generate_field_description(comment)
 
 
 def generate_input_annotation(

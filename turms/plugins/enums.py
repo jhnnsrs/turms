@@ -1,14 +1,16 @@
-from turms.plugins.base import PluginConfig, AstGenerator
 import ast
 from typing import List
-from turms.config import GeneratorConfig
-from graphql.utilities.build_client_schema import GraphQLSchema
-from turms.plugins.base import Plugin
-from pydantic import Field
-from graphql.type.definition import (
-    GraphQLEnumType, GraphQLEnumValue,
-)
 
+from graphql import (
+    GraphQLSchema,
+    GraphQLEnumType,
+    GraphQLEnumValue,
+)
+from pydantic import Field
+
+from turms.ast_generators import EnumTypeAstGenerator
+from turms.config import GeneratorConfig
+from turms.plugins.base import Plugin, PluginConfig
 from turms.registry import ClassRegistry
 
 
@@ -30,10 +32,10 @@ class EnumsPlugin(Plugin):
     config: EnumsPluginConfig = Field(default_factory=EnumsPluginConfig)
 
     def generate_ast(
-        self,
-        client_schema: GraphQLSchema,
-        config: GeneratorConfig,
-        registry: ClassRegistry,
+            self,
+            client_schema: GraphQLSchema,
+            config: GeneratorConfig,
+            registry: ClassRegistry,
     ) -> List[ast.AST]:
 
         # Todo: Remove, use self._generate_base_classes instead
@@ -70,7 +72,7 @@ class EnumsPlugin(Plugin):
         classname = self._generate_classname(registry, typename)
         base_classes = self._generate_base_classes(registry)
         enum_body = self._generate_enum_body(gql_type)
-        return AstGenerator.generate_class_definition(classname, base_classes, enum_body)
+        return EnumTypeAstGenerator.generate_class_definition(classname, base_classes, enum_body)
 
     def _generate_classname(self, registry: ClassRegistry, typename: str) -> str:
         return registry.generate_enum(typename)
@@ -95,7 +97,7 @@ class EnumsPlugin(Plugin):
         return body
 
     def _generate_enum_value_ast(self, enum_key: str, enum_value: GraphQLEnumValue) -> ast.Assign:
-        return AstGenerator.generate_enum_value(enum_key, enum_value.value)
+        return EnumTypeAstGenerator.generate_enum_value(enum_key, enum_value.value)
 
     def _enum_value_has_description(self, enum_value: GraphQLEnumValue) -> bool:
         return enum_value.description is not None or enum_value.deprecation_reason is not None
@@ -105,4 +107,4 @@ class EnumsPlugin(Plugin):
             comment = f"DEPRECATED: {enum_value.deprecation_reason}"
         else:
             comment = enum_value.description
-        return AstGenerator.generate_field_description(comment)
+        return EnumTypeAstGenerator.generate_field_description(comment)

@@ -10,6 +10,7 @@ from turms.errors import (
     RegistryError,
 )
 from turms.stylers.base import Styler
+from turms.ast_generators import AnnotationAstGenerator
 from rich import get_console
 
 SCALAR_DEFAULTS = {
@@ -113,8 +114,8 @@ class BaseTypeRegistry(abc.ABC):
                     f"And we dont allow forward references"
                 )
             self.forward_references.add(parent)
-            return ast.Constant(value=classname, ctx=ast.Load())
-        return ast.Name(id=classname, ctx=ast.Load())
+            return AnnotationAstGenerator.forward_reference(classname)
+        return AnnotationAstGenerator.reference(classname)
 
 
 class InputTypeRegistry(BaseTypeRegistry):
@@ -155,7 +156,7 @@ class InterfaceTypeRegistry(BaseTypeRegistry):
     ) -> Union[ast.Name, ast.Constant]:
         classname = self.style_type(typename)
         self.forward_references.add(parent)
-        return ast.Constant(value=classname, ctx=ast.Load())
+        return AnnotationAstGenerator.forward_reference(classname)
 
 
 class FragmentTypeRegistry(BaseTypeRegistry):
