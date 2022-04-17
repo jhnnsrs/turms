@@ -184,7 +184,7 @@ def generate_object_field_annotation(
             ctx=ast.Load(),
         )
 
-    raise NotImplementedError(f"Unknown input type {repr(graphql_type)}")
+    raise NotImplementedError(f"Unknown input type {repr(graphql_type)}")  # pragma: no cover
 
 
 def generate_types(

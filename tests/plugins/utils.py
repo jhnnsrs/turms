@@ -39,6 +39,11 @@ def re_token_can_be_forward_reference(string: str) -> str:
     return fr"(?:\'{string}\'|{string})"
 
 
+def re_token_one_of_base_classes(classname: str) -> str:
+    base_classes_token = r"[ ,a-zA-Z]"
+    return fr"\({base_classes_token}*{classname}{base_classes_token}*\):"
+
+
 class TestCaseGenerator:
     gql_type_identifier: str = NotImplemented
 
