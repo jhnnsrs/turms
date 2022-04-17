@@ -35,6 +35,7 @@ class TestCase(BaseModel):
 
 
 def re_token_can_be_forward_reference(string: str) -> str:
+    """Regular expression that matches <string> and '<string>'."""
     return fr"(?:\'{string}\'|{string})"
 
 
