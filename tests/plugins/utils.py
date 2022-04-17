@@ -1,6 +1,5 @@
 import ast
 import re
-from enum import Enum
 from typing import List, Union
 
 from graphql import GraphQLSchema, build_ast_schema, parse, DEFAULT_DEPRECATION_REASON
@@ -39,15 +38,8 @@ def re_token_can_be_forward_reference(string: str) -> str:
     return fr"(?:\'{string}\'|{string})"
 
 
-class GeneratedTestCaseFlavour(str, Enum):
-    INPUT_OBJECT_TYPE = "input"
-    OBJECT_TYPE = "type"
-
-
 class TestCaseGenerator:
-    def __init__(self, gql_type_identifier: GeneratedTestCaseFlavour):
-        assert gql_type_identifier in ["type", "input"]
-        self.gql_type_identifier = gql_type_identifier
+    gql_type_identifier: str = NotImplemented
 
     @staticmethod
     def _format_list_for_parametrize(test_cases: Union[TestCase, List[TestCase]]) -> List[List[TestCase]]:
@@ -55,14 +47,15 @@ class TestCaseGenerator:
             test_cases = [test_cases]
         return [[case] for case in test_cases]
 
-    def make_test_cases_primitive_field_value(self):
+    @classmethod
+    def make_test_cases_primitive_field_value(cls):
         test_cases = [
             TestCase(
                 sdl="""
                 %s OptionalField {
                   test: String
                 }
-                """ % self.gql_type_identifier,
+                """ % cls.gql_type_identifier,
                 expected_re_patterns=[
                     r"class OptionalField",
                     r"test: Optional\[str\]"
@@ -73,7 +66,7 @@ class TestCaseGenerator:
                 %s MandatoryField {
                   test: String!
                 }
-                """ % self.gql_type_identifier,
+                """ % cls.gql_type_identifier,
                 expected_re_patterns=[
                     r"class MandatoryField",
                     r"test: str"
@@ -84,7 +77,7 @@ class TestCaseGenerator:
                 %s OptionalInsideOptionalList {
                   test: [String]
                 }
-                """ % self.gql_type_identifier,
+                """ % cls.gql_type_identifier,
                 expected_re_patterns=[
                     r"class OptionalInsideOptionalList",
                     r"test: Optional\[List\[Optional\[str\]\]\]"
@@ -95,7 +88,7 @@ class TestCaseGenerator:
                 %s MandatoryInsideOptionalList {
                   test: [String!]
                 }
-                """ % self.gql_type_identifier,
+                """ % cls.gql_type_identifier,
                 expected_re_patterns=[
                     r"class MandatoryInsideOptionalList",
                     r"test: Optional\[List\[str\]\]"
@@ -106,7 +99,7 @@ class TestCaseGenerator:
                 %s OptionalInsideMandatoryList {
                   test: [String]!
                 }
-                """ % self.gql_type_identifier,
+                """ % cls.gql_type_identifier,
                 expected_re_patterns=[
                     r"class OptionalInsideMandatoryList",
                     r"test: List\[Optional\[str\]\]"
@@ -117,16 +110,17 @@ class TestCaseGenerator:
                 %s MandatoryInsideMandatoryList {
                   test: [String!]!
                 }
-                """ % self.gql_type_identifier,
+                """ % cls.gql_type_identifier,
                 expected_re_patterns=[
                     r"class MandatoryInsideMandatoryList",
                     r"test: List\[str\]"
                 ]
             ),
         ]
-        return self._format_list_for_parametrize(test_cases)
+        return cls._format_list_for_parametrize(test_cases)
 
-    def make_test_cases_enum_field_value(self):
+    @classmethod
+    def make_test_cases_enum_field_value(cls):
         test_cases = [
             TestCase(
                 sdl="""
@@ -138,7 +132,7 @@ class TestCaseGenerator:
                 %s EnumField {
                   foo: Foo!
                 }
-                """ % self.gql_type_identifier,
+                """ % cls.gql_type_identifier,
                 expected_re_patterns=[
                     r"class Foo\(str, Enum\):",
                     r"bar = \'bar\'",
@@ -158,7 +152,7 @@ class TestCaseGenerator:
                 %s OptionalEnumField {
                   foo: Foo
                 }
-                """ % self.gql_type_identifier,
+                """ % cls.gql_type_identifier,
                 expected_re_patterns=[
                     r"class Foo\(str, Enum\):",
                     r"bar = \'bar\'",
@@ -168,9 +162,10 @@ class TestCaseGenerator:
                 ]
             )
         ]
-        return self._format_list_for_parametrize(test_cases)
+        return cls._format_list_for_parametrize(test_cases)
 
-    def make_test_cases_nested_field_value(self) -> List[List[TestCase]]:
+    @classmethod
+    def make_test_cases_nested_field_value(cls) -> List[List[TestCase]]:
         test_cases = [
             TestCase(
                 sdl="""
@@ -181,7 +176,7 @@ class TestCaseGenerator:
                 %s Bar {
                   test: String!
                 }
-                """ % (self.gql_type_identifier, self.gql_type_identifier),
+                """ % (cls.gql_type_identifier, cls.gql_type_identifier),
                 expected_re_patterns=[
                     r"class MandatoryNestedField",
                     fr"foo: {re_token_can_be_forward_reference('Bar')}",
@@ -198,7 +193,7 @@ class TestCaseGenerator:
                 %s Bar {
                   test: String!
                 }
-                """ % (self.gql_type_identifier, self.gql_type_identifier),
+                """ % (cls.gql_type_identifier, cls.gql_type_identifier),
                 expected_re_patterns=[
                     r"class OptionalNestedField",
                     fr"foo: Optional\[{re_token_can_be_forward_reference('Bar')}\]",
@@ -216,7 +211,7 @@ class TestCaseGenerator:
                 %s Bar {
                   test: String!
                 }
-                """ % (self.gql_type_identifier, self.gql_type_identifier),
+                """ % (cls.gql_type_identifier, cls.gql_type_identifier),
                 expected_re_patterns=[
                     r"class OptionalNestedTypeInListField",
                     fr"foo: List\[Optional\[{re_token_can_be_forward_reference('Bar')}\]\]",
@@ -234,7 +229,7 @@ class TestCaseGenerator:
                 %s Bar {
                   test: String!
                 }
-                """ % (self.gql_type_identifier, self.gql_type_identifier),
+                """ % (cls.gql_type_identifier, cls.gql_type_identifier),
                 expected_re_patterns=[
                     r"class MandatoryNestedTypeInListField",
                     fr"foo: List\[{re_token_can_be_forward_reference('Bar')}\]",
@@ -243,9 +238,10 @@ class TestCaseGenerator:
                 ]
             ),
         ]
-        return self._format_list_for_parametrize(test_cases)
+        return cls._format_list_for_parametrize(test_cases)
 
-    def make_test_cases_description(self):
+    @classmethod
+    def make_test_cases_description(cls):
         test_cases = [
             TestCase(
                 sdl='''
@@ -255,7 +251,7 @@ class TestCaseGenerator:
             %s TypeWithDescription {
               test: String!
             }
-            ''' % self.gql_type_identifier,
+            ''' % cls.gql_type_identifier,
                 expected_re_patterns=[
                     r"class TypeWithDescription",
                     r"\"Test description\"",
@@ -269,7 +265,7 @@ class TestCaseGenerator:
               "Test description"
               test: String!
             }
-            """ % self.gql_type_identifier,
+            """ % cls.gql_type_identifier,
                 expected_re_patterns=[
                     r"class FieldWithDescription",
                     r"\'Test description\'",
@@ -277,16 +273,17 @@ class TestCaseGenerator:
                 ]
             ),
         ]
-        return self._format_list_for_parametrize(test_cases)
+        return cls._format_list_for_parametrize(test_cases)
 
-    def make_test_cases_deprecation(self):
+    @classmethod
+    def make_test_cases_deprecation(cls):
         test_cases = [
             TestCase(
                 sdl="""
                         %s DeprecatedFieldWithReason {
                           test: String! @deprecated(reason: "Custom deprecation reason")
                         }
-                        """ % self.gql_type_identifier,
+                        """ % cls.gql_type_identifier,
                 expected_re_patterns=[
                     r"class DeprecatedFieldWithReason",
                     r"test: str",
@@ -299,7 +296,7 @@ class TestCaseGenerator:
                         %s DeprecatedFieldWithoutReason {
                           test: String! @deprecated
                         }
-                        """ % self.gql_type_identifier,
+                        """ % cls.gql_type_identifier,
                 expected_re_patterns=[
                     r"class DeprecatedFieldWithoutReason",
                     r"test: str",
@@ -307,48 +304,51 @@ class TestCaseGenerator:
                 ]
             ),
         ]
-        return self._format_list_for_parametrize(test_cases)
+        return cls._format_list_for_parametrize(test_cases)
 
-    def make_test_cases_skip_underscore(self, should_skip: bool):
+    @classmethod
+    def make_test_cases_skip_underscore(cls, should_skip: bool):
         on_skip_patterns = ["^$"]  # empty string
         on_generated_patterns = [
             r"class _SkipUnderscore",
             r"test: Optional\[str\]",
         ]
-        return self._format_list_for_parametrize(
+        return cls._format_list_for_parametrize(
             TestCase(
                 sdl="""
                 %s _SkipUnderscore {
                   test: String
-                }""" % self.gql_type_identifier,
+                }""" % cls.gql_type_identifier,
                 expected_re_patterns=on_skip_patterns if should_skip else on_generated_patterns
             )
         )
 
-    def make_test_cases_skip_double_underscore(self, should_skip: bool):
+    @classmethod
+    def make_test_cases_skip_double_underscore(cls, should_skip: bool):
         on_skip_patterns = ["^$"]  # empty string
         on_generated_patterns = [
             r"class __SkipDoubleUnderscore",
             r"test: Optional\[str\]",
         ]
-        return self._format_list_for_parametrize(
+        return cls._format_list_for_parametrize(
             TestCase(
                 sdl="""
                 %s __SkipDoubleUnderscore {
                  test: String
-                }""" % self.gql_type_identifier,
+                }""" % cls.gql_type_identifier,
                 expected_re_patterns=on_skip_patterns if should_skip else on_generated_patterns
             )
         )
 
-    def make_test_cases_is_keyword(self):
-        return self._format_list_for_parametrize(
+    @classmethod
+    def make_test_cases_is_keyword(cls):
+        return cls._format_list_for_parametrize(
             TestCase(
                 sdl="""
                 %s FieldIsKeyword {
                   from: Int!
                 }
-                """ % self.gql_type_identifier,
+                """ % cls.gql_type_identifier,
                 expected_re_patterns=[
                     r"class FieldIsKeyword",
                     r"from_: int = Field\(alias='from'\)"
