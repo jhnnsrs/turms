@@ -73,19 +73,12 @@ class InputsPlugin(Plugin):
             config: GeneratorConfig,
             registry: ClassRegistry
     ) -> List[str]:
-        base_classes = self.config.inputtype_bases.copy()
-        addition_base_classes = self._generate_additional_base_classes(gql_type, config)
-        all_base_classes = base_classes + addition_base_classes
+        base_classes = self.config.inputtype_bases
+        additional_base_classes = self._get_additional_base_classes(gql_type, config)
+        all_base_classes = base_classes + additional_base_classes
         for base in all_base_classes:
             registry.register_import(base)
         return all_base_classes
-
-    @staticmethod
-    def _generate_additional_base_classes(
-            gql_type: GraphQLNamedType,
-            config: GeneratorConfig,
-    ) -> List[str]:
-        return config.additional_bases.get(gql_type.name, [])
 
     def _generate_input_body(
             self,

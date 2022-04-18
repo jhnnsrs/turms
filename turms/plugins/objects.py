@@ -1,6 +1,9 @@
+import ast
+from collections import defaultdict
+from typing import Dict, List, Union, DefaultDict
+
 from graphql import (
     GraphQLField,
-    GraphQLInputObjectType,
     GraphQLInterfaceType,
     GraphQLList,
     GraphQLNonNull,
@@ -8,21 +11,17 @@ from graphql import (
     GraphQLScalarType,
     GraphQLType,
     GraphQLUnionType,
-    is_wrapping_type,
+    GraphQLEnumType,
+    GraphQLSchema,
 )
+from pydantic import Field
+
+from turms.ast_generators import ObjectTypeAstGenerator
+from turms.config import GeneratorConfig
 from turms.errors import GenerationError
 from turms.plugins.base import Plugin, PluginConfig
-import ast
-from typing import Dict, List
-from turms.config import GeneratorConfig
-from graphql.utilities.build_client_schema import GraphQLSchema
-from pydantic import Field
-from graphql.type.definition import (
-    GraphQLEnumType,
-)
 from turms.registry import ClassRegistry
 from turms.utils import (
-    get_additional_bases_for_type,
     interface_is_extended_by_other_interfaces,
 )
 
@@ -37,13 +36,179 @@ class ObjectsPluginConfig(PluginConfig):
         env_prefix = "TURMS_PLUGINS_OBJECTS_"
 
 
+class ObjectsPlugin(Plugin):
+    config: ObjectsPluginConfig = Field(default_factory=ObjectsPluginConfig)
+    _interface_to_implementations_map: DefaultDict[str, List[str]]
+    _interface_to_generated_classname_map: Dict[str, str]
+
+    class Config:
+        underscore_attrs_are_private = True
+
+    def generate_ast(
+            self,
+            client_schema: GraphQLSchema,
+            config: GeneratorConfig,
+            registry: ClassRegistry,
+    ) -> List[ast.AST]:
+        return self._generate_types(client_schema, config, registry)
+
+    def _generate_types(
+            self,
+            schema: GraphQLSchema,
+            config: GeneratorConfig,
+            registry: ClassRegistry
+    ) -> List[ast.AST]:
+        self._interface_to_implementations_map = defaultdict(list)
+        self._interface_to_generated_classname_map = {}
+
+        types_ast: List[ast.AST] = []
+        interfaces = self._get_types_from_schema(schema, GraphQLInterfaceType)
+        objects = self._get_types_from_schema(schema, GraphQLObjectType)
+
+        for typename, gql_type in {**interfaces, **objects}.items():
+            if self._skip_type(typename):
+                continue
+            types_ast.append(
+                self._generate_class_definition(gql_type, config, registry)
+            )
+
+        # Check unimplemented interfaces
+        types_ast.extend(self._generate_interface_implementations(config, registry))
+
+        return types_ast
+
+    def _skip_type(self, typename: str) -> bool:
+        if self.config.skip_underscore and typename.startswith("_"):
+            return True
+        if self.config.skip_double_underscore and typename.startswith("__"):
+            return True
+        return False
+
+    def _generate_class_definition(
+            self,
+            gql_type: Union[GraphQLInterfaceType, GraphQLObjectType],
+            config: GeneratorConfig,
+            registry: ClassRegistry
+    ) -> ast.ClassDef:
+        typename = gql_type.name
+        classname = self._generate_classname(gql_type, registry)
+        if isinstance(gql_type, GraphQLInterfaceType):
+            self._interface_to_generated_classname_map[typename] = classname
+        base_classes = self._generate_base_classes(classname, gql_type, config, registry)
+        body = self._generate_type_body(gql_type, config, registry)
+        return ObjectTypeAstGenerator.generate_class_definition(classname, base_classes, body)
+
+    @staticmethod
+    def _generate_classname(gql_type: Union[GraphQLObjectType, GraphQLInterfaceType], registry: ClassRegistry) -> str:
+        if isinstance(gql_type, GraphQLObjectType):
+            return registry.generate_objecttype(gql_type.name)
+        if isinstance(gql_type, GraphQLInterfaceType):
+            return registry.generate_interface(gql_type.name)
+        raise NotImplementedError  # pragma: no cover
+
+    def _generate_base_classes(
+            self,
+            classname: str,
+            gql_type: Union[GraphQLObjectType, GraphQLInterfaceType],
+            config: GeneratorConfig,
+            registry: ClassRegistry,
+    ) -> List[str]:
+        base_classes = self.config.types_bases
+        additional_base_classes = self._get_additional_base_classes(gql_type, config)
+        importable_base_classes = base_classes + additional_base_classes
+        for base in importable_base_classes:
+            registry.register_import(base)
+        interface_base_classes = self._get_interface_base_classes(classname, gql_type, registry)
+        return interface_base_classes + importable_base_classes
+
+    def _get_interface_base_classes(
+            self,
+            classname: str,
+            gql_type: Union[GraphQLObjectType, GraphQLInterfaceType],
+            registry: ClassRegistry,
+    ) -> List[str]:
+        base_classes = []
+        for interface in gql_type.interfaces:
+            self._interface_to_implementations_map[interface.name].append(classname)
+            other_interfaces = set(gql_type.interfaces)
+            if not interface_is_extended_by_other_interfaces(interface, other_interfaces):
+                base_classes.append(registry.inherit_interface(interface.name))
+        return base_classes
+
+    def _generate_type_body(
+            self,
+            gql_type: Union[GraphQLObjectType, GraphQLInterfaceType],
+            config: GeneratorConfig,
+            registry: ClassRegistry,
+    ) -> List[ast.AST]:
+        body: List[ast.AST] = []
+        if self._type_has_description(gql_type):
+            body.append(self._generate_type_description_ast(gql_type))
+        for field_name, field_value in gql_type.fields.items():
+            attribute_name = registry.generate_node_name(field_name)
+            if attribute_name != field_name:
+                alias = ObjectTypeAstGenerator.generate_field_alias(field_name)
+            else:
+                alias = None
+            annotation = generate_object_field_annotation(
+                field_value.type,
+                gql_type.name,
+                config,
+                self.config,
+                registry,
+                is_optional=True
+            )
+            body.append(ObjectTypeAstGenerator.generate_attribute(attribute_name, annotation, alias))
+            if self._field_has_description(field_value):
+                body.append(self._generate_field_description(field_value))
+        return body
+
+    def _field_has_description(self, field: GraphQLField) -> bool:
+        return field.description is not None or field.deprecation_reason is not None
+
+    def _generate_field_description(self, field: GraphQLField) -> ast.Expr:
+        if not field.deprecation_reason:
+            comment = field.description
+        else:
+            comment = f"DEPRECATED: {field.deprecation_reason}"
+        return ObjectTypeAstGenerator.generate_field_description(comment)
+
+    def _generate_interface_implementations(self, config: GeneratorConfig, registry: ClassRegistry) -> List[ast.AST]:
+        implementations_ast: List[ast.AST] = []
+        for interface, implementations in sorted(self._interface_to_implementations_map.items()):
+            if implementations:
+                registry.register_import("typing.Union")
+                implementations_ast.append(
+                    ObjectTypeAstGenerator.generate_interface_implementations(interface, sorted(implementations))
+                )
+
+        interfaces_without_implementations = {
+            interface: base_class
+            for interface, base_class in self._interface_to_generated_classname_map.items()
+            if interface not in self._interface_to_implementations_map
+        }
+        if interfaces_without_implementations:
+            if config.always_resolve_interfaces:
+                raise GenerationError(
+                    f"Interfaces {interfaces_without_implementations.keys()} have no types implementing it. "
+                    f"And we have set always_resolve_interfaces to true. "
+                    f"Make sure your schema is correct"
+                )
+            for interface, base_class in sorted(interfaces_without_implementations.items()):
+                registry.warn(f"Interface {interface} has no types implementing it")
+                implementations_ast.append(
+                    ObjectTypeAstGenerator.generate_interface_without_implementation(interface, base_class)
+                )
+        return implementations_ast
+
+
 def generate_object_field_annotation(
-    graphql_type: GraphQLType,
-    parent: str,
-    config: GeneratorConfig,
-    plugin_config: ObjectsPluginConfig,
-    registry: ClassRegistry,
-    is_optional=True,
+        graphql_type: GraphQLType,
+        parent: str,
+        config: GeneratorConfig,
+        plugin_config: ObjectsPluginConfig,
+        registry: ClassRegistry,
+        is_optional=True,
 ):
     if isinstance(graphql_type, GraphQLScalarType):
         if is_optional:
@@ -185,203 +350,3 @@ def generate_object_field_annotation(
         )
 
     raise NotImplementedError(f"Unknown input type {repr(graphql_type)}")  # pragma: no cover
-
-
-def generate_types(
-    client_schema: GraphQLSchema,
-    config: GeneratorConfig,
-    plugin_config: ObjectsPluginConfig,
-    registry: ClassRegistry,
-):
-
-    tree = []
-
-    objects = {
-        key: value
-        for key, value in client_schema.type_map.items()
-        if isinstance(value, GraphQLObjectType)
-        and not isinstance(value, GraphQLInputObjectType)
-        or isinstance(value, GraphQLInterfaceType)
-    }
-
-    sorted_objects = {
-        k: v
-        for k, v in sorted(
-            objects.items(),
-            key=lambda item: isinstance(item[1], GraphQLInterfaceType),
-            reverse=True,
-        )
-    }
-
-    interface_map: Dict[
-        str, List[str]
-    ] = {}  # A list of interfaces with the union classes attached
-    interface_base_map: Dict[
-        str, str
-    ] = {}  # A list of interfaces with its respective base
-
-    for base in plugin_config.types_bases:
-        registry.register_import(base)
-
-    for key, object_type in sorted_objects.items():
-
-        additional_bases = get_additional_bases_for_type(
-            object_type.name, config, registry
-        )
-
-        if plugin_config.skip_underscore and key.startswith("_"):
-            continue
-
-        if plugin_config.skip_double_underscore and key.startswith("__"):
-            continue
-
-        if isinstance(object_type, GraphQLObjectType):
-            classname = registry.generate_objecttype(key)
-        if isinstance(object_type, GraphQLInterfaceType):
-            classname = registry.generate_interface(key)
-            interface_base_map[key] = classname
-
-        for interface in object_type.interfaces:
-            # Populate the Union_classed
-            interface_map.setdefault(interface.name, []).append(classname)
-
-            other_interfaces = set(object_type.interfaces) - {interface}
-            if not interface_is_extended_by_other_interfaces(
-                interface, other_interfaces
-            ):
-                additional_bases.append(
-                    ast.Name(
-                        id=registry.inherit_interface(interface.name),
-                        ctx=ast.Load(),
-                    )
-                )
-
-        fields = (
-            [ast.Expr(value=ast.Constant(value=object_type.description))]
-            if object_type.description
-            else []
-        )
-
-        for value_key, value in object_type.fields.items():
-            value: GraphQLField
-            field_name = registry.generate_node_name(value_key)
-
-            if field_name != value_key:
-                registry.register_import("pydantic.Field")
-                assign = ast.AnnAssign(
-                    target=ast.Name(field_name, ctx=ast.Store()),
-                    annotation=generate_object_field_annotation(
-                        value.type,
-                        classname,
-                        config,
-                        plugin_config,
-                        registry,
-                        is_optional=True,
-                    ),
-                    value=ast.Call(
-                        func=ast.Name(id="Field", ctx=ast.Load()),
-                        args=[],
-                        keywords=[
-                            ast.keyword(
-                                arg="alias", value=ast.Constant(value=value_key)
-                            )
-                        ],
-                    ),
-                    simple=1,
-                )
-            else:
-                assign = ast.AnnAssign(
-                    target=ast.Name(value_key, ctx=ast.Store()),
-                    annotation=generate_object_field_annotation(
-                        value.type,
-                        classname,
-                        config,
-                        plugin_config,
-                        registry,
-                        is_optional=True,
-                    ),
-                    simple=1,
-                )
-
-            potential_comment = (
-                value.description
-                if not value.deprecation_reason
-                else f"DEPRECATED: {value.deprecation_reason}"
-            )
-
-            if potential_comment:
-                fields += [
-                    assign,
-                    ast.Expr(value=ast.Constant(value=potential_comment)),
-                ]
-
-            else:
-                fields += [assign]
-
-        tree.append(
-            ast.ClassDef(
-                classname,
-                bases=additional_bases
-                + [
-                    ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                    for base in plugin_config.types_bases
-                ],
-                decorator_list=[],
-                keywords=[],
-                body=fields,
-            )
-        )
-
-    for interface, union_class_names in sorted(interface_map.items()):
-        registry.register_import("typing.Union")
-        tree.append(
-            ast.Assign(
-                targets=[ast.Name(id=interface, ctx=ast.Store())],
-                value=ast.Subscript(
-                    value=ast.Name("Union", ctx=ast.Load()),
-                    slice=ast.Tuple(
-                        elts=[
-                            ast.Name(id=clsname, ctx=ast.Load())
-                            for clsname in sorted(union_class_names)
-                        ],
-                        ctx=ast.Load(),
-                    ),
-                    ctx=ast.Load(),
-                ),
-            )
-        )
-
-    unimplemented_interfaces = {
-        interface: baseclass
-        for interface, baseclass in interface_base_map.items()
-        if interface not in interface_map
-    }
-    if unimplemented_interfaces:
-        if config.always_resolve_interfaces:
-            raise GenerationError(
-                f"Interfaces {unimplemented_interfaces.keys()} have no types implementing it. And we have set always_resolve_interfaces to true. Make sure your schema is correct"
-            )
-
-        for interface, baseclass in sorted(unimplemented_interfaces.items()):
-            registry.warn(f"Interface {interface} has no types implementing it")
-            tree.append(
-                ast.Assign(
-                    targets=[ast.Name(id=interface, ctx=ast.Store())],
-                    value=ast.Name(baseclass, ctx=ast.Load()),
-                )
-            )
-
-    return tree
-
-
-class ObjectsPlugin(Plugin):
-    config: ObjectsPluginConfig = Field(default_factory=ObjectsPluginConfig)
-
-    def generate_ast(
-        self,
-        client_schema: GraphQLSchema,
-        config: GeneratorConfig,
-        registry: ClassRegistry,
-    ) -> List[ast.AST]:
-
-        return generate_types(client_schema, config, self.config, registry)
