@@ -1,5 +1,5 @@
 import ast
-from typing import Optional, List
+from typing import Optional, List, Union
 
 
 class TypeAstGenerator:
@@ -141,7 +141,11 @@ class AnnotationAstGenerator:
         return AnnotationAstGenerator._wrap("List", value)
 
     @staticmethod
-    def _wrap(outside: str, inside: ast.AST):
+    def union(types: List[ast.AST]) -> ast.Subscript:
+        return AnnotationAstGenerator._wrap("Union", ast.Tuple(types))
+
+    @staticmethod
+    def _wrap(outside: str, inside: Union[ast.AST, ast.Tuple]):
         return ast.Subscript(value=ast.Name(outside, ctx=ast.Load()),
                              slice=inside,
                              ctx=ast.Load())

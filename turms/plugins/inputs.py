@@ -123,8 +123,8 @@ class InputsPlugin(Plugin):
             config: GeneratorConfig,
             registry: ClassRegistry,
     ) -> ast.AST:
-        return generate_input_annotation(
-            type=field_value.type,
+        return generate_input_field_annotation(
+            graphql_type=field_value.type,
             parent=parent_name,
             config=config,
             plugin_config=self.config,
@@ -147,34 +147,34 @@ class InputsPlugin(Plugin):
         return InputTypeAstGenerator.generate_field_description(comment)
 
 
-def generate_input_annotation(
-        type: GraphQLInputType,
+def generate_input_field_annotation(
+        graphql_type: GraphQLInputType,
         parent: str,
         config: GeneratorConfig,
         plugin_config: InputsPluginConfig,
         registry: ClassRegistry,
         is_optional=True,
 ) -> ast.AST:
-    if isinstance(type, GraphQLScalarType):
-        annotation = registry.reference_scalar(type.name)
+    if isinstance(graphql_type, GraphQLScalarType):
+        annotation = registry.reference_scalar(graphql_type.name)
 
-    elif isinstance(type, GraphQLInputObjectType):
-        annotation = registry.reference_inputtype(type.name, parent)
+    elif isinstance(graphql_type, GraphQLInputObjectType):
+        annotation = registry.reference_inputtype(graphql_type.name, parent)
 
-    elif isinstance(type, GraphQLEnumType):
-        annotation = registry.reference_enum(type.name, parent, allow_forward=not config.force_plugin_order)
+    elif isinstance(graphql_type, GraphQLEnumType):
+        annotation = registry.reference_enum(graphql_type.name, parent, allow_forward=not config.force_plugin_order)
 
-    elif isinstance(type, GraphQLNonNull):
-        annotation = generate_input_annotation(
-            type.of_type, parent, config, plugin_config, registry, is_optional=False
+    elif isinstance(graphql_type, GraphQLNonNull):
+        annotation = generate_input_field_annotation(
+            graphql_type.of_type, parent, config, plugin_config, registry, is_optional=False
         )
         is_optional = False
 
-    elif isinstance(type, GraphQLList):
+    elif isinstance(graphql_type, GraphQLList):
         registry.register_import("typing.List")
         annotation = AnnotationAstGenerator.list(
-            generate_input_annotation(
-                type.of_type,
+            generate_input_field_annotation(
+                graphql_type.of_type,
                 parent,
                 config,
                 plugin_config,
@@ -183,7 +183,7 @@ def generate_input_annotation(
             )
         )
     else:
-        raise NotImplementedError(f"Unknown input type {type}")  # pragma: no cover
+        raise NotImplementedError(f"Unknown input type {graphql_type}")  # pragma: no cover
 
     if is_optional:
         registry.register_import("typing.Optional")

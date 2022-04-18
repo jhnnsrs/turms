@@ -139,7 +139,7 @@ class ObjectTypeRegistry(BaseTypeRegistry):
 class InterfaceTypeRegistry(BaseTypeRegistry):
     def __init__(self, *args, **kwargs):
         super(InterfaceTypeRegistry, self).__init__(*args, **kwargs)
-        self.interface_reference_map: Dict[str, str] = {}
+        self.interface_reference_map: Dict[str, str] = {}  # Todo: This is unused! Is this still required?
 
     @staticmethod
     def _get_styler_method(styler: Styler) -> Callable[[str], str]:
@@ -275,7 +275,7 @@ class ClassRegistry(object):
     def _reference_builtin_enum(self, typename: str, parent: str) -> ast.Constant:
         self._builtins.add(typename)
         self._builtins_forward_references.add(parent)
-        return ast.Constant(value=typename, ctx=ast.Load())
+        return AnnotationAstGenerator.forward_reference(typename)
 
     def style_objecttype_class(self, typename: str):
         return self._object_type_registry.style_type(typename)
@@ -354,11 +354,7 @@ class ClassRegistry(object):
         )
 
     def style_mutation_class(self, typename: str):
-        for styler in self.stylers:
-            typename = styler.style_mutation_name(typename)
-        if iskeyword(typename):
-            typename += "_"
-        return typename
+        return self._mutation_type_registry.style_type(typename)
 
     def generate_mutation(self, typename: str):
         return self._mutation_type_registry.generate_type(typename)
@@ -371,11 +367,7 @@ class ClassRegistry(object):
         )
 
     def style_subscription_class(self, typename: str):
-        for styler in self.stylers:
-            typename = styler.style_subscription_name(typename)
-        if iskeyword(typename):
-            typename += "_"
-        return typename
+        return self._subscription_type_registry.style_type(typename)
 
     def generate_subscription(self, typename: str):
         return self._subscription_type_registry.generate_type(typename)
@@ -453,10 +445,7 @@ class ClassRegistry(object):
             if "." in python_type:
                 # We make the assumption that the scalar type is a fully qualified class name
                 self.register_import(python_type)
-
-            return ast.Name(
-                id=python_type.split(".")[-1], ctx=ast.Load()
-            )  # That results only in the class name (also in the case of a builtin)
+            return AnnotationAstGenerator.reference(python_type.split(".")[-1])
 
         raise NoScalarFound(
             f"No python equivalent found for {scalar_type}. Please define in scalar_definitions"

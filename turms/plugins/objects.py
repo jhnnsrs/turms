@@ -16,7 +16,7 @@ from graphql import (
 )
 from pydantic import Field
 
-from turms.ast_generators import ObjectTypeAstGenerator
+from turms.ast_generators import ObjectTypeAstGenerator, AnnotationAstGenerator
 from turms.config import GeneratorConfig
 from turms.errors import GenerationError
 from turms.plugins.base import Plugin, PluginConfig
@@ -95,7 +95,7 @@ class ObjectsPlugin(Plugin):
         if isinstance(gql_type, GraphQLInterfaceType):
             self._interface_to_generated_classname_map[typename] = classname
         base_classes = self._generate_base_classes(classname, gql_type, config, registry)
-        body = self._generate_type_body(gql_type, config, registry)
+        body = self._generate_type_body(classname, gql_type, config, registry)
         return ObjectTypeAstGenerator.generate_class_definition(classname, base_classes, body)
 
     @staticmethod
@@ -137,6 +137,7 @@ class ObjectsPlugin(Plugin):
 
     def _generate_type_body(
             self,
+            classname: str,
             gql_type: Union[GraphQLObjectType, GraphQLInterfaceType],
             config: GeneratorConfig,
             registry: ClassRegistry,
@@ -147,12 +148,13 @@ class ObjectsPlugin(Plugin):
         for field_name, field_value in gql_type.fields.items():
             attribute_name = registry.generate_node_name(field_name)
             if attribute_name != field_name:
+                registry.register_import("pydantic.Field")
                 alias = ObjectTypeAstGenerator.generate_field_alias(field_name)
             else:
                 alias = None
             annotation = generate_object_field_annotation(
                 field_value.type,
-                gql_type.name,
+                classname,
                 config,
                 self.config,
                 registry,
@@ -209,144 +211,56 @@ def generate_object_field_annotation(
         plugin_config: ObjectsPluginConfig,
         registry: ClassRegistry,
         is_optional=True,
-):
+) -> ast.AST:
     if isinstance(graphql_type, GraphQLScalarType):
-        if is_optional:
-            registry.register_import("typing.Optional")
-            return ast.Subscript(
-                value=ast.Name("Optional", ctx=ast.Load()),
-                slice=registry.reference_scalar(graphql_type.name),
-                ctx=ast.Load(),
-            )
+        annotation = registry.reference_scalar(graphql_type.name)
 
-        return registry.reference_scalar(graphql_type.name)
+    elif isinstance(graphql_type, GraphQLInterfaceType):
+        annotation = registry.reference_interface(graphql_type.name, parent)
 
-    if isinstance(graphql_type, GraphQLInterfaceType):
-        if is_optional:
-            registry.register_import("typing.Optional")
-            return ast.Subscript(
-                value=ast.Name("Optional", ctx=ast.Load()),
-                slice=registry.reference_interface(graphql_type.name, parent),
-                ctx=ast.Load(),
-            )
+    elif isinstance(graphql_type, GraphQLObjectType):
+        annotation = registry.reference_object(graphql_type.name, parent)
 
-        return registry.reference_interface(graphql_type.name, parent)
+    elif isinstance(graphql_type, GraphQLEnumType):
+        annotation = registry.reference_enum(graphql_type.name, parent, allow_forward=not config.force_plugin_order)
 
-    if isinstance(graphql_type, GraphQLObjectType):
-        if is_optional:
-            registry.register_import("typing.Optional")
-            return ast.Subscript(
-                value=ast.Name("Optional", ctx=ast.Load()),
-                slice=registry.reference_object(graphql_type.name, parent),
-                ctx=ast.Load(),
-            )
-        return registry.reference_object(graphql_type.name, parent)
-
-    if isinstance(graphql_type, GraphQLUnionType):
-        if is_optional:
-            registry.register_import("typing.Optional")
-            registry.register_import("typing.Union")
-            return ast.Subscript(
-                value=ast.Name("Optional", ctx=ast.Load()),
-                slice=ast.Subscript(
-                    value=ast.Name("Union", ctx=ast.Load()),
-                    slice=ast.Tuple(
-                        elts=[
-                            generate_object_field_annotation(
-                                union_type,
-                                parent,
-                                config,
-                                plugin_config,
-                                registry,
-                                is_optional=False,
-                            )
-                            for union_type in graphql_type.types
-                        ],
-                        ctx=ast.Load(),
-                    ),
-                ),
-                ctx=ast.Load(),
-            )
-        registry.register_import("typing.Union")
-
-        return ast.Subscript(
-            value=ast.Name("Union", ctx=ast.Load()),
-            slice=ast.Tuple(
-                elts=[
-                    generate_object_field_annotation(
-                        union_type,
-                        parent,
-                        config,
-                        plugin_config,
-                        registry,
-                        is_optional=False,
-                    )
-                    for union_type in graphql_type.types
-                ],
-                ctx=ast.Load(),
-            ),
-            ctx=ast.Load(),
+    elif isinstance(graphql_type, GraphQLNonNull):
+        annotation = generate_object_field_annotation(
+            graphql_type.of_type, parent, config, plugin_config, registry, is_optional=False,
         )
+        is_optional = False
 
-    if isinstance(graphql_type, GraphQLEnumType):
-        if is_optional:
-            registry.register_import("typing.Optional")
-            return ast.Subscript(
-                value=ast.Name("Optional", ctx=ast.Load()),
-                slice=registry.reference_enum(
-                    graphql_type.name,
-                    parent,
-                    allow_forward=not config.force_plugin_order,
-                ),
-                ctx=ast.Load(),
-            )
-        return registry.reference_enum(
-            graphql_type.name, parent, allow_forward=not config.force_plugin_order
-        )
-
-    if isinstance(graphql_type, GraphQLNonNull):
-        return generate_object_field_annotation(
-            graphql_type.of_type,
-            parent,
-            config,
-            plugin_config,
-            registry,
-            is_optional=False,
-        )
-
-    if isinstance(graphql_type, GraphQLList):
-        if is_optional:
-            registry.register_import("typing.Optional")
-            registry.register_import("typing.List")
-            return ast.Subscript(
-                value=ast.Name("Optional", ctx=ast.Load()),
-                slice=ast.Subscript(
-                    value=ast.Name("List", ctx=ast.Load()),
-                    slice=generate_object_field_annotation(
-                        graphql_type.of_type,
-                        parent,
-                        config,
-                        plugin_config,
-                        registry,
-                        is_optional=True,
-                    ),
-                    ctx=ast.Load(),
-                ),
-                ctx=ast.Load(),
-            )
-
+    elif isinstance(graphql_type, GraphQLList):
         registry.register_import("typing.List")
-        return ast.Subscript(
-            value=ast.Name("List", ctx=ast.Load()),
-            slice=generate_object_field_annotation(
+        annotation = AnnotationAstGenerator.list(
+            generate_object_field_annotation(
                 graphql_type.of_type,
                 parent,
                 config,
                 plugin_config,
                 registry,
                 is_optional=True,
-            ),
-            ctx=ast.Load(),
+            )
         )
 
-    raise NotImplementedError(f"Unknown input type {repr(graphql_type)}")  # pragma: no cover
+    elif isinstance(graphql_type, GraphQLUnionType):
+        registry.register_import("typing.Union")
+        annotation = AnnotationAstGenerator.union([
+            generate_object_field_annotation(
+                union_type,
+                parent,
+                config,
+                plugin_config,
+                registry,
+                is_optional=False,
+            )
+            for union_type in graphql_type.types
+        ])
+
+    else:
+        raise NotImplementedError(f"Unknown field type {repr(graphql_type)}")  # pragma: no cover
+
+    if is_optional:
+        registry.register_import("typing.Optional")
+        annotation = AnnotationAstGenerator.optional(annotation)
+    return annotation
