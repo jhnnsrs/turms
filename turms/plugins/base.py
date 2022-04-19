@@ -6,7 +6,7 @@ from graphql import GraphQLNamedType
 from pydantic import BaseModel, BaseSettings
 from graphql.utilities.build_client_schema import GraphQLSchema
 
-from config import GeneratorConfig
+from turms.config import GeneratorConfig
 from turms.ast_generators import TypeAstGenerator
 
 GNT = TypeVar("GNT", bound=GraphQLNamedType)
