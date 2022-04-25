@@ -27,7 +27,7 @@ type Mutation {
     nested: [[String!]!]
     optional_parameter: String
     nonOptionalParameter: String!
-  ): Beast
+  ): Beast!
 
   createIntBeast(
     nested: [[String!]!]

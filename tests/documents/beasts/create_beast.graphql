@@ -1,0 +1,20 @@
+mutation createBeast(
+  $id: ID!
+  $legs: Int!
+  $binomial: String!
+  $commonName: String!
+  $taxClass: String!
+  $eats: [ID]
+) {
+  createBeast(
+    id: $id
+    legs: $legs
+    binomial: $binomial
+    commonName: $commonName
+    taxClass: $taxClass
+    eats: $eats
+  ) {
+    binomial
+    commonName
+  }
+}
