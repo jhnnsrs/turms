@@ -289,7 +289,7 @@ def recurse_outputtype_annotation(
     registry: ClassRegistry,
     optional=True,
     overwrite_final: Optional[str] = None,
-):
+) -> ast.expr:
     if isinstance(type, GraphQLNonNull):
         return recurse_outputtype_annotation(
             type.of_type, registry, optional=False, overwrite_final=overwrite_final
@@ -350,7 +350,7 @@ def recurse_outputtype_annotation(
             )
 
         else:
-            return (ast.Name(id=overwrite_final, ctx=ast.Load()),)
+            return ast.Name(id=overwrite_final, ctx=ast.Load())
 
     raise NotImplementedError("oisnosin")  # pragma: no cover
 
