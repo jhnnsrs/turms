@@ -39,20 +39,18 @@ def import_string(dotted_path):
         ) from err
 
 
-def build_schema_from_introspect_url(
-    schema_url: str, bearer_token: Optional[str] = None
-) -> graphql.GraphQLSchema:
+def introspect_url(schema_url: str, bearer_token: Optional[str] = None) -> {}:
     """Introspect a GraphQL schema using introspection query
 
     Args:
-        schema_url (_type_): The Schema url
-        bearer_token (_type_, optional): A Bearer token. Defaults to None.
+        schema_url (str): The Schema url
+        bearer_token (str, optional): A Bearer token. Defaults to None.
 
     Raises:
-        GenerationError: _description_
+        GenerationError: An error occurred while generating the schema.
 
     Returns:
-        _type_: _description_
+        dict: The introspection query response.
     """
     jdata = json.dumps({"query": get_introspection_query()}).encode("utf-8")
     req = request.Request(schema_url, data=jdata)
@@ -60,19 +58,36 @@ def build_schema_from_introspect_url(
     req.add_header("Accept", "application/json")
     if bearer_token:
         req.add_header("Authorization", f"Bearer {bearer_token}")
-
     try:
         resp = request.urlopen(req)
         x = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         raise GenerationError(f"Failed to fetch schema from {schema_url}")
-
     if "errors" in x:  # pragma: no cover
         raise GenerationError(
             f"Failed to fetch schema from {schema_url} Graphql error: {x['errors']}"
         )
+    return x["data"]
 
-    return build_client_schema(x["data"])
+
+def build_schema_from_introspect_url(
+    schema_url: str, bearer_token: Optional[str] = None
+) -> graphql.GraphQLSchema:
+    """Introspect a GraphQL schema using introspection query
+
+    Args:
+        schema_url (str): The Schema url
+        bearer_token (str, optional): A Bearer token. Defaults to None.
+
+    Raises:
+        GenerationError: An error occurred while generating the schema.
+
+    Returns:
+        graphql.GraphQLSchema: The parsed GraphQL schema.
+    """
+    x = introspect_url(schema_url, bearer_token)
+
+    return build_client_schema(x)
 
 
 def build_schema_from_glob(glob_string: str):
