@@ -2,7 +2,7 @@ from typing import List
 
 import pytest
 
-from tests.plugins.utils import (
+from .utils import (
     build_schema_from_sdl,
     re_patterns_in_python_ast,
     python_from_ast,
@@ -56,36 +56,40 @@ class ObjectTypeTestCaseGenerator(TestCaseGenerator):
 
         test_cases = [
             TestCase(
-                sdl=union_ab_sdl + """
+                sdl=union_ab_sdl
+                + """
                 type MandatoryUnion {
                   bar: AorB!
                 }
                 """,
-                expected_re_patterns=union_ab_regexes + [
+                expected_re_patterns=union_ab_regexes
+                + [
                     r"class MandatoryUnion",
                     (
                         fr"bar: Union\["
                         fr"{re_token_can_be_forward_reference('A')}, "
                         fr"{re_token_can_be_forward_reference('B')}"
                         r"\]"
-                    )
-                ]
+                    ),
+                ],
             ),
             TestCase(
-                sdl=union_ab_sdl + """
+                sdl=union_ab_sdl
+                + """
                 type OptionalUnion {
                   bar: AorB
                 }
                 """,
-                expected_re_patterns=union_ab_regexes + [
+                expected_re_patterns=union_ab_regexes
+                + [
                     r"class OptionalUnion",
                     (
                         fr"bar: Optional\[Union\["
                         fr"{re_token_can_be_forward_reference('A')}, "
                         fr"{re_token_can_be_forward_reference('B')}"
                         r"\]\]"
-                    )
-                ]
+                    ),
+                ],
             ),
         ]
         return cls._format_list_for_parametrize(test_cases)
@@ -101,12 +105,14 @@ class InterfaceTypeTestCaseGenerator(TestCaseGenerator):
     + ObjectTypeTestCaseGenerator.make_test_cases_nested_field_value()
     + ObjectTypeTestCaseGenerator.make_test_cases_description()
     + ObjectTypeTestCaseGenerator.make_test_cases_deprecation()
-    + ObjectTypeTestCaseGenerator.make_test_cases_is_keyword()
+    + ObjectTypeTestCaseGenerator.make_test_cases_is_keyword(),
 )
 def test_objects(test_case: TestCase, objects_plugin, config, registry):
     schema = build_schema_from_sdl(test_case.sdl)
     inputs_ast = objects_plugin.generate_ast(schema, config, registry)
-    assert re_patterns_in_python_ast(test_case.expected_re_patterns, inputs_ast), python_from_ast(inputs_ast)
+    assert re_patterns_in_python_ast(
+        test_case.expected_re_patterns, inputs_ast
+    ), python_from_ast(inputs_ast)
 
 
 @pytest.mark.parametrize(
@@ -115,46 +121,66 @@ def test_objects(test_case: TestCase, objects_plugin, config, registry):
     + InterfaceTypeTestCaseGenerator.make_test_cases_nested_field_value()
     + InterfaceTypeTestCaseGenerator.make_test_cases_description()
     + InterfaceTypeTestCaseGenerator.make_test_cases_deprecation()
-    + InterfaceTypeTestCaseGenerator.make_test_cases_is_keyword()
+    + InterfaceTypeTestCaseGenerator.make_test_cases_is_keyword(),
 )
-def test_interfaces__implementation_not_required(test_case: TestCase, objects_plugin, config, registry):
+def test_interfaces__implementation_not_required(
+    test_case: TestCase, objects_plugin, config, registry
+):
     config.always_resolve_interfaces = False
     schema = build_schema_from_sdl(test_case.sdl)
     inputs_ast = objects_plugin.generate_ast(schema, config, registry)
-    assert re_patterns_in_python_ast(test_case.expected_re_patterns, inputs_ast), python_from_ast(inputs_ast)
+    assert re_patterns_in_python_ast(
+        test_case.expected_re_patterns, inputs_ast
+    ), python_from_ast(inputs_ast)
 
 
 @pytest.mark.parametrize(
     ["test_case"],
-    InterfaceTypeTestCaseGenerator.make_test_cases_primitive_field_value()
+    InterfaceTypeTestCaseGenerator.make_test_cases_primitive_field_value(),
 )
-def test_interfaces__trigger_always_resolve(test_case: TestCase, objects_plugin, config, registry):
+def test_interfaces__trigger_always_resolve(
+    test_case: TestCase, objects_plugin, config, registry
+):
     schema = build_schema_from_sdl(test_case.sdl)
     with pytest.raises(GenerationError):
         objects_plugin.generate_ast(schema, config, registry)
 
 
-@pytest.mark.parametrize(["test_case"], ObjectTypeTestCaseGenerator.make_test_cases_union_field_value())
+@pytest.mark.parametrize(
+    ["test_case"], ObjectTypeTestCaseGenerator.make_test_cases_union_field_value()
+)
 def test_object_with_union(test_case: TestCase, objects_plugin, config, registry):
     schema = build_schema_from_sdl(test_case.sdl)
     ast = objects_plugin.generate_ast(schema, config, registry)
-    assert re_patterns_in_python_ast(test_case.expected_re_patterns, ast), python_from_ast(ast)
+    assert re_patterns_in_python_ast(
+        test_case.expected_re_patterns, ast
+    ), python_from_ast(ast)
 
 
-@pytest.mark.parametrize(["test_case"], ObjectTypeTestCaseGenerator.make_test_cases_enum_field_value())
-def test_objects_without_enum_plugin(test_case: TestCase, objects_plugin, config, registry):
+@pytest.mark.parametrize(
+    ["test_case"], ObjectTypeTestCaseGenerator.make_test_cases_enum_field_value()
+)
+def test_objects_without_enum_plugin(
+    test_case: TestCase, objects_plugin, config, registry
+):
     schema = build_schema_from_sdl(test_case.sdl)
     with pytest.raises(NoEnumFound):
         objects_plugin.generate_ast(schema, config, registry)
 
 
-@pytest.mark.parametrize(["test_case"], ObjectTypeTestCaseGenerator.make_test_cases_enum_field_value())
-def test_objects_with_enum_plugin(test_case: TestCase, enums_plugin, objects_plugin, config, registry):
+@pytest.mark.parametrize(
+    ["test_case"], ObjectTypeTestCaseGenerator.make_test_cases_enum_field_value()
+)
+def test_objects_with_enum_plugin(
+    test_case: TestCase, enums_plugin, objects_plugin, config, registry
+):
     schema = build_schema_from_sdl(test_case.sdl)
     enum_ast = enums_plugin.generate_ast(schema, config, registry)
     objects_ast = objects_plugin.generate_ast(schema, config, registry)
     ast = enum_ast + objects_ast
-    assert re_patterns_in_python_ast(test_case.expected_re_patterns, ast), python_from_ast(ast)
+    assert re_patterns_in_python_ast(
+        test_case.expected_re_patterns, ast
+    ), python_from_ast(ast)
 
 
 def test_interface_and_implementation(objects_plugin, config, registry):
@@ -168,12 +194,15 @@ def test_interface_and_implementation(objects_plugin, config, registry):
     """
     schema = build_schema_from_sdl(sdl)
     ast = objects_plugin.generate_ast(schema, config, registry)
-    assert re_patterns_in_python_ast([
-        r"class InterfaceBase",
-        r"test: str",
-        fr"class Implementation{re_token_one_of_base_classes('InterfaceBase')}",
-        r"Interface = Union\[Implementation,\]",
-    ], ast), python_from_ast(ast)
+    assert re_patterns_in_python_ast(
+        [
+            r"class InterfaceBase",
+            r"test: str",
+            fr"class Implementation{re_token_one_of_base_classes('InterfaceBase')}",
+            r"Interface = Union\[Implementation,\]",
+        ],
+        ast,
+    ), python_from_ast(ast)
 
 
 def test_multiple_interface_mro(objects_plugin, config, registry):
@@ -197,35 +226,54 @@ def test_multiple_interface_mro(objects_plugin, config, registry):
     }"""
     schema = build_schema_from_sdl(sdl)
     ast = objects_plugin.generate_ast(schema, config, registry)
-    assert re_patterns_in_python_ast([
-        r"foo: str",
-        r"bar: str",
-        r"class ABase",
-        fr"class BBase{re_token_one_of_base_classes('ABase')}",
-        fr"class ThisWorks{re_token_one_of_base_classes('BBase')}",
-        fr"class ThisDoesnt{re_token_one_of_base_classes('BBase')}",
-        r"A = Union\[BBase, ThisDoesnt, ThisWorks\]",
-        r"B = Union\[ThisDoesnt, ThisWorks\]",
-    ], ast), python_from_ast(ast)
+    assert re_patterns_in_python_ast(
+        [
+            r"foo: str",
+            r"bar: str",
+            r"class ABase",
+            fr"class BBase{re_token_one_of_base_classes('ABase')}",
+            fr"class ThisWorks{re_token_one_of_base_classes('BBase')}",
+            fr"class ThisDoesnt{re_token_one_of_base_classes('BBase')}",
+            r"A = Union\[BBase, ThisDoesnt, ThisWorks\]",
+            r"B = Union\[ThisDoesnt, ThisWorks\]",
+        ],
+        ast,
+    ), python_from_ast(ast)
 
 
-@pytest.mark.parametrize(["test_case"],
-                         ObjectTypeTestCaseGenerator.make_test_cases_skip_underscore(should_skip=True)
-                         + ObjectTypeTestCaseGenerator.make_test_cases_skip_double_underscore(should_skip=True))
-def test_objects_plugin_skip_underscores(test_case: TestCase, objects_plugin, config, registry):
+@pytest.mark.parametrize(
+    ["test_case"],
+    ObjectTypeTestCaseGenerator.make_test_cases_skip_underscore(should_skip=True)
+    + ObjectTypeTestCaseGenerator.make_test_cases_skip_double_underscore(
+        should_skip=True
+    ),
+)
+def test_objects_plugin_skip_underscores(
+    test_case: TestCase, objects_plugin, config, registry
+):
     objects_plugin.config.skip_underscore = True
     objects_plugin.config.skip_double_underscore = True
     schema = build_schema_from_sdl(test_case.sdl)
     ast = objects_plugin.generate_ast(schema, config, registry)
-    assert re_patterns_in_python_ast(test_case.expected_re_patterns, ast), python_from_ast(ast)
+    assert re_patterns_in_python_ast(
+        test_case.expected_re_patterns, ast
+    ), python_from_ast(ast)
 
 
-@pytest.mark.parametrize(["test_case"],
-                         ObjectTypeTestCaseGenerator.make_test_cases_skip_underscore(should_skip=False)
-                         + ObjectTypeTestCaseGenerator.make_test_cases_skip_double_underscore(should_skip=False))
-def test_objects_plugin_ignore_underscores(test_case: TestCase, objects_plugin, config, registry):
+@pytest.mark.parametrize(
+    ["test_case"],
+    ObjectTypeTestCaseGenerator.make_test_cases_skip_underscore(should_skip=False)
+    + ObjectTypeTestCaseGenerator.make_test_cases_skip_double_underscore(
+        should_skip=False
+    ),
+)
+def test_objects_plugin_ignore_underscores(
+    test_case: TestCase, objects_plugin, config, registry
+):
     objects_plugin.config.skip_underscore = False
     objects_plugin.config.skip_double_underscore = False
     schema = build_schema_from_sdl(test_case.sdl)
     ast = objects_plugin.generate_ast(schema, config, registry)
-    assert re_patterns_in_python_ast(test_case.expected_re_patterns, ast), python_from_ast(ast)
+    assert re_patterns_in_python_ast(
+        test_case.expected_re_patterns, ast
+    ), python_from_ast(ast)
