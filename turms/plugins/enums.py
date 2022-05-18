@@ -1,15 +1,16 @@
-from turms.plugins.base import Plugin, PluginConfig
 import ast
 from typing import List
-from turms.config import GeneratorConfig
-from graphql.utilities.build_client_schema import GraphQLSchema
-from turms.plugins.base import Plugin
-from pydantic import Field
-from graphql.type.definition import (
-    GraphQLEnumType,
-)
-import keyword
 
+from graphql import (
+    GraphQLSchema,
+    GraphQLEnumType,
+    GraphQLEnumValue,
+)
+from pydantic import Field
+
+from turms.ast_generators import EnumTypeAstGenerator
+from turms.config import GeneratorConfig
+from turms.plugins.base import Plugin, PluginConfig
 from turms.registry import ClassRegistry
 
 
@@ -27,82 +28,83 @@ class EnumsPluginConfig(PluginConfig):
         env_prefix = "TURMS_PLUGINS_ENUMS_"
 
 
-def generate_enums(
-    client_schema: GraphQLSchema,
-    config: GeneratorConfig,
-    plugin_config: EnumsPluginConfig,
-    registry: ClassRegistry,
-):
-
-    tree = []
-
-    enum_types = {
-        key: value
-        for key, value in client_schema.type_map.items()
-        if isinstance(value, GraphQLEnumType)
-    }
-
-    for key, type in enum_types.items():
-
-        if plugin_config.skip_underscore and key.startswith("_"):
-            continue
-
-        classname = registry.generate_enum(key)
-
-        fields = (
-            [ast.Expr(value=ast.Constant(value=type.description))]
-            if type.description
-            else []
-        )
-
-        for value_key, value in type.values.items():
-
-            assign = ast.Assign(
-                targets=[ast.Name(id=str(value_key), ctx=ast.Store())],
-                value=ast.Constant(value=value.value),
-            )
-
-            potential_comment = (
-                value.description
-                if not value.deprecation_reason
-                else f"DEPRECATED: {value.description}"
-            )
-
-            if potential_comment:
-                fields += [
-                    assign,
-                    ast.Expr(value=ast.Constant(value=potential_comment)),
-                ]
-
-            else:
-                fields += [assign]
-
-        tree.append(
-            ast.ClassDef(
-                classname,
-                bases=[
-                    ast.Name(id="str", ctx=ast.Load()),
-                    ast.Name(id="Enum", ctx=ast.Load()),
-                ],
-                decorator_list=[],
-                keywords=[],
-                body=fields,
-            )
-        )
-
-    return tree
-
-
 class EnumsPlugin(Plugin):
     config: EnumsPluginConfig = Field(default_factory=EnumsPluginConfig)
 
     def generate_ast(
-        self,
-        client_schema: GraphQLSchema,
-        config: GeneratorConfig,
-        registry: ClassRegistry,
+            self,
+            client_schema: GraphQLSchema,
+            config: GeneratorConfig,
+            registry: ClassRegistry,
     ) -> List[ast.AST]:
 
+        # Todo: Remove, use self._generate_base_classes instead
+        #  Unfortunately, this requires updating tests, because some tests
+        #  test for the enum import even though their schema doesn't contain enums.
         registry.register_import("enum.Enum")
 
-        return generate_enums(client_schema, config, self.config, registry)
+        return self._generate_enums(client_schema, config, registry)
+
+    def _generate_enums(self, client_schema, config, registry) -> List[ast.AST]:
+        enums_ast: List[ast.AST] = []
+        enums = self._get_types_from_schema(client_schema, GraphQLEnumType)
+
+        for typename, gql_type in enums.items():
+            if self._skip_type(typename):
+                continue
+            enums_ast.append(
+                self._generate_enum_class_definition(
+                    typename, gql_type, registry
+                )
+            )
+
+        return enums_ast
+
+    def _skip_type(self, typename: str) -> bool:
+        return self.config.skip_underscore and typename.startswith("_")
+
+    def _generate_enum_class_definition(
+            self,
+            typename: str,
+            gql_type: GraphQLEnumType,
+            registry: ClassRegistry
+    ) -> ast.ClassDef:
+        classname = self._generate_classname(registry, typename)
+        base_classes = self._generate_base_classes(registry)
+        enum_body = self._generate_enum_body(gql_type)
+        return EnumTypeAstGenerator.generate_class_definition(classname, base_classes, enum_body)
+
+    def _generate_classname(self, registry: ClassRegistry, typename: str) -> str:
+        return registry.generate_enum(typename)
+
+    def _generate_base_classes(self, registry: ClassRegistry) -> List[str]:
+        registry.register_import("enum.Enum")
+        return ["str", "enum.Enum"]
+
+    def _generate_enum_body(
+            self,
+            gql_type: GraphQLEnumType
+    ) -> List[ast.AST]:
+        body: List[ast.AST] = []
+        if self._type_has_description(gql_type):
+            body.append(self._generate_type_description_ast(gql_type))
+
+        for enum_key, enum_value in gql_type.values.items():
+            body.append(self._generate_enum_value_ast(enum_key, enum_value))
+            if self._enum_value_has_description(enum_value):
+                body.append(self._generate_enum_value_description_ast(enum_value))
+
+        return body
+
+    def _generate_enum_value_ast(self, enum_key: str, enum_value: GraphQLEnumValue) -> ast.Assign:
+        return EnumTypeAstGenerator.generate_enum_value(enum_key, enum_value.value)
+
+    def _enum_value_has_description(self, enum_value: GraphQLEnumValue) -> bool:
+        return enum_value.description is not None or enum_value.deprecation_reason is not None
+
+    def _generate_enum_value_description_ast(self, enum_value: GraphQLEnumValue) -> ast.Expr:
+        if enum_value.deprecation_reason is not None:
+            comment = f"DEPRECATED: {enum_value.deprecation_reason}"
+        else:
+            comment = enum_value.description
+        return EnumTypeAstGenerator.generate_field_description(comment)
