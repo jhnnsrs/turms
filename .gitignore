@@ -147,3 +147,4 @@ static_collected
 data
 *.temp
 cov.xml
+.idea/

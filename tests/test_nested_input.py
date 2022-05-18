@@ -36,6 +36,22 @@ def test_nested_input_funcs(nested_input_schema):
             InputsPlugin(),
             FragmentsPlugin(),
             OperationsPlugin(),
+            FuncsPlugin(
+                config=FuncsPluginConfig(
+                    definitions=[
+                        FunctionDefinition(
+                            type="mutation",
+                            use="tests.mocks.aquery",
+                            is_async=False,
+                        ),
+                        FunctionDefinition(
+                            type="mutation",
+                            use="tests.mocks.aquery",
+                            is_async=True,
+                        ),
+                    ]
+                ),
+            )
         ],
     )
 
@@ -55,6 +71,22 @@ def test_default_input_funcs(nested_input_schema):
             InputsPlugin(),
             FragmentsPlugin(),
             OperationsPlugin(),
+            FuncsPlugin(
+                config=FuncsPluginConfig(
+                    definitions=[
+                        FunctionDefinition(
+                            type="mutation",
+                            use="tests.mocks.aquery",
+                            is_async=False,
+                        ),
+                        FunctionDefinition(
+                            type="mutation",
+                            use="tests.mocks.aquery",
+                            is_async=True,
+                        ),
+                    ]
+                ),
+            )
         ],
     )
 

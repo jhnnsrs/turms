@@ -29,7 +29,7 @@ type Mutation {
     commonName: String!
     taxClass: String!
     eats: [ID]
-  ): Beast
+  ): Beast!
 }
 
 type Subscription {
