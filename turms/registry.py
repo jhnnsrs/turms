@@ -398,7 +398,7 @@ class ClassRegistry(object):
     def generate_forward_refs(self):
         tree = []
 
-        for reference in self.forward_references:
+        for reference in sorted(self.forward_references):
             tree.append(
                 ast.Expr(
                     value=ast.Call(
