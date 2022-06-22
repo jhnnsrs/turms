@@ -332,7 +332,7 @@ def generate_types(
             )
         )
 
-    for interface, union_class_names in interface_map.items():
+    for interface, union_class_names in sorted(interface_map.items()):
         registry.register_import("typing.Union")
         tree.append(
             ast.Assign(
@@ -342,7 +342,7 @@ def generate_types(
                     slice=ast.Tuple(
                         elts=[
                             ast.Name(id=clsname, ctx=ast.Load())
-                            for clsname in union_class_names
+                            for clsname in sorted(union_class_names)
                         ],
                         ctx=ast.Load(),
                     ),
@@ -362,7 +362,7 @@ def generate_types(
                 f"Interfaces {unimplemented_interfaces.keys()} have no types implementing it. And we have set always_resolve_interfaces to true. Make sure your schema is correct"
             )
 
-        for interface, baseclass in unimplemented_interfaces.items():
+        for interface, baseclass in sorted(unimplemented_interfaces.items()):
             registry.warn(f"Interface {interface} has no types implementing it")
             tree.append(
                 ast.Assign(
