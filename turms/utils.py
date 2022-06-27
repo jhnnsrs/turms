@@ -41,6 +41,11 @@ from turms.errors import (
     NoScalarFound,
     RegistryError,
 )
+from graphql.language import print_location
+import re
+
+
+commentline_regex = re.compile(r"^.*#(.*)")
 
 
 class FragmentNotFoundError(Exception):
@@ -59,6 +64,26 @@ def target_from_node(node: FieldNode) -> str:
     return (
         node.alias.value if hasattr(node, "alias") and node.alias else node.name.value
     )
+
+
+def inspect_operation_for_documentation(operation: OperationDefinitionNode):
+    """Checks for operation level documentatoin"""
+
+    definition = operation.loc.source.body.splitlines()[
+        operation.loc.source.get_location(operation.loc.start).line
+        - 1 : operation.loc.source.get_location(
+            operation.selection_set.selections[0].loc.start
+        ).line
+        - 1
+    ]
+    doc = []
+    for line in definition:
+        if line and line != "":
+            x = commentline_regex.match(line)
+            if x:
+                doc.append(x.group(1))
+
+    return "\n".join(doc) if doc else None
 
 
 def generate_typename_field(typename: str, registry: ClassRegistry):
@@ -87,7 +112,7 @@ def generate_typename_field(typename: str, registry: ClassRegistry):
     )
 
 
-def generate_config_class(config: GeneratorConfig):
+def generate_config_class(config: GeneratorConfig, typename: str = None):
 
     config_fields = []
 
@@ -98,6 +123,16 @@ def generate_config_class(config: GeneratorConfig):
                 value=ast.Constant(value=True),
             )
         )
+
+    if typename:
+        if typename in config.additional_config:
+            for key, value in config.additional_config[typename].items():
+                config_fields.append(
+                    ast.Assign(
+                        targets=[ast.Name(id=key, ctx=ast.Store())],
+                        value=ast.Constant(value=value),
+                    )
+                )
 
     if len(config_fields) > 0:
         return [

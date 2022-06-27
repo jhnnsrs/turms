@@ -22,6 +22,7 @@ from graphql.type.definition import (
 )
 from turms.registry import ClassRegistry
 from turms.utils import (
+    generate_config_class,
     get_additional_bases_for_type,
     interface_is_extended_by_other_interfaces,
 )
@@ -328,7 +329,7 @@ def generate_types(
                 ],
                 decorator_list=[],
                 keywords=[],
-                body=fields,
+                body=fields + generate_config_class(key, config),
             )
         )
 

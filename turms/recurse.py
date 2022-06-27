@@ -1,3 +1,4 @@
+from xml.dom.expatbuilder import parseFragment
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.language.ast import (
@@ -254,22 +255,22 @@ def recurse_annotation(
 
         # Single Item collapse
         if len(node.selection_set.selections) == 1:
-            subnode = node.selection_set.selections[0]
-            if isinstance(subnode, FragmentSpreadNode):
+            sub_node = node.selection_set.selections[0]
+            if isinstance(sub_node, FragmentSpreadNode):
                 if is_optional:
                     registry.register_import("typing.Optional")
                     return ast.Subscript(
                         value=ast.Name("Optional", ctx=ast.Load()),
                         slice=registry.reference_fragment(
-                            subnode.name.value, object_class_name
-                        ),
+                            sub_node.name.value, parent
+                        ),  # needs to be parent not object as reference will be to parent
                         ctx=ast.Load(),
                     )
 
                 else:
                     return registry.reference_fragment(
-                        subnode.name.value, object_class_name
-                    )
+                        sub_node.name.value, parent
+                    )  # needs to be parent not object as reference will be to parent
 
         for sub_node in node.selection_set.selections:
 

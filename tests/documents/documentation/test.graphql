@@ -1,0 +1,18 @@
+mutation createBeast($nested: [[String!]!], $nonOptionalParameter: String!) {
+  # Testing the documentatoin ability
+  createBeast(nested: $nested, nonOptionalParameter: $nonOptionalParameter) {
+    binomial # field docu
+  }
+}
+
+mutation createBeastss($nested: [[String!]!], $nonOptionalParameter: String!) {
+  createBeast(nested: $nested, nonOptionalParameter: $nonOptionalParameter) {
+    binomial
+  }
+}
+
+mutation fsdfsd($nested: [[String!]!], $nonOptionalParameter: String!) {
+  createBeast(nested: $nested, nonOptionalParameter: $nonOptionalParameter) {
+    binomial
+  }
+}

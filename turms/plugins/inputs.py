@@ -16,7 +16,7 @@ from graphql.type.definition import (
     GraphQLEnumType,
 )
 from turms.registry import ClassRegistry
-from turms.utils import get_additional_bases_for_type
+from turms.utils import generate_config_class, get_additional_bases_for_type
 
 
 class InputsPluginConfig(PluginConfig):
@@ -205,7 +205,7 @@ def generate_inputs(
                 + additional_bases,
                 decorator_list=[],
                 keywords=[],
-                body=fields,
+                body=fields + generate_config_class(config, typename=key),
             )
         )
 
