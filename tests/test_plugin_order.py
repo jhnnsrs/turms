@@ -44,32 +44,32 @@ def test_different_plugin_order(arkitekt_schema):
                     definitions=[
                         FunctionDefinition(
                             type="query",
-                            use="tests.mocks.query",
+                            use="mocks.query",
                             is_async=False,
                         ),
                         FunctionDefinition(
                             type="query",
-                            use="tests.mocks.query",
+                            use="mocks.query",
                             is_async=True,
                         ),
                         FunctionDefinition(
                             type="mutation",
-                            use="tests.mocks.aquery",
+                            use="mocks.aquery",
                             is_async=False,
                         ),
                         FunctionDefinition(
                             type="mutation",
-                            use="tests.mocks.aquery",
+                            use="mocks.aquery",
                             is_async=True,
                         ),
                         FunctionDefinition(
                             type="subscription",
-                            use="tests.mocks.subscribe",
+                            use="mocks.subscribe",
                             is_async=False,
                         ),
                         FunctionDefinition(
                             type="subscription",
-                            use="tests.mocks.asubscribe",
+                            use="mocks.asubscribe",
                             is_async=True,
                         ),
                     ]

@@ -330,10 +330,16 @@ def get_return_type_annotation(
                     ).id,
                 )
 
+        field_name = (
+            collapsable_field.name.value
+            if not collapsable_field.alias
+            else collapsable_field.alias.value
+        )
+
         return recurse_outputtype_annotation(
             field_definition.type,
             registry,
-            overwrite_final=f"{o_name}{collapsable_field.name.value.capitalize()}",
+            overwrite_final=f"{o_name}{field_name.capitalize()}",
         )
 
     return ast.Name(

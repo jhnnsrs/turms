@@ -40,10 +40,10 @@ def test_extra_arguments(arkitekt_schema):
             FragmentsPlugin(),
             OperationsPlugin(
                 config=OperationsPluginConfig(
-                    subscription_bases=["tests.mocks.ExtraOnOperations"],
-                    mutation_bases=["tests.mocks.ExtraOnOperations"],
-                    query_bases=["tests.mocks.ExtraOnOperations"],
-                    arguments_bases=["tests.mocks.ExtraArguments"],
+                    subscription_bases=["mocks.ExtraOnOperations"],
+                    mutation_bases=["mocks.ExtraOnOperations"],
+                    query_bases=["mocks.ExtraOnOperations"],
+                    arguments_bases=["mocks.ExtraArguments"],
                 )
             ),
         ],

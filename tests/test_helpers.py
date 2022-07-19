@@ -1,4 +1,6 @@
+import os
 import pytest
+from .utils import DIR_NAME
 
 from turms.helpers import import_string, build_schema_from_glob
 
@@ -15,4 +17,4 @@ def test_schema_from_introspection_json():
     """
     Tests that the result of an introspection query can be read from a file.
     """
-    build_schema_from_glob("tests/introspection/spacex.json")
+    build_schema_from_glob(os.path.join(DIR_NAME, "introspection/spacex.json"))

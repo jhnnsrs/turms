@@ -41,12 +41,12 @@ def test_documentatoin(nested_input_schema):
                     definitions=[
                         FunctionDefinition(
                             type="mutation",
-                            use="turms.mocks.aquery",
+                            use="mocks.aquery",
                             is_async=False,
                         ),
                         FunctionDefinition(
                             type="mutation",
-                            use="turms.mocks.aquery",
+                            use="mocks.aquery",
                             is_async=True,
                         ),
                     ]
@@ -76,12 +76,12 @@ def test_default_input_funcs(nested_input_schema):
                     definitions=[
                         FunctionDefinition(
                             type="mutation",
-                            use="tests.mocks.aquery",
+                            use="mocks.aquery",
                             is_async=False,
                         ),
                         FunctionDefinition(
                             type="mutation",
-                            use="tests.mocks.aquery",
+                            use="mocks.aquery",
                             is_async=True,
                         ),
                     ]

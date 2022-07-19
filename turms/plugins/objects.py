@@ -329,7 +329,7 @@ def generate_types(
                 ],
                 decorator_list=[],
                 keywords=[],
-                body=fields + generate_config_class(key, config),
+                body=fields + generate_config_class(config, key),
             )
         )
 
