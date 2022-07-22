@@ -1,0 +1,24 @@
+﻿type Query {
+  hello(
+    orderBy: HelloWorldOrder! = ASC
+    filter: HelloWorldFilter
+    first: Int
+    last: Int
+    before: String
+    after: String
+  ): [World!]!
+}
+
+enum HelloWorldOrder {
+  ASC
+  "A beautiful thing"
+  DESC
+}
+
+input HelloWorldFilter {
+  searchMassimo: String!
+}
+
+type World {
+  message: String!
+}
