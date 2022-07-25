@@ -24,4 +24,4 @@ def test_utf8_bom():
     """
     Tests that the files with UTF8-BOM are readable.
     """
-    build_schema_from_glob(os.path.join(DIR_NAME, "/schemas/helloworld_bom.graphql")
+    build_schema_from_glob(os.path.join(DIR_NAME, "schemas/helloworld_bom.graphql"))
