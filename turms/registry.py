@@ -1,5 +1,5 @@
 import ast
-from typing import List
+from typing import Dict, List
 from turms.config import GeneratorConfig
 from keyword import iskeyword
 from turms.errors import (
@@ -196,7 +196,7 @@ class ClassRegistry(object):
         typename: str,
         parent: str,
         styler,
-        class_map: {},
+        class_map: Dict,
         error_class: str,
         allow_forward=True,
     ) -> ast.AST:

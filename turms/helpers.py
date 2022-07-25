@@ -1,6 +1,6 @@
 import json
 from importlib import import_module
-from typing import Optional
+from typing import Dict, Optional
 from urllib import request
 import glob
 import graphql
@@ -39,7 +39,7 @@ def import_string(dotted_path):
         ) from err
 
 
-def introspect_url(schema_url: str, bearer_token: Optional[str] = None) -> {}:
+def introspect_url(schema_url: str, bearer_token: Optional[str] = None) -> Dict:
     """Introspect a GraphQL schema using introspection query
 
     Args:
