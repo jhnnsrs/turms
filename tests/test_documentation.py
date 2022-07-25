@@ -23,9 +23,9 @@ def nested_input_schema():
     return build_schema_from_glob(build_relative_glob("/schemas/nested_inputs.graphql"))
 
 
-def test_nested_input_funcs(nested_input_schema):
+def test_documentatoin(nested_input_schema):
     config = GeneratorConfig(
-        documents=build_relative_glob("/documents/nested_inputs/*.graphql"),
+        documents=build_relative_glob("/documents/documentation/*.graphql"),
     )
     generated_ast = generate_ast(
         config,

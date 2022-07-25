@@ -21,6 +21,7 @@ from turms.registry import ClassRegistry
 from turms.utils import (
     NoDocumentsFoundError,
     generate_config_class,
+    inspect_operation_for_documentation,
     parse_documents,
     recurse_type_annotation,
     replace_iteratively,
@@ -41,6 +42,7 @@ class OperationsPluginConfig(PluginConfig):
     subscription_bases: List[str] = None
     operations_glob: Optional[str]
     create_arguments: bool = True
+    extract_documentation: bool = True
 
     class Config:
         env_prefix = "TURMS_PLUGINS_OPERATIONS_"
@@ -166,6 +168,18 @@ def generate_operation(
 
     x = get_operation_root_type(client_schema, o)
     class_body_fields = []
+
+    operation_documentation = (
+        inspect_operation_for_documentation(o)
+        if plugin_config.extract_documentation
+        else None
+    )
+    if operation_documentation:
+        class_body_fields.append(
+            ast.Expr(
+                value=ast.Str(s=operation_documentation),
+            )
+        )
 
     for field_node in o.selection_set.selections:
         field_node: FieldNode = field_node

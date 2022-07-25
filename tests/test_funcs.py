@@ -55,32 +55,32 @@ def test_arkitekt_schema(arkitekt_schema):
                     definitions=[
                         FunctionDefinition(
                             type="query",
-                            use="tests.mocks.query",
+                            use="mocks.query",
                             is_async=False,
                         ),
                         FunctionDefinition(
                             type="query",
-                            use="tests.mocks.query",
+                            use="mocks.query",
                             is_async=True,
                         ),
                         FunctionDefinition(
                             type="mutation",
-                            use="tests.mocks.aquery",
+                            use="mocks.aquery",
                             is_async=False,
                         ),
                         FunctionDefinition(
                             type="mutation",
-                            use="tests.mocks.aquery",
+                            use="mocks.aquery",
                             is_async=True,
                         ),
                         FunctionDefinition(
                             type="subscription",
-                            use="tests.mocks.subscribe",
+                            use="mocks.subscribe",
                             is_async=False,
                         ),
                         FunctionDefinition(
                             type="subscription",
-                            use="tests.mocks.asubscribe",
+                            use="mocks.asubscribe",
                             is_async=True,
                         ),
                     ]
@@ -121,32 +121,32 @@ def test_beasts_schema(beasts_schema):
                     definitions=[
                         FunctionDefinition(
                             type="query",
-                            use="tests.mocks.query",
+                            use="mocks.query",
                             is_async=False,
                         ),
                         FunctionDefinition(
                             type="query",
-                            use="tests.mocks.query",
+                            use="mocks.query",
                             is_async=True,
                         ),
                         FunctionDefinition(
                             type="mutation",
-                            use="tests.mocks.aquery",
+                            use="mocks.aquery",
                             is_async=False,
                         ),
                         FunctionDefinition(
                             type="mutation",
-                            use="tests.mocks.aquery",
+                            use="mocks.aquery",
                             is_async=True,
                         ),
                         FunctionDefinition(
                             type="subscription",
-                            use="tests.mocks.subscribe",
+                            use="mocks.subscribe",
                             is_async=False,
                         ),
                         FunctionDefinition(
                             type="subscription",
-                            use="tests.mocks.asubscribe",
+                            use="mocks.asubscribe",
                             is_async=True,
                         ),
                     ]
@@ -169,7 +169,7 @@ def test_extra_args(beasts_schema):
     extra_args = [
         Arg(
             key="client",
-            type="tests.mocks.ExtraArg",
+            type="mocks.ExtraArg",
             description="An Extra Arg",
         )
     ]
@@ -197,42 +197,42 @@ def test_extra_args(beasts_schema):
                     definitions=[
                         FunctionDefinition(
                             type="query",
-                            use="tests.mocks.query",
+                            use="mocks.query",
                             is_async=False,
                             extra_args=extra_args,
                             extra_kwargs=extra_kwargs,
                         ),
                         FunctionDefinition(
                             type="query",
-                            use="tests.mocks.query",
+                            use="mocks.query",
                             is_async=True,
                             extra_args=extra_args,
                             extra_kwargs=extra_kwargs,
                         ),
                         FunctionDefinition(
                             type="mutation",
-                            use="tests.mocks.aquery",
+                            use="mocks.aquery",
                             is_async=False,
                             extra_args=extra_args,
                             extra_kwargs=extra_kwargs,
                         ),
                         FunctionDefinition(
                             type="mutation",
-                            use="tests.mocks.aquery",
+                            use="mocks.aquery",
                             is_async=True,
                             extra_args=extra_args,
                             extra_kwargs=extra_kwargs,
                         ),
                         FunctionDefinition(
                             type="subscription",
-                            use="tests.mocks.subscribe",
+                            use="mocks.subscribe",
                             is_async=False,
                             extra_args=extra_args,
                             extra_kwargs=extra_kwargs,
                         ),
                         FunctionDefinition(
                             type="subscription",
-                            use="tests.mocks.asubscribe",
+                            use="mocks.asubscribe",
                             is_async=True,
                             extra_args=extra_args,
                             extra_kwargs=extra_kwargs,

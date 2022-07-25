@@ -1,6 +1,6 @@
 import builtins
 from pydantic import AnyHttpUrl, BaseModel, BaseSettings, Field, validator
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from turms.helpers import import_string
 
 
@@ -39,6 +39,7 @@ class GeneratorConfig(BaseSettings):
     scalar_definitions: Dict[str, PythonScalar] = {}
     freeze: bool = False
     additional_bases = {}
+    additional_config: Dict[str, Dict[str, Any]] = {}
     force_plugin_order: bool = True
 
     parsers: List[ConfigProxy] = []

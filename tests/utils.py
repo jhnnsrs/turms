@@ -17,6 +17,46 @@ class ExecuteError(Exception):
     pass
 
 
+mocks_code = """
+from typing import Optional, Type, TypeVar
+
+from pydantic import BaseModel
+
+T = TypeVar("T")
+
+
+def query(model: Type[T], variables) -> T:
+    return model(variables)  # pragma: nocover
+
+
+async def aquery(model: Type[T], variables) -> T:
+    return model(variables)  # pragma: nocover
+
+
+def subscribe(model: Type[T], variables) -> T:
+    yield model(variables)  # pragma: nocover
+    yield model(variables)  # pragma: nocover
+
+
+async def asubscribe(model: Type[T], variables) -> T:
+    yield model(variables)  # pragma: nocover
+    yield model(variables)  # pragma: nocover
+
+
+class ExtraArguments(BaseModel):
+    extra: Optional[str]
+
+
+class ExtraOnOperations(BaseModel):
+    extra: Optional[str]
+
+
+class ExtraArg(BaseModel):
+    extra: Optional[str]
+
+"""
+
+
 def unit_test_with(generated_ast: List[ast.AST], test_string: str):
 
     added_code = ast.parse(test_string).body
@@ -27,7 +67,9 @@ def unit_test_with(generated_ast: List[ast.AST], test_string: str):
     parsed_code = ast.unparse(ast.fix_missing_locations(md))
 
     with tempfile.TemporaryDirectory() as tmpdirname:
+
         filename = write_code_to_file(parsed_code, tmpdirname, "minimal.py")
+        mocksfile = write_code_to_file(mocks_code, tmpdirname, "mocks.py")
         s = subprocess.run([sys.executable, filename], capture_output=True)
         if s.returncode == 0:
             return True

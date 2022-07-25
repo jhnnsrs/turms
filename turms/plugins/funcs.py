@@ -6,6 +6,8 @@ import re
 from ctypes import Union
 from enum import Enum
 from typing import Any, List, Optional, Tuple
+from graphql.language.print_location import print_location
+
 
 from graphql import (
     BooleanValueNode,
@@ -43,6 +45,7 @@ from turms.plugins.base import Plugin, PluginConfig
 from turms.registry import ClassRegistry
 from turms.utils import (
     NoDocumentsFoundError,
+    inspect_operation_for_documentation,
     parse_documents,
     parse_value_node,
     recurse_outputtype_annotation,
@@ -85,6 +88,7 @@ class FuncsPluginConfig(PluginConfig):
     global_args: List[Arg] = []
     global_kwargs: List[Kwarg] = []
     definitions: List[FunctionDefinition] = []
+    extract_documentation: bool = True
 
     class Config:
         env_prefix = "TURMS_PLUGINS_FUNCS_"
@@ -326,10 +330,16 @@ def get_return_type_annotation(
                     ).id,
                 )
 
+        field_name = (
+            collapsable_field.name.value
+            if not collapsable_field.alias
+            else collapsable_field.alias.value
+        )
+
         return recurse_outputtype_annotation(
             field_definition.type,
             registry,
-            overwrite_final=f"{o_name}{collapsable_field.name.value.capitalize()}",
+            overwrite_final=f"{o_name}{field_name.capitalize()}",
         )
 
     return ast.Name(
@@ -405,18 +415,30 @@ def generate_query_doc(
 
     header = f"{o.name.value} \n\n"
 
+    operation_documentation = (
+        inspect_operation_for_documentation(o)
+        if plugin_config.extract_documentation
+        else None
+    )
+
     op_descriptions = []
 
-    for field in o.selection_set.selections:
-        if isinstance(field, FieldNode):
-            target = target_from_node(field)
-            operation_type = get_field_def(client_schema, x, field).type
-            while is_wrapping_type(operation_type):
-                operation_type = operation_type.of_type
-            if operation_type.description:
-                op_descriptions.append(f"{target}: {operation_type.description}\n")
+    if not operation_documentation:
+        op_descriptions = []
 
-    description = "\n ".join([header] + op_descriptions)
+        for field in o.selection_set.selections:
+            if isinstance(field, FieldNode):
+                target = target_from_node(field)
+                operation_type = get_field_def(client_schema, x, field).type
+                while is_wrapping_type(operation_type):
+                    operation_type = operation_type.of_type
+                if operation_type.description:
+                    op_descriptions.append(f"{target}: {operation_type.description}\n")
+
+        description = "\n ".join([header] + op_descriptions)
+
+    else:
+        description = header + operation_documentation
 
     description += "\n\nArguments:\n"
 
