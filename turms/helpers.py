@@ -1,6 +1,6 @@
 import json
 from importlib import import_module
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 from urllib import request
 import glob
 import graphql
