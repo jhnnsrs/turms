@@ -182,11 +182,29 @@ class ClassRegistry(object):
     def reference_object(
         self, typename: str, parent: str, allow_forward=True
     ) -> ast.AST:
-        classname = self.style_objecttype_class(typename)
-        if typename not in self.object_class_map or parent == classname:
+        return self._reference_generic(
+            typename,
+            parent,
+            self.style_objecttype_class,
+            self.object_class_map,
+            "Object",
+            allow_forward,
+        )
+
+    def _reference_generic(
+        self,
+        typename: str,
+        parent: str,
+        styler,
+        class_map: {},
+        error_class: str,
+        allow_forward=True,
+    ) -> ast.AST:
+        classname = styler(typename)
+        if typename not in class_map or parent == classname:
             if not allow_forward:
                 raise RegistryError(
-                    f"Object type {typename} is not yet defined but referenced by {parent}. And we dont allow forward references"
+                    f"""{error_class} type {typename} is not yet defined but referenced by {parent}. And we dont allow forward references"""
                 )
             self.forward_references.add(parent)
             return ast.Constant(value=classname, ctx=ast.Load())
@@ -241,15 +259,14 @@ class ClassRegistry(object):
     def reference_fragment(
         self, typename: str, parent: str, allow_forward=True
     ) -> ast.AST:
-        classname = self.style_fragment_class(typename)
-        if typename not in self.fragment_class_map or parent == classname:
-            if not allow_forward:
-                raise RegistryError(
-                    f"Object type {typename} is not yet defined but referenced by {parent}. And we dont allow forward references"
-                )
-            self.forward_references.add(parent)
-            return ast.Constant(value=classname, ctx=ast.Load())
-        return ast.Name(id=classname, ctx=ast.Load())
+        return self._reference_generic(
+            typename,
+            parent,
+            self.style_fragment_class,
+            self.fragment_class_map,
+            "Fragment",
+            allow_forward,
+        )
 
     def inherit_fragment(self, typename: str, allow_forward=True) -> ast.AST:
         if typename not in self.fragment_class_map:
@@ -294,15 +311,14 @@ class ClassRegistry(object):
     def reference_query(
         self, typename: str, parent: str, allow_forward=True
     ) -> ast.AST:
-        classname = self.style_query_class(typename)
-        if typename not in self.query_class_map or parent == classname:
-            if not allow_forward:
-                raise RegistryError(
-                    f"Query type {typename} is not yet defined but referenced by {parent}. And we dont allow forward references"
-                )
-            self.forward_references.add(parent)
-            return ast.Constant(value=classname, ctx=ast.Load())
-        return ast.Name(id=classname, ctx=ast.Load())
+        return self._reference_generic(
+            typename,
+            parent,
+            self.style_query_class,
+            self.query_class_map,
+            "Query",
+            allow_forward,
+        )
 
     def style_mutation_class(self, typename: str):
         for styler in self.stylers:
@@ -322,15 +338,14 @@ class ClassRegistry(object):
     def reference_mutation(
         self, typename: str, parent: str, allow_forward=True
     ) -> ast.AST:
-        classname = self.style_mutation_class(typename)
-        if typename not in self.mutation_class_map or parent == classname:
-            if not allow_forward:
-                raise RegistryError(
-                    f"Query type {typename} is not yet defined but referenced by {parent}. And we dont allow forward references"
-                )
-            self.forward_references.add(parent)
-            return ast.Constant(value=classname, ctx=ast.Load())
-        return ast.Name(id=classname, ctx=ast.Load())
+        return self._reference_generic(
+            typename,
+            parent,
+            self.style_mutation_class,
+            self.mutation_class_map,
+            "Mutation",
+            allow_forward,
+        )
 
     def style_subscription_class(self, typename: str):
         for styler in self.stylers:
@@ -350,15 +365,14 @@ class ClassRegistry(object):
     def reference_subscription(
         self, typename: str, parent: str, allow_forward=True
     ) -> ast.AST:
-        classname = self.style_subscription_class(typename)
-        if typename not in self.subscription_class_map or parent == classname:
-            if not allow_forward:
-                raise RegistryError(
-                    f"Query type {typename} is not yet defined but referenced by {parent}. And we dont allow forward references"
-                )
-            self.forward_references.add(parent)
-            return ast.Constant(value=classname, ctx=ast.Load())
-        return ast.Name(id=classname, ctx=ast.Load())
+        return self._reference_generic(
+            typename,
+            parent,
+            self.style_subscription_class,
+            self.subscription_class_map,
+            "Subscription",
+            allow_forward,
+        )
 
     def register_import(self, name):
         if name in ("bool", "str", "int", "float", "dict", "list", "tuple"):
@@ -398,7 +412,7 @@ class ClassRegistry(object):
     def generate_forward_refs(self):
         tree = []
 
-        for reference in self.forward_references:
+        for reference in sorted(self.forward_references):
             tree.append(
                 ast.Expr(
                     value=ast.Call(

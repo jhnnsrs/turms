@@ -28,7 +28,6 @@ black = "^22.1.0"
 pylint = "^2.12.2"
 autoflake = "^1.4"
 
-
 [tool.poetry.extras]
 watch = ["watchdog"]
 black = ["black"]

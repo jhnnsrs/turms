@@ -1,0 +1,21 @@
+type ParentForwardReference {
+    forward_one: ForwardReferenceOne
+    forward_two: ForwardReferenceTwo
+    forward_three: ForwardReferenceThree
+}
+
+type ForwardReferenceOne {
+    forward: Ref
+}
+
+type ForwardReferenceTwo {
+    forward: Ref
+}
+
+type ForwardReferenceThree {
+    forward: Ref
+}
+
+type Ref {
+  id: ID
+}
