@@ -96,12 +96,13 @@ def build_schema_from_glob(glob_string: str):
     dsl_string = ""
     introspection_string = ""
     for file in schema_glob:
-        with open(file, "r") as f:
+        with open(file, "rb") as f:
+            decoded_file = f.read().decode("utf-8-sig")
             if file.endswith(".graphql"):
-                dsl_string += f.read()
+                dsl_string += decoded_file
             elif file.endswith(".json"):
                 # not really necessary as json files are generally not splitable
-                introspection_string += f.read()
+                introspection_string += decoded_file
 
     if not dsl_string and not introspection_string:
         raise GenerationError(f"No schema files found in {glob_string}")
