@@ -55,7 +55,7 @@ def test_documentatoin(nested_input_schema):
         ],
     )
 
-    # unit_test_with(generated_ast, "")
+    unit_test_with(generated_ast, "")
 
 
 def test_default_input_funcs(nested_input_schema):
