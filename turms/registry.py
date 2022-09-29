@@ -17,7 +17,7 @@ SCALAR_DEFAULTS = {
     "Int": "int",
     "Boolean": "bool",
     "GenericScalar": "typing.Dict",
-    "DateTime": "str",
+    "DateTime": "datetime.datetime",
     "Float": "float",
 }
 
