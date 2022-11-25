@@ -26,6 +26,8 @@ from graphql.type.definition import (
     GraphQLType,
 )
 
+from turms.config import GraphQLTypes
+
 
 def recurse_annotation(
     node: FieldNode,
@@ -147,7 +149,8 @@ def recurse_annotation(
                     ],
                     decorator_list=[],
                     keywords=[],
-                    body=[ast.Pass()] + generate_config_class(config),
+                    body=[ast.Pass()]
+                    + generate_config_class(GraphQLTypes.FRAGMENT, config),
                 )
 
                 subtree.append(cls)
@@ -197,7 +200,8 @@ def recurse_annotation(
                     ],
                     decorator_list=[],
                     keywords=[],
-                    body=inline_fragment_fields + generate_config_class(config),
+                    body=inline_fragment_fields
+                    + generate_config_class(GraphQLTypes.FRAGMENT, config),
                 )
 
                 subtree.append(cls)
@@ -310,7 +314,7 @@ def recurse_annotation(
             ],
             decorator_list=[],
             keywords=[],
-            body=body + generate_config_class(config),
+            body=body + generate_config_class(GraphQLTypes.OBJECT, config),
         )
 
         subtree.append(cls)
@@ -370,14 +374,28 @@ def recurse_annotation(
 
     if isinstance(type, GraphQLList):
 
+        if config.freeze.enabled:
+            registry.register_import("typing.Tuple")
+            list_builder = lambda x: ast.Subscript(
+                value=ast.Name("Tuple", ctx=ast.Load()),
+                slice=ast.Tuple(elts=[x, ast.Ellipsis()], ctx=ast.Load()),
+                ctx=ast.Load(),
+            )
+
+        else:
+
+            registry.register_import("typing.List")
+            list_builder = lambda x: ast.Subscript(
+                value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
+            )
+
         if is_optional:
             registry.register_import("typing.Optional")
-            registry.register_import("typing.List")
+
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
-                slice=ast.Subscript(
-                    value=ast.Name("List", ctx=ast.Load()),
-                    slice=recurse_annotation(
+                slice=list_builder(
+                    recurse_annotation(
                         node,
                         parent,
                         type.of_type,
@@ -385,17 +403,14 @@ def recurse_annotation(
                         config,
                         subtree,
                         registry,
-                    ),
-                    ctx=ast.Load(),
+                    )
                 ),
                 ctx=ast.Load(),
             )
 
         else:
-            registry.register_import("typing.List")
-            return ast.Subscript(
-                value=ast.Name("List", ctx=ast.Load()),
-                slice=recurse_annotation(
+            return list_builder(
+                recurse_annotation(
                     node,
                     parent,
                     type.of_type,
@@ -403,8 +418,7 @@ def recurse_annotation(
                     config,
                     subtree,
                     registry,
-                ),
-                ctx=ast.Load(),
+                )
             )
 
 

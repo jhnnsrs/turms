@@ -41,6 +41,7 @@ from turms.errors import (
     NoScalarFound,
     RegistryError,
 )
+from .config import GraphQLTypes
 from graphql.language import print_location
 import re
 
@@ -112,17 +113,25 @@ def generate_typename_field(typename: str, registry: ClassRegistry):
     )
 
 
-def generate_config_class(config: GeneratorConfig, typename: str = None):
+def generate_config_class(
+    graphQLType: GraphQLTypes, config: GeneratorConfig, typename: str = None
+):
 
     config_fields = []
 
-    if config.freeze:
-        config_fields.append(
-            ast.Assign(
-                targets=[ast.Name(id="frozen", ctx=ast.Store())],
-                value=ast.Constant(value=True),
-            )
-        )
+    if config.freeze.enabled:
+        if graphQLType in config.freeze.types:
+            if config.freeze.exclude and typename in config.freeze.exclude:
+                pass
+            elif config.freeze.include and typename not in config.freeze.include:
+                pass
+            else:
+                config_fields.append(
+                    ast.Assign(
+                        targets=[ast.Name(id="frozen", ctx=ast.Store())],
+                        value=ast.Constant(value=True),
+                    )
+                )
 
     if typename:
         if typename in config.additional_config:

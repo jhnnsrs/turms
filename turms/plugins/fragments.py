@@ -23,7 +23,7 @@ from graphql import (
     InlineFragmentNode,
     language,
 )
-
+from turms.config import GraphQLTypes
 
 from graphql.utilities.type_info import get_field_def
 import logging
@@ -185,7 +185,8 @@ def generate_fragment(
                     ],
                     decorator_list=[],
                     keywords=[],
-                    body=inline_fragment_fields + generate_config_class(config),
+                    body=inline_fragment_fields
+                    + generate_config_class(GraphQLTypes.FRAGMENT, config),
                 )
 
                 tree.append(cls)
@@ -260,7 +261,7 @@ def generate_fragment(
                 + get_fragment_bases(config, plugin_config, registry),
                 decorator_list=[],
                 keywords=[],
-                body=fields + generate_config_class(config),
+                body=fields + generate_config_class(GraphQLTypes.FRAGMENT, config),
             )
         )
         return tree

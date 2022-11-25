@@ -17,6 +17,7 @@ from graphql.type.definition import (
 )
 from turms.registry import ClassRegistry
 from turms.utils import generate_config_class, get_additional_bases_for_type
+from turms.config import GraphQLTypes
 
 
 class InputsPluginConfig(PluginConfig):
@@ -76,33 +77,45 @@ def generate_input_annotation(
         )
 
     if isinstance(type, GraphQLList):
-        if is_optional:
-            registry.register_import("typing.Optional")
+        if (
+            config.freeze.enabled
+            and GraphQLTypes.INPUT in config.freeze.types
+            and config.freeze.convert_list_to_tuple
+        ):
+            registry.register_import("typing.Tuple")
+            list_builder = lambda x: ast.Subscript(
+                value=ast.Name("Tuple", ctx=ast.Load()),
+                slice=ast.Tuple(elts=[x, ast.Ellipsis()], ctx=ast.Load()),
+                ctx=ast.Load(),
+            )
+        else:
             registry.register_import("typing.List")
+            list_builder = lambda x: ast.Subscript(
+                value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
+            )
+
+        if is_optional:
+
+            registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
-                slice=ast.Subscript(
-                    value=ast.Name("List", ctx=ast.Load()),
-                    slice=generate_input_annotation(
+                slice=list_builder(
+                    generate_input_annotation(
                         type.of_type,
                         parent,
                         config,
                         plugin_config,
                         registry,
                         is_optional=True,
-                    ),
-                    ctx=ast.Load(),
+                    )
                 ),
                 ctx=ast.Load(),
             )
 
-        registry.register_import("typing.List")
-        return ast.Subscript(
-            value=ast.Name("List", ctx=ast.Load()),
-            slice=generate_input_annotation(
+        return list_builder(
+            generate_input_annotation(
                 type.of_type, parent, config, plugin_config, registry, is_optional=True
-            ),
-            ctx=ast.Load(),
+            )
         )
 
     raise NotImplementedError(f"Unknown input type {type}")
@@ -205,7 +218,8 @@ def generate_inputs(
                 + additional_bases,
                 decorator_list=[],
                 keywords=[],
-                body=fields + generate_config_class(config, typename=key),
+                body=fields
+                + generate_config_class(GraphQLTypes.INPUT, config, typename=key),
             )
         )
 

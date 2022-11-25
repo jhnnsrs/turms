@@ -272,7 +272,7 @@ def generate_operation(
             bases=extra_bases,
             decorator_list=[],
             keywords=[],
-            body=class_body_fields + generate_config_class(config),
+            body=class_body_fields + generate_config_class(o.operation, config),
         )
     )
 
