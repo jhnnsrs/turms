@@ -25,7 +25,7 @@ const FeatureList: FeatureItem[] = [
     image: "/img/undraw_docusaurus_tree.svg",
     description: (
       <>
-        Turms allows easy extensions of your GraphQL schema on the cliend side
+        Turms allows easy extensions of your GraphQL schema on the client side
         via additional bases (traits) based on the graphql type
       </>
     ),

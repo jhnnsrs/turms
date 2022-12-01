@@ -13,6 +13,8 @@ class ConfigProxy(BaseModel):
 
 
 class PythonType(str):
+    """A string that represents a python type. Either a builtin type or a type from a module."""
+
     @classmethod
     def __get_validators__(cls):
         yield cls.validate
@@ -47,17 +49,22 @@ class FreezeConfig(BaseSettings):
     """
 
     enabled: bool = Field(False, description="Enabling this, will freeze the schema")
+    """Enabling this, will freeze the schema"""
 
     types: List[GraphQLTypes] = Field(
         [GraphQLTypes.INPUT, GraphQLTypes.FRAGMENT, GraphQLTypes.OBJECT],
         description="The types to freeze",
     )
+    """The core types (Input, Fragment, Object, Operation) to freeze"""
+
     exclude: Optional[List[str]] = Field(
         description="List of types to exclude from freezing"
     )
+    """List of types to exclude from freezing"""
     include: Optional[List[str]] = Field(
         description="List of types to include in freezing"
     )
+    """The types to freeze"""
     exclude_fields: Optional[List[str]] = Field(
         [], description="List of fields to exclude from freezing"
     )
@@ -67,6 +74,7 @@ class FreezeConfig(BaseSettings):
     convert_list_to_tuple: bool = Field(
         True, description="Convert GraphQL List to tuple (with varying length"
     )
+    """Convert GraphQL List to tuple (with varying length)"""
 
 
 class GeneratorConfig(BaseSettings):
@@ -81,52 +89,70 @@ class GeneratorConfig(BaseSettings):
     """
 
     domain: Optional[str] = None
+    """The domain of the GraphQL API ( will be set as a config variable)"""
     out_dir: str = "api"
+    """The output directory for the generated models"""
     generated_name: str = "schema.py"
+    """ The name of the generated file within the output directory"""
     documents: Optional[str]
+    """The documents to parse. Setting this will overwrite the documents in the graphql config"""
     verbose: bool = False
+    """Enable verbose logging"""
 
     object_bases: List[str] = ["pydantic.BaseModel"]
+    """The base classes for the generated objects. This is useful if you want to change the base class from BaseModel to something else"""
 
     interface_bases: Optional[List[str]] = None
+    """List of base classes for interfaces"""
     always_resolve_interfaces: bool = True
+    """Always resolve interfaces to concrete types"""
 
     scalar_definitions: Dict[str, PythonType] = Field(
         default_factory=dict,
         description="Additional config for mapping scalars to python types (e.g. ID: str). Can use dotted paths to import types from other modules.",
     )
+    """Additional config for mapping scalars to python types (e.g. ID: str). Can use dotted paths to import types from other modules."""
     freeze: FreezeConfig = Field(
         default_factory=FreezeConfig,
         description="Configuration for freezing the generated models",
     )
+    """Configuration for freezing the generated models: by default disabled"""
 
     additional_bases: Dict[str, Dict[str, PythonType]] = Field(
         default_factory=dict,
-        description="Additional config for the generated models as map of GraphQL Type to importable base class (e.g. module.package.Class)",
+        description="Additional bases for the generated models as map of GraphQL Type to importable base class (e.g. module.package.Class)",
     )
+    "Additional bases for the generated models as map of GraphQL Type to importable base class (e.g. module.package.Class)"
     additional_config: Dict[str, Dict[str, Any]] = Field(
         default_factory=dict,
         description="Additional config for the generated models as map of GraphQL Type to config attributes",
     )
+    "Additional config for the generated models as map of GraphQL Type to config attributes"
+
     force_plugin_order: bool = True
+    "Should the plugins be forced to run in the order they are defined"
 
     parsers: List[ConfigProxy] = Field(
         default_factory=list,
         description="List of parsers to use. Parsers are used to parse the generated AST and translate it before it is converted to python code",
     )
+    "List of parsers to use. Parsers are used to parse the generated AST and translate it before it is converted to python code"
 
     plugins: List[ConfigProxy] = Field(
         default_factory=list,
         description="List of plugins to use. Plugins are used to generated the python ast from the graphql documents, objects, etc.",
     )
+    "List of plugins to use. Plugins are used to generated the python ast from the graphql documents, objects, etc."
     processors: List[ConfigProxy] = Field(
         default_factory=list,
         description="List of processors to use. Processor are used to enforce specific styles on the generated python code",
     )
+    "List of processors to use. Processor are used to enforce specific styles on the generated python code"
     stylers: List[ConfigProxy] = Field(
         default_factory=list,
         description="List of stylers to use. Style are used to enforce specific styles on the generaded class or fieldnames. ",
     )
+    "List of stylers to use. Style are used to enforce specific styles on the generaded class or fieldnames. "
 
     @validator("parsers", "plugins", "processors", "stylers")
     def validate_importable(cls, v):
@@ -147,6 +173,7 @@ class Extensions(BaseModel):
     """Wrapping class to be able to extract the tums configuraiton"""
 
     turms: GeneratorConfig
+    "The turms configuration"
 
 
 class GraphQLProject(BaseSettings):
@@ -161,9 +188,13 @@ class GraphQLProject(BaseSettings):
     """
 
     schema_url: Optional[Union[AnyHttpUrl, str]] = Field(alias="schema", env="schema")
+    """The schema url or path to the schema file"""
     bearer_token: Optional[str] = None
+    """The bearer token to use for the schema if retrieving it from a remote url"""
     documents: Optional[str]
+    """The documents (operations,fragments) to parse"""
     extensions: Extensions
+    """The extensions configuration for the project (here resides the turms configuration)"""
 
     class Config:
         env_prefix = "TURMS_GRAPHQL_"
@@ -177,6 +208,7 @@ class GraphQLConfigMultiple(BaseSettings):
     the graphql-config specification for multiple projec."""
 
     projects: Dict[str, GraphQLProject]
+    """ The projects that should be parsed. The key is the name of the project and the value is the graphql project"""
 
     class Config:
         extra = "allow"
