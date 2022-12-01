@@ -10,11 +10,19 @@
     {
       "items": [
         "reference/cli/__init__",
-        "reference/cli/gen",
         "reference/cli/main",
         "reference/cli/watch"
       ],
       "label": "cli",
+      "type": "category"
+    },
+    {
+      "items": [
+        "reference/parsers/__init__",
+        "reference/parsers/base",
+        "reference/parsers/polyfill"
+      ],
+      "label": "parsers",
       "type": "category"
     },
     {
@@ -25,19 +33,20 @@
         "reference/plugins/fragments",
         "reference/plugins/funcs",
         "reference/plugins/inputs",
-        "reference/plugins/operation"
+        "reference/plugins/objects",
+        "reference/plugins/operations"
       ],
       "label": "plugins",
       "type": "category"
     },
     {
       "items": [
-        "reference/processor/__init__",
-        "reference/processor/base",
-        "reference/processor/black",
-        "reference/processor/isort"
+        "reference/processors/__init__",
+        "reference/processors/base",
+        "reference/processors/black",
+        "reference/processors/isort"
       ],
-      "label": "processor",
+      "label": "processors",
       "type": "category"
     },
     {
@@ -46,27 +55,18 @@
         "reference/stylers/appender",
         "reference/stylers/base",
         "reference/stylers/capitalize",
-        "reference/stylers/snake"
+        "reference/stylers/default",
+        "reference/stylers/snake_case"
       ],
       "label": "stylers",
-      "type": "category"
-    },
-    {
-      "items": [
-        "reference/types/__init__",
-        "reference/types/object",
-        "reference/types/operation",
-        "reference/types/scalar",
-        "reference/types/utils"
-      ],
-      "label": "types",
       "type": "category"
     },
     "reference/config",
     "reference/console",
     "reference/errors",
-    "reference/globals",
     "reference/helpers",
+    "reference/mocks",
+    "reference/recurse",
     "reference/registry",
     "reference/run",
     "reference/utils"
