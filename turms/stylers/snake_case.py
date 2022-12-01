@@ -13,6 +13,8 @@ class SnakeCaseStylerConfig(StylerConfig):
 
 
 class SnakeCaseStyler(BaseStyler):
+    """A styler that snake cased node and parameter names.  (e.g. camelCase -> camel_case)"""
+
     config: SnakeCaseStylerConfig = Field(default_factory=SnakeCaseStylerConfig)
 
     def style_node_name(self, name: str) -> str:

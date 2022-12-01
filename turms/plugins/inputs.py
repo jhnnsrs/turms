@@ -227,6 +227,13 @@ def generate_inputs(
 
 
 class InputsPlugin(Plugin):
+    """Generate pydantic Models for GraphQL inputs
+
+    This plugin generates pydantic models for all GraphQL inputtypes in
+    your schema. It will generate a model for each inputtype in your schema.
+
+    """
+
     config: InputsPluginConfig = Field(default_factory=InputsPluginConfig)
 
     def generate_ast(

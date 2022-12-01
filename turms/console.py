@@ -6,6 +6,8 @@ try:
 except ImportError:
 
     class Console:
+        """A fake console if rich is not installed"""
+
         def __init__(self) -> None:
             pass
 

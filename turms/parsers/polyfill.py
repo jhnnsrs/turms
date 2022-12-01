@@ -51,11 +51,10 @@ def polyfill_python_seven(
 
 
 class PolyfillParser(Parser):
-    """Base Paser Class
+    """The polyfill parser is used to polyfill the generated python code with
+    additional imports and code to make it compatible with older python versions.
 
-    Raises:
-        NotImplementedError: [description]
-    """
+    Right now it only supports polyfils for python 3.7 and higher"""
 
     config: PolyfillPluginConfig = Field(default_factory=PolyfillPluginConfig)
 

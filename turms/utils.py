@@ -2,6 +2,7 @@ import glob
 import re
 from typing import Dict, List, Optional, Set, Union
 from turms.config import GeneratorConfig
+from turms.errors import GenerationError
 from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.language.ast import DocumentNode, FieldNode
 from graphql.error.graphql_error import GraphQLError
@@ -49,19 +50,20 @@ import re
 commentline_regex = re.compile(r"^.*#(.*)")
 
 
-class FragmentNotFoundError(Exception):
+class FragmentNotFoundError(GenerationError):
     pass
 
 
-class NoDocumentsFoundError(Exception):
+class NoDocumentsFoundError(GenerationError):
     pass
 
 
-class NoScalarEquivalentDefined(Exception):
+class NoScalarEquivalentDefined(GenerationError):
     pass
 
 
 def target_from_node(node: FieldNode) -> str:
+    """Extacts the field name from a FieldNode. If alias is present, it will be used instead of the name"""
     return (
         node.alias.value if hasattr(node, "alias") and node.alias else node.name.value
     )
@@ -88,6 +90,7 @@ def inspect_operation_for_documentation(operation: OperationDefinitionNode):
 
 
 def generate_typename_field(typename: str, registry: ClassRegistry):
+    """Generates the typename field a specific type, this will be used to determine the type of the object in the response"""
 
     registry.register_import("pydantic.Field")
     registry.register_import("typing.Optional")
@@ -116,6 +119,16 @@ def generate_typename_field(typename: str, registry: ClassRegistry):
 def generate_config_class(
     graphQLType: GraphQLTypes, config: GeneratorConfig, typename: str = None
 ):
+    """Generates the config class for a specific type
+
+    It will append the config class to the registry, and set the frozen
+    attribute for the class to True, if the freeze config is enabled and
+    the type appears in the freeze list.
+
+    It will also add config attributes to the class, if the type appears in
+    'additional_config' in the config file.
+
+    """
 
     config_fields = []
 
