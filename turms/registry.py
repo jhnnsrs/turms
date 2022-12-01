@@ -248,13 +248,14 @@ class ClassRegistry(object):
             typename += "_"
         return typename
 
-    def generate_fragment(self, typename: str):
+    def generate_fragment(self, fragmentname: str, is_interface=False):
         assert (
-            typename not in self.fragment_class_map
-        ), f"Type {typename} was already registered, cannot register annew"
-        classname = self.style_fragment_class(typename)
-        self.fragment_class_map[typename] = classname
-        return classname
+            fragmentname not in self.fragment_class_map
+        ), f"Fragment {fragmentname} was already registered, cannot register annew"
+        classname = self.style_fragment_class(fragmentname)
+        real_classname = classname if not is_interface else classname + "Base"
+        self.fragment_class_map[fragmentname] = real_classname
+        return real_classname
 
     def reference_fragment(
         self, typename: str, parent: str, allow_forward=True

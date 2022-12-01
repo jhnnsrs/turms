@@ -211,11 +211,11 @@ def generate_inputs(
         tree.append(
             ast.ClassDef(
                 name,
-                bases=[
+                bases=additional_bases
+                + [
                     ast.Name(id=base.split(".")[-1], ctx=ast.Load())
                     for base in plugin_config.inputtype_bases
-                ]
-                + additional_bases,
+                ],
                 decorator_list=[],
                 keywords=[],
                 body=fields

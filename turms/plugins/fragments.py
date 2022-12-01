@@ -75,7 +75,10 @@ def generate_fragment(
     tree = []
     fields = []
     type = client_schema.get_type(f.type_condition.name.value)
-    name = registry.generate_fragment(f.name.value)
+    name = registry.generate_fragment(
+        f.name.value, isinstance(type, GraphQLInterfaceType)
+    )
+    print(f.name.value, name, isinstance(type, GraphQLInterfaceType))
 
     registry.register_fragment_document(
         f.name.value, language.print_ast(f)
@@ -83,7 +86,7 @@ def generate_fragment(
 
     if isinstance(type, GraphQLInterfaceType):
         mother_class_fields = []
-        base_fragment_name = f"{name}Base"
+        base_fragment_name = f"{name}"
         additional_bases = get_additional_bases_for_type(type.name, config, registry)
 
         if type.description:
@@ -182,7 +185,8 @@ def generate_fragment(
                     inline_name,
                     bases=[
                         ast.Name(id=base_fragment_name, ctx=ast.Load()),
-                    ],
+                    ]
+                    + additional_bases,
                     decorator_list=[],
                     keywords=[],
                     body=inline_fragment_fields
@@ -205,7 +209,12 @@ def generate_fragment(
             )
             tree.append(
                 ast.Assign(
-                    targets=[ast.Name(id=name, ctx=ast.Store())],
+                    targets=[
+                        ast.Name(
+                            id=registry.style_fragment_class(f.name.value),
+                            ctx=ast.Store(),
+                        )
+                    ],
                     value=ast.Subscript(
                         value=ast.Name("Union", ctx=ast.Load()),
                         slice=slice,
@@ -233,12 +242,12 @@ def generate_fragment(
                 continue
 
             if isinstance(field, FragmentSpreadNode):
-                additional_bases.append(
+                additional_bases = [
                     ast.Name(
-                        id=registry.inherit_fragment(field.name.value) + "Base",
+                        id=registry.inherit_fragment(field.name.value),
                         ctx=ast.Load(),
                     )
-                )
+                ] + additional_bases  # needs to be prepended (MRO)
                 continue
 
             field_definition = get_field_def(client_schema, type, field)

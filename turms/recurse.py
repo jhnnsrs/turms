@@ -126,7 +126,7 @@ def recurse_annotation(
             bases=get_interface_bases(config, registry) + additional_bases,
             decorator_list=[],
             keywords=[],
-            body=body + generate_config_class(config),
+            body=body + generate_config_class(GraphQLTypes.FRAGMENT, config),
         )
         subtree.append(mother_class)
 
