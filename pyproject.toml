@@ -1,11 +1,11 @@
 [tool.poetry]
 name = "turms"
-version = "0.2.5"
+version = "0.2.8"
 description = "graphql-codegen powered by pydantic"
 authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
 license = "CC BY-NC 3.0"
 readme = "README.md"
-packages = [{include = "turms"}]
+packages = [{ include = "turms" }]
 
 [tool.poetry.dependencies]
 python = "^3.9"
@@ -14,9 +14,9 @@ graphql-core = "^3.2.0"
 pydantic = "^1.9.0"
 PyYAML = ">=5.3.0"
 black = { version = "^22.1.0", optional = true }
-watchdog = {version = "^2.1.6", optional = true}
-astunparse = {version = "^1.6.3",python = ">=3.7,<3.9"}
-isort = { version ="^5.10.1", optional = true }
+watchdog = { version = "^2.1.6", optional = true }
+astunparse = { version = "^1.6.3", python = ">=3.7,<3.9" }
+isort = { version = "^5.10.1", optional = true }
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.5"
@@ -42,7 +42,7 @@ build-backend = "poetry.core.masonry.api"
 
 [[tool.pydoc-markdown.loaders]]
 type = "python"
-search_path = [ "turms" ]
+search_path = ["turms"]
 
 [tool.pydoc-markdown.renderer]
 type = "docusaurus"
