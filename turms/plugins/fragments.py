@@ -78,7 +78,6 @@ def generate_fragment(
     name = registry.generate_fragment(
         f.name.value, isinstance(type, GraphQLInterfaceType)
     )
-    print(f.name.value, name, isinstance(type, GraphQLInterfaceType))
 
     registry.register_fragment_document(
         f.name.value, language.print_ast(f)

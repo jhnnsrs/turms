@@ -118,7 +118,7 @@ class GeneratorConfig(BaseSettings):
     )
     """Configuration for freezing the generated models: by default disabled"""
 
-    additional_bases: Dict[str, Dict[str, PythonType]] = Field(
+    additional_bases: Dict[str, List[PythonType]] = Field(
         default_factory=dict,
         description="Additional bases for the generated models as map of GraphQL Type to importable base class (e.g. module.package.Class)",
     )
