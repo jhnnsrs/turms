@@ -17,7 +17,7 @@ SCALAR_DEFAULTS = {
     "Int": "int",
     "Boolean": "bool",
     "GenericScalar": "typing.Dict",
-    "DateTime": "str",
+    "DateTime": "datetime.datetime",
     "Float": "float",
 }
 
@@ -67,10 +67,17 @@ built_in_map = {
             ]
         ],
     ),
-}
+}  # builtin map provides the default types for any schema if they are referenced
 
 
 class ClassRegistry(object):
+    """Class Registry is responsible for keeping track of all the classes that are generated
+    as well as their names. It also keeps track of all the imports that are required for the
+    generated code to work, as well as all the forward references that are required
+    for the generated code to work (i.e. when a class references another class that has not
+    yet been defined). Class Registry provides a facade to the rest of the code to abstract
+    the logic behind the stylers."""
+
     def __init__(self, config: GeneratorConfig, stylers: List[Styler]):
         self.stylers = stylers
         self._imports = set()
@@ -248,13 +255,14 @@ class ClassRegistry(object):
             typename += "_"
         return typename
 
-    def generate_fragment(self, typename: str):
+    def generate_fragment(self, fragmentname: str, is_interface=False):
         assert (
-            typename not in self.fragment_class_map
-        ), f"Type {typename} was already registered, cannot register annew"
-        classname = self.style_fragment_class(typename)
-        self.fragment_class_map[typename] = classname
-        return classname
+            fragmentname not in self.fragment_class_map
+        ), f"Fragment {fragmentname} was already registered, cannot register annew"
+        classname = self.style_fragment_class(fragmentname)
+        real_classname = classname if not is_interface else classname + "Base"
+        self.fragment_class_map[fragmentname] = real_classname
+        return real_classname
 
     def reference_fragment(
         self, typename: str, parent: str, allow_forward=True

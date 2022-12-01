@@ -15,6 +15,7 @@ from graphql import (
 
 
 def import_class(module_path, class_name):
+    """Import a module from a module_path and return the class"""
     module = import_module(module_path)
     return getattr(module, class_name)
 

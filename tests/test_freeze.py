@@ -24,7 +24,10 @@ def countries_schema():
 
 def test_freeze_classes(countries_schema):
     config = GeneratorConfig(
-        documents=build_relative_glob("/documents/countries/**.graphql"), freeze=True
+        documents=build_relative_glob("/documents/countries/**.graphql"),
+        freeze={
+            "enabled": True,
+        },
     )
 
     generated_ast = generate_ast(

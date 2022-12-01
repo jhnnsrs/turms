@@ -37,6 +37,7 @@ projects:
 
 
 def main(script: TurmsOptions, project=None):
+    """The main entrypoint for the CLI"""
 
     app_directory = os.getcwd()
 

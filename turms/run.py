@@ -28,6 +28,7 @@ import json
 import os
 
 try:
+    # If toml is installed, use it to load the config file
     import toml
 
     def toml_loader(file):
@@ -36,7 +37,7 @@ try:
 except ImportError:
 
     def toml_loader(file):
-        raise NotImplementedError("TOML not supported if you dont install `toml`")
+        raise NotImplementedError("TOML not supported. Please install `toml`")
 
 
 def json_loader(file):

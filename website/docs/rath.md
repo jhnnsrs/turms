@@ -67,25 +67,21 @@ from schema.api import Get_capsulesQuery
 
 rath = Rath(...)
 
-typed_answer = GetcapuslesQuery(**rath.execute(GetcapuslesQuery.Meta.document).data) # fully tpyed
+with rath:
+  typed_answer = GetcapuslesQuery(**rath.execute(GetcapuslesQuery.Meta.document).data) # fully tpyed
 
 ```
 
-Also when using the Turms Operation Func plugin the turms generated
-automatically registers fully typed utilify functions:
+You can also use the funcs plugin in conjuction with a rath proxy function to
+allow fully typed calls to your api like this:
 
-```python title="/schema/api.py"
-def get_capsules() -> List[Get_capsulesQueryCapsules]:
-    """get_capsules
+```python
+from rath import Rath
+from schema.api import get_capsules
 
+rath = Rath(...)
 
-
-    Arguments:
-
-    Returns:
-        Get_capsulesQueryCapsules: The returned Mutation"""
-    return Get_capsulesQuery.execute({}).capsules
+with rath:
+ typed_answer = get_capsules()
 
 ```
-
-Isn't this lovely?

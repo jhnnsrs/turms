@@ -31,6 +31,7 @@ class QueueHandler(FileSystemEventHandler):
 
 
 def watcher(path, queue, event: threading.Event):
+    """Watch a directory for changes"""
     try:
         console.print(f"Watching path {path}")
         event_handler = QueueHandler(sync_q=queue)

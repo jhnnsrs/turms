@@ -11,11 +11,10 @@ class ParserConfig(BaseSettings):
 
 
 class Parser(BaseModel):
-    """Base Paser Class
+    """Base class for all parsers
 
-    Raises:
-        NotImplementedError: [description]
-    """
+    Parsers are used to parse the AST of the generated python code. They can be used to
+    modify the AST before it is written to the file."""
 
     config: ParserConfig
 

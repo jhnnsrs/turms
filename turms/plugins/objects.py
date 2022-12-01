@@ -26,6 +26,7 @@ from turms.utils import (
     get_additional_bases_for_type,
     interface_is_extended_by_other_interfaces,
 )
+from turms.config import GraphQLTypes
 
 
 class ObjectsPluginConfig(PluginConfig):
@@ -151,38 +152,51 @@ def generate_object_field_annotation(
         )
 
     if isinstance(graphql_type, GraphQLList):
+        if (
+            config.freeze.enabled
+            and GraphQLTypes.OBJECT in config.freeze.types
+            and config.freeze.convert_list_to_tuple
+        ):
+            registry.register_import("typing.Tuple")
+            list_builder = lambda x: ast.Subscript(
+                value=ast.Name("Tuple", ctx=ast.Load()),
+                slice=ast.Tuple(elts=[x, ast.Ellipsis()], ctx=ast.Load()),
+                ctx=ast.Load(),
+            )
+        else:
+
+            registry.register_import("typing.List")
+            list_builder = lambda x: ast.Subscript(
+                value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
+            )
+
         if is_optional:
             registry.register_import("typing.Optional")
-            registry.register_import("typing.List")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
-                slice=ast.Subscript(
-                    value=ast.Name("List", ctx=ast.Load()),
-                    slice=generate_object_field_annotation(
+                slice=list_builder(
+                    generate_object_field_annotation(
                         graphql_type.of_type,
                         parent,
                         config,
                         plugin_config,
                         registry,
                         is_optional=True,
-                    ),
-                    ctx=ast.Load(),
+                    )
                 ),
                 ctx=ast.Load(),
             )
 
         registry.register_import("typing.List")
-        return ast.Subscript(
-            value=ast.Name("List", ctx=ast.Load()),
-            slice=generate_object_field_annotation(
+        return list_builder(
+            generate_object_field_annotation(
                 graphql_type.of_type,
                 parent,
                 config,
                 plugin_config,
                 registry,
                 is_optional=True,
-            ),
-            ctx=ast.Load(),
+            )
         )
 
     raise NotImplementedError(f"Unknown input type {repr(graphql_type)}")
@@ -329,7 +343,7 @@ def generate_types(
                 ],
                 decorator_list=[],
                 keywords=[],
-                body=fields + generate_config_class(config, key),
+                body=fields + generate_config_class(GraphQLTypes.OBJECT, config, key),
             )
         )
 
@@ -376,6 +390,17 @@ def generate_types(
 
 
 class ObjectsPlugin(Plugin):
+    """Generate Pydantic models for GraphQL objects
+
+    This plugin generates Pydantic models for GraphQL ObjectTypes and Interfaces in your graphql schema.
+
+    Attention: This plugin is not made for client side usage. Most likely you are looking for the
+    operations, fragments and funcs plugin (that generates client side validation and query function
+    for your documents (your operations, fragments and queries).
+
+
+    """
+
     config: ObjectsPluginConfig = Field(default_factory=ObjectsPluginConfig)
 
     def generate_ast(

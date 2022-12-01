@@ -13,6 +13,8 @@ class CapitalizeSylerConfig(BaseModel):
 
 
 class CapitalizeStyler(BaseStyler):
+    """A styler that capitalizes the first letter of the python class names."""
+
     config: CapitalizeSylerConfig = Field(default_factory=CapitalizeSylerConfig)
 
     def style_fragment_name(self, typename):

@@ -13,6 +13,11 @@ class DefaultStylerConfig(StylerConfig):
 
 
 class DefaultStyler(BaseStyler):
+    """A styler that does capitalize the first letter of the python class names
+    and converts camelCase to snake_case for node and parameter names.  (e.g. camelCase -> camel_case)
+
+    This is the default styler used for python projects"""
+
     config: DefaultStylerConfig = Field(default_factory=DefaultStylerConfig)
 
     def style_fragment_name(self, typename):
