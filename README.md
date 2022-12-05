@@ -8,8 +8,6 @@
 [![PyPI status](https://img.shields.io/pypi/status/turms.svg)](https://pypi.python.org/pypi/turms/)
 [![PyPI download month](https://img.shields.io/pypi/dm/turms.svg)](https://pypi.python.org/pypi/turms/)
 
-### BETA
-
 ## Inspiration
 
 Turms is a pure python implementation following the awesome graphql-codegen library with a similar extensible design.
@@ -18,14 +16,15 @@ It makes heavy use of pydantic and its serialization capablities and provides fu
 ## Supports
 
 Schema Generation
+
 - Enums
 - Inputs
 - Objects
 
 Documents Generation
+
 - Fragments
 - Operations
-
 
 ## Features
 
@@ -36,7 +35,6 @@ Documents Generation
 - full support type hints for variables (Pylance)
 - Compliant with graphl-config
 - Support for custom scalars
-
 
 ## Installation
 
@@ -74,12 +72,11 @@ projects:
           Date: str
 ```
 
-## Run 
+## Run
 
 ```bash
 turms gen
 ```
-
 
 Turms configuration is based on plugins that can be configured in the graphql.config. There exist three major classes:
 
@@ -136,7 +133,7 @@ In Etruscan religion, Turms (usually written as 𐌕𐌖𐌓𐌌𐌑 Turmś in t
 
 ## Transport Layer
 
-Turms does *not* come with a default transport layer but if you are searching for an Apollo-like GraphQL Client you can check out [rath](https://github.com/jhnnsrs/rath), that works especially well with turms.
+Turms does _not_ come with a default transport layer but if you are searching for an Apollo-like GraphQL Client you can check out [rath](https://github.com/jhnnsrs/rath), that works especially well with turms.
 
 ## Examples
 

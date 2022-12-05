@@ -29,7 +29,7 @@ function HomepageHeader() {
 export default function Home(): JSX.Element {
   const { siteConfig } = useDocusaurusContext();
   return (
-    <Layout title={`Rath}`} description="Apollo for python">
+    <Layout title={`Turms`} description="graphql-coidegen for python">
       <HomepageHeader />
       <main>
         <HomepageFeatures />
