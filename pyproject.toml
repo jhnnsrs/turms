@@ -1,11 +1,21 @@
 [tool.poetry]
 name = "turms"
-version = "0.2.8"
+version = "0.2.10"
 description = "graphql-codegen powered by pydantic"
 authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
 license = "CC BY-NC 3.0"
 readme = "README.md"
 packages = [{ include = "turms" }]
+homepage = "https://jhnnsrs.github.io/turms"
+repository = "https://github.com/jhnnsrs/turms"
+classifiers = [
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Code Generators",
+    "Typing :: Typed",
+    "Topic :: Utilities",
+    "Development Status :: 6 - Mature",
+]
 
 [tool.poetry.dependencies]
 python = "^3.9"

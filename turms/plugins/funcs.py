@@ -85,6 +85,7 @@ class FuncsPluginConfig(PluginConfig):
     prepend_sync: str = ""
     prepend_async: str = "a"
     collapse_lonely: bool = True
+    generate_protocol: bool = False
     global_args: List[Arg] = []
     global_kwargs: List[Kwarg] = []
     definitions: List[FunctionDefinition] = []
