@@ -1,0 +1,14 @@
+fragment Continent on Continent {
+  code
+  name
+}
+
+query get_capsules {
+  countries {
+    code
+    name
+    continent {
+      ...Continent
+    }
+  }
+}

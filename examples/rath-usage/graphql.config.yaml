@@ -1,0 +1,48 @@
+projects:
+  default:
+    schema: https://countries.trevorblades.com/
+    documents: your_documents/*.graphql
+    extensions:
+      turms:
+        out_dir: your_library
+
+        stylers:
+          - type: turms.stylers.capitalize.CapitalizeStyler
+          - type: turms.stylers.snake_case.SnakeCaseStyler
+        plugins:
+          - type: turms.plugins.enums.EnumsPlugin
+          - type: turms.plugins.inputs.InputsPlugin
+          - type: turms.plugins.fragments.FragmentsPlugin
+          - type: turms.plugins.operations.OperationsPlugin
+          - type: turms.plugins.funcs.FuncsPlugin
+            global_kwargs:
+              - type: rath.Rath
+                key: rath
+                description: "The client we want to use (defaults to the currently active client)"
+            definitions:
+              - type: subscription
+                is_async: True
+                use: your_library.proxies.asubscribe
+              - type: query
+                is_async: True
+                use: your_library.proxies.aexecute
+              - type: mutation
+                is_async: True
+                use: your_library.proxies.aexecute
+              - type: subscription
+                use: your_library.proxies.subscribe
+              - type: query
+                use: your_library.proxies.execute
+              - type: mutation
+                use: your_library.proxies.execute
+
+        processors:
+          - type: turms.processors.black.BlackProcessor
+          - type: turms.processors.isort.IsortProcessor
+        scalar_definitions:
+          uuid: str
+          UUID: str
+          Callback: str
+          Any: typing.Any
+          QString: str
+          ID: str
