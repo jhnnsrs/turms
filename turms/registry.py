@@ -386,17 +386,23 @@ class ClassRegistry(object):
         if name in ("bool", "str", "int", "float", "dict", "list", "tuple"):
             return
 
-        assert "." in name, "Please only register imports with a top level package"
         self._imports.add(name)
 
     def generate_imports(self):
         imports = []
 
+        lone_top_imports = set()
         top_level = {}
         for name in self._imports:
-            top_level.setdefault(".".join(name.split(".")[:-1]), set()).add(
-                name.split(".")[-1]
-            )
+            if "." not in name:
+                lone_top_imports.add(name)
+            else:
+                top_level.setdefault(".".join(name.split(".")[:-1]), set()).add(
+                    name.split(".")[-1]
+                )
+
+        for lone_top_import in lone_top_imports:
+            imports.append(ast.Import(names=[ast.alias(name=lone_top_import)]))
 
         for top_level_name, sub_level_names in top_level.items():
             imports.append(

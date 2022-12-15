@@ -16,12 +16,18 @@ type Beast {
 }
 
 type Query {
+  """
+  get all the beasts on the server
+  """
   beasts: [Beast]
   beast(id: ID!): Beast!
   calledBy(commonName: String!): [Beast]!
 }
 
 type Mutation {
+  """
+  create a massive beast on the server
+  """
   createBeast(
     id: ID!
     legs: Int!

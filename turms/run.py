@@ -299,6 +299,7 @@ def generate_ast(
     schema: GraphQLSchema,
     plugins: Optional[List[Plugin]] = None,
     stylers: Optional[List[Styler]] = None,
+    skip_forwards: bool = False,
 ) -> List[ast.AST]:
     """Generates the ast from the schema
 
@@ -328,10 +329,9 @@ def generate_ast(
             raise GenerationError(f"Plugin:{plugin} failed!") from e
 
     global_tree = (
-        registry.generate_imports()
-        + registry.generate_builtins()
-        + global_tree
-        + registry.generate_forward_refs()
+        registry.generate_imports() + registry.generate_builtins() + global_tree
     )
+    if not skip_forwards:
+        global_tree += registry.generate_forwards()
 
     return global_tree
