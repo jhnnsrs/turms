@@ -332,6 +332,6 @@ def generate_ast(
         registry.generate_imports() + registry.generate_builtins() + global_tree
     )
     if not skip_forwards:
-        global_tree += registry.generate_forwards()
+        global_tree += registry.generate_forward_refs()
 
     return global_tree
