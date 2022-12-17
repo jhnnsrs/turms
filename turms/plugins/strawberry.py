@@ -29,10 +29,11 @@ from turms.utils import (
 from turms.config import GraphQLTypes
 
 
-class ObjectsPluginConfig(PluginConfig):
-    type = "turms.plugins.objects.ObjectsPlugin"
-    types_bases: List[str] = ["object"]
-    skip_underscore: bool = False
+class StrawberryPluginConfig(PluginConfig):
+    type = "turms.plugins.strawberry.Strawberry"
+    types_bases: List[str] = []
+    inputtype_bases: List[str] = []
+    skip_underscore: bool = True
     skip_double_underscore: bool = True
 
     class Config:
@@ -43,7 +44,7 @@ def generate_object_field_annotation(
     graphql_type: GraphQLType,
     parent: str,
     config: GeneratorConfig,
-    plugin_config: ObjectsPluginConfig,
+    plugin_config: StrawberryPluginConfig,
     registry: ClassRegistry,
     is_optional=True,
 ):
@@ -194,7 +195,7 @@ def recurse_argument_annotation(
     graphql_type: GraphQLType,
     parent: str,
     config: GeneratorConfig,
-    plugin_config: ObjectsPluginConfig,
+    plugin_config: StrawberryPluginConfig,
     registry: ClassRegistry,
     is_optional=True,
 ):
@@ -214,10 +215,10 @@ def recurse_argument_annotation(
             registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
-                slice=registry.reference_object(graphql_type.name, parent),
+                slice=registry.reference_inputtype(graphql_type.name, parent),
                 ctx=ast.Load(),
             )
-        return registry.reference_object(graphql_type.name, parent)
+        return registry.reference_inputtype(graphql_type.name, parent)
 
     if isinstance(graphql_type, GraphQLUnionType):
         if is_optional:
@@ -330,10 +331,177 @@ def recurse_argument_annotation(
     raise NotImplementedError(f"Unknown input type {repr(graphql_type)}")
 
 
+def generate_enums(
+    client_schema: GraphQLSchema,
+    config: GeneratorConfig,
+    plugin_config: StrawberryPluginConfig,
+    registry: ClassRegistry,
+):
+
+    tree = []
+
+    enum_types = {
+        key: value
+        for key, value in client_schema.type_map.items()
+        if isinstance(value, GraphQLEnumType)
+    }
+
+    registry.register_import("enum.Enum")
+
+    decorator = ast.Name(id="strawberry.enum", ctx=ast.Load())
+
+    for key, type in enum_types.items():
+
+        if plugin_config.skip_underscore and key.startswith("_"):
+            continue
+
+        classname = registry.generate_enum(key)
+
+        fields = (
+            [ast.Expr(value=ast.Constant(value=type.description))]
+            if type.description
+            else []
+        )
+
+        for value_key, value in type.values.items():
+
+            assign = ast.Assign(
+                targets=[ast.Name(id=str(value_key), ctx=ast.Store())],
+                value=ast.Constant(value=value.value),
+            )
+
+            potential_comment = (
+                value.description
+                if not value.deprecation_reason
+                else f"DEPRECATED: {value.description}"
+            )
+
+            if potential_comment:
+                fields += [
+                    assign,
+                    ast.Expr(value=ast.Constant(value=potential_comment)),
+                ]
+
+            else:
+                fields += [assign]
+
+        tree.append(
+            ast.ClassDef(
+                classname,
+                bases=[
+                    ast.Name(id="Enum", ctx=ast.Load()),
+                ],
+                decorator_list=[decorator],
+                keywords=[],
+                body=fields,
+            )
+        )
+
+    return tree
+
+
+def generate_inputs(
+    client_schema: GraphQLSchema,
+    config: GeneratorConfig,
+    plugin_config: StrawberryPluginConfig,
+    registry: ClassRegistry,
+):
+
+    tree = []
+
+    inputobjects_type = {
+        key: value
+        for key, value in client_schema.type_map.items()
+        if isinstance(value, GraphQLInputObjectType)
+    }
+
+    decorator = ast.Name(id="strawberry.input", ctx=ast.Load())
+
+    for key, type in inputobjects_type.items():
+
+        if plugin_config.skip_underscore and key.startswith("_"):  # pragma: no cover
+            continue
+
+        additional_bases = get_additional_bases_for_type(type.name, config, registry)
+        name = registry.generate_inputtype(key)
+        fields = (
+            [ast.Expr(value=ast.Constant(value=type.description))]
+            if type.description
+            else []
+        )
+
+        for value_key, value in type.fields.items():
+            value: GraphQLField
+
+            keywords = []
+            if value.description:
+                keywords.append(
+                    ast.keyword(
+                        arg="description",
+                        value=ast.Constant(value=value.description),
+                    )
+                )
+
+            if value.deprecation_reason:
+                keywords.append(
+                    ast.keyword(
+                        arg="deprecation_reason",
+                        value=ast.Constant(value=value.deprecation_reason),
+                    )
+                )
+
+            if keywords:
+                assign_value = ast.Call(
+                    func=ast.Name(
+                        id="strawberry.field",
+                        ctx=ast.Load(),
+                    ),
+                    keywords=keywords,
+                    args=[],
+                )
+            else:
+                assign_value = None
+
+            assign = ast.AnnAssign(
+                target=ast.Name(
+                    registry.generate_node_name(value_key), ctx=ast.Store()
+                ),
+                annotation=recurse_argument_annotation(
+                    value.type,
+                    name,
+                    config,
+                    plugin_config,
+                    registry,
+                    is_optional=True,
+                ),
+                value=assign_value,
+                simple=1,
+            )
+
+            fields += [assign]
+
+        tree.append(
+            ast.ClassDef(
+                name,
+                bases=additional_bases
+                + [
+                    ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+                    for base in plugin_config.inputtype_bases
+                ],
+                decorator_list=[decorator],
+                keywords=[],
+                body=fields
+                + generate_config_class(GraphQLTypes.INPUT, config, typename=key),
+            )
+        )
+
+    return tree
+
+
 def generate_types(
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    plugin_config: ObjectsPluginConfig,
+    plugin_config: StrawberryPluginConfig,
     registry: ClassRegistry,
 ):
 
@@ -594,7 +762,7 @@ class StrawberryPlugin(Plugin):
 
     """
 
-    config: ObjectsPluginConfig = Field(default_factory=ObjectsPluginConfig)
+    config: StrawberryPluginConfig = Field(default_factory=StrawberryPluginConfig)
 
     def generate_ast(
         self,
@@ -603,4 +771,8 @@ class StrawberryPlugin(Plugin):
         registry: ClassRegistry,
     ) -> List[ast.AST]:
 
-        return generate_types(client_schema, config, self.config, registry)
+        enums = generate_enums(client_schema, config, self.config, registry)
+        inputs = generate_inputs(client_schema, config, self.config, registry)
+        types = generate_types(client_schema, config, self.config, registry)
+
+        return enums + inputs + types

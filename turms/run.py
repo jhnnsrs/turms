@@ -289,7 +289,7 @@ def generate(project: GraphQLProject) -> str:
     generated = ast.unparse(ast.fix_missing_locations(module))
 
     for processor in processors:
-        generated = processor.run(generated)
+        generated = processor.run(generated, gen_config)
 
     return generated
 

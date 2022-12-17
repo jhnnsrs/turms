@@ -5,6 +5,14 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Python: Merge Tree",
+      "type": "python",
+      "request": "launch",
+      "program": "merge_tree.py",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
       "name": "Python TTT",
       "type": "python",
       "request": "launch",

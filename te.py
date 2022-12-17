@@ -21,7 +21,7 @@ config = GeneratorConfig(
         "Any": "str",
         "UUID": "pydantic.UUID4",
         "ID": "strawberry.ID",
-    }
+    },
 )
 
 generated_ast = generate_ast(
@@ -41,5 +41,3 @@ md = ast.Module(body=generated_ast, type_ignores=[])
 
 # We need to unparse before otherwise there might be complaints with missing lineno
 parsed_code = ast.unparse(ast.fix_missing_locations(md))
-with open("beasts.py", "w") as f:
-    f.write(parsed_code)

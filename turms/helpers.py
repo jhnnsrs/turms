@@ -1,7 +1,6 @@
 import json
 from importlib import import_module
 from typing import Any, Dict, Optional
-from urllib import request
 import glob
 import graphql
 from turms.errors import GenerationError
@@ -55,15 +54,20 @@ def introspect_url(
     Returns:
         dict: The introspection query response.
     """
-    jdata = json.dumps({"query": get_introspection_query()}).encode("utf-8")
-    req = request.Request(schema_url, data=jdata)
-    req.add_header("Content-Type", "application/json")
-    req.add_header("Accept", "application/json")
-    if bearer_token:
-        req.add_header("Authorization", f"Bearer {bearer_token}")
     try:
-        resp = request.urlopen(req)
-        x = json.loads(resp.read().decode("utf-8"))
+        import requests
+    except ImportError:
+        raise GenerationError(
+            "The requests library is required to introspect a schema from a url"
+        )
+
+    jdata = json.dumps({"query": get_introspection_query()}).encode("utf-8")
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    if bearer_token:
+        headers["Authorization"] = f"Bearer {bearer_token}"
+    try:
+        req = requests.post(schema_url, data=jdata, headers=headers)
+        x = req.json()
     except Exception as e:
         raise GenerationError(f"Failed to fetch schema from {schema_url}")
     if "errors" in x:  # pragma: no cover
