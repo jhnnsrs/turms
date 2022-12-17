@@ -771,6 +771,8 @@ class StrawberryPlugin(Plugin):
         registry: ClassRegistry,
     ) -> List[ast.AST]:
 
+        registry.register_import("strawberry")
+
         enums = generate_enums(client_schema, config, self.config, registry)
         inputs = generate_inputs(client_schema, config, self.config, registry)
         types = generate_types(client_schema, config, self.config, registry)

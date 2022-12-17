@@ -280,6 +280,7 @@ def generate(project: GraphQLProject) -> str:
         schema,
         plugins=plugins,
         stylers=stylers,
+        skip_forwards=gen_config.skip_forwards,
     )
 
     for styler in parsers:

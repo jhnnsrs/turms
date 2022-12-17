@@ -23,28 +23,29 @@ def arkitekt_schema():
 
 
 def test_countries_schema(countries_schema):
-    config = GeneratorConfig()
+    config = GeneratorConfig(scalar_definitions={"_Any": "typing.Any"})
 
     generated_ast = generate_ast(
         config,
         countries_schema,
         stylers=[DefaultStyler()],
         plugins=[
-            EnumsPlugin(),
-            InputsPlugin(),
             StrawberryPlugin(),
         ],
+        skip_forwards=True,
     )
 
     unit_test_with(generated_ast, "")
 
-    with pytest.raises(ExecuteError):
-        unit_test_with(generated_ast, "Country()")
-
 
 def test_arkitekt_schema(arkitekt_schema):
     config = GeneratorConfig(
-        scalar_definitions={"QString": "str", "Any": "str", "UUID": "pydantic.UUID4"}
+        scalar_definitions={
+            "QString": "str",
+            "Any": "str",
+            "UUID": "pydantic.UUID4",
+            "Callback": "str",
+        }
     )
 
     generated_ast = generate_ast(
@@ -52,10 +53,9 @@ def test_arkitekt_schema(arkitekt_schema):
         arkitekt_schema,
         stylers=[DefaultStyler()],
         plugins=[
-            EnumsPlugin(),
-            InputsPlugin(),
             StrawberryPlugin(),
         ],
+        skip_forwards=True,
     )
 
     unit_test_with(generated_ast, "")

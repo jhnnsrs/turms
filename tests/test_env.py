@@ -67,4 +67,4 @@ def test_env_complex(arkitekt_schema, monkeypatch):
         IsortProcessor(),
         BlackProcessor(),
     ]:
-        generated = processor.run(generated)
+        generated = processor.run(generated, config)
