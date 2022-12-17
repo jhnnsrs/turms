@@ -33,7 +33,7 @@ class StrawberryPluginConfig(PluginConfig):
     type = "turms.plugins.strawberry.Strawberry"
     types_bases: List[str] = []
     inputtype_bases: List[str] = []
-    skip_underscore: bool = True
+    skip_underscore: bool = False
     skip_double_underscore: bool = True
 
     class Config:
@@ -355,6 +355,9 @@ def generate_enums(
         if plugin_config.skip_underscore and key.startswith("_"):
             continue
 
+        if plugin_config.skip_double_underscore and key.startswith("__"):
+            continue
+
         classname = registry.generate_enum(key)
 
         fields = (
@@ -365,9 +368,14 @@ def generate_enums(
 
         for value_key, value in type.values.items():
 
+            if isinstance(value.value, str):
+                servalue = value.value
+            else:
+                servalue = value.value.value
+
             assign = ast.Assign(
                 targets=[ast.Name(id=str(value_key), ctx=ast.Store())],
-                value=ast.Constant(value=value.value),
+                value=ast.Constant(value=servalue),
             )
 
             potential_comment = (

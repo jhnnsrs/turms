@@ -13,6 +13,14 @@
       "justMyCode": true
     },
     {
+      "name": "Python: Cli",
+      "type": "python",
+      "request": "launch",
+      "program": "cli.py",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
       "name": "Python TTT",
       "type": "python",
       "request": "launch",

@@ -1,6 +1,6 @@
 projects:
   default:
-    schema: beasts.graphql
+    schema: https://countries.trevorblades.com/
     extensions:
       turms:
         out_dir: examples/countries-code/api
@@ -11,7 +11,6 @@ projects:
           - type: turms.stylers.capitalize.CapitalizeStyler
           - type: turms.stylers.snake_case.SnakeCaseStyler
         plugins:
-          - type: turms.plugins.enums.EnumsPlugin
           - type: turms.plugins.strawberry.StrawberryPlugin
         processors:
           - type: turms.processors.disclaimer.DisclaimerProcessor
@@ -24,4 +23,4 @@ projects:
           Callback: str
           Any: typing.Any
           QString: str
-          ID: str
+          _Any: typing.Any
