@@ -1,10 +1,10 @@
 projects:
   default:
-    schema: https://countries.trevorblades.com/
+    schema: beasts.graphql
     extensions:
       turms:
         skip_forwards: true
-        out_dir: examples/countries-code/api
+        out_dir: api
         stylers:
           - type: turms.stylers.capitalize.CapitalizeStyler
           - type: turms.stylers.snake_case.SnakeCaseStyler

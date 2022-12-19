@@ -31,6 +31,9 @@ from turms.config import GraphQLTypes
 
 class StrawberryPluginConfig(PluginConfig):
     type = "turms.plugins.strawberry.Strawberry"
+    generate_enums: bool = True
+    generate_types: bool = True
+    generate_inputs: bool = True
     types_bases: List[str] = []
     inputtype_bases: List[str] = []
     skip_underscore: bool = False
@@ -781,8 +784,20 @@ class StrawberryPlugin(Plugin):
 
         registry.register_import("strawberry")
 
-        enums = generate_enums(client_schema, config, self.config, registry)
-        inputs = generate_inputs(client_schema, config, self.config, registry)
-        types = generate_types(client_schema, config, self.config, registry)
+        enums = (
+            generate_enums(client_schema, config, self.config, registry)
+            if self.config.generate_enums
+            else []
+        )
+        inputs = (
+            generate_inputs(client_schema, config, self.config, registry)
+            if self.config.generate_inputs
+            else []
+        )
+        types = (
+            generate_types(client_schema, config, self.config, registry)
+            if self.config.generate_types
+            else []
+        )
 
         return enums + inputs + types

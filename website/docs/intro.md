@@ -9,7 +9,7 @@ Let's discover **Turms in less than 5 minutes**.
 
 ### Goal
 
-Turms is a graphql-codegen inspired code generator for python that generates typed and serializable models from your graphql schema with the help of pydantic. Just define your query in standard graphql syntax and let turms create fully typed queries/mutation and subscriptions, that you can use in your favourite IDE.
+Turms is a `graphql-codegen` inspired code generator for python that generates typed and serializable python code from your graphql schema and documents. Just define your query in standard graphql syntax and let turms create fully typed queries/mutation and subscriptions, that you can use in your favourite IDE.
 
 ### Installation
 
@@ -17,8 +17,8 @@ Turms is a graphql-codegen inspired code generator for python that generates typ
 pip install turms
 ```
 
-turms has no dependencies to itself (besides pydantic) in its generated code, so its recommended to install
-turms as a development dependency.
+turms is a pure development library and will not introduce any dependency on itself into your
+code, so we recommend installing turms as a development dependency.
 
 ```bash
 poetry add -D turms
@@ -31,8 +31,7 @@ As of now turms only supports python 3.9 and higher (as we rely on ast unparsing
 
 ### Configuration
 
-Turms relies on and complies with [graphql-config](https://www.graphql-config.com/docs/user/user-introduction) and searches
-your current working dir for the graphql-config file.
+Turms relies on and complies with [graphql-config](https://www.graphql-config.com/docs/user/user-introduction) and searches your current working dir for the graphql-config file.
 
 ```yaml
 projects:
@@ -69,9 +68,11 @@ turms gen
 
 Will generate python code according to the schema and your documents.
 
-### Generation Flow
+### Design
 
-Turms generates code with the help of plugins, parsers and processors:
+Turm uses a modular design to ensure a wide range of applications of graphql
+codegeneration. This means that you can freely choose to add and alter some 
+behaviour of the code generation library. This is done with the help of plugins, parsers and processors:
 
 ```mermaid
 flowchart LR;
@@ -90,8 +91,8 @@ flowchart LR;
 
 Turms loads or introspects your schema, parses your configuration and loads the
 plugins sequentially, causing them to generate their part of the python AST,
-concats these together, pipes them to parsers to manipulate the ast.Trre and unparsers
-this to a codestring that can then be processed by processors (like black or isort),
+concats these together, pipes them to parsers to manipulate the ast.Tree and unparsers
+this to a codestring that can then be processed by processors (like black or isort or merge),
 and are then written to file.
 
 If you wish to enforce a specific naming style (like snakecasing, pascal case gql)

@@ -84,6 +84,3 @@ class Subscription:
     @strawberry.subscription()
     async def watch_beast(self, id: str) -> AsyncGenerator[Optional[Beast], None]:
         return None
-
-
-Beast.update_forward_refs()

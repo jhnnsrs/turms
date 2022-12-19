@@ -6,72 +6,6 @@ from typing import Any, List, Optional, Union
 import strawberry
 
 
-@strawberry.enum
-class __TypeKind(Enum):
-    """An enum describing what kind of type a given `__Type` is."""
-
-    SCALAR = "scalar"
-    "Indicates this type is a scalar."
-    OBJECT = "object"
-    "Indicates this type is an object. `fields` and `interfaces` are valid fields."
-    INTERFACE = "interface"
-    "Indicates this type is an interface. `fields`, `interfaces`, and `possibleTypes` are valid fields."
-    UNION = "union"
-    "Indicates this type is a union. `possibleTypes` is a valid field."
-    ENUM = "enum"
-    "Indicates this type is an enum. `enumValues` is a valid field."
-    INPUT_OBJECT = "input object"
-    "Indicates this type is an input object. `inputFields` is a valid field."
-    LIST = "list"
-    "Indicates this type is a list. `ofType` is a valid field."
-    NON_NULL = "non-null"
-    "Indicates this type is a non-null. `ofType` is a valid field."
-
-
-@strawberry.enum
-class __DirectiveLocation(Enum):
-    """A Directive can be adjacent to many parts of the GraphQL language, a __DirectiveLocation describes one such possible adjacencies."""
-
-    QUERY = "query"
-    "Location adjacent to a query operation."
-    MUTATION = "mutation"
-    "Location adjacent to a mutation operation."
-    SUBSCRIPTION = "subscription"
-    "Location adjacent to a subscription operation."
-    FIELD = "field"
-    "Location adjacent to a field."
-    FRAGMENT_DEFINITION = "fragment definition"
-    "Location adjacent to a fragment definition."
-    FRAGMENT_SPREAD = "fragment spread"
-    "Location adjacent to a fragment spread."
-    INLINE_FRAGMENT = "inline fragment"
-    "Location adjacent to an inline fragment."
-    VARIABLE_DEFINITION = "variable definition"
-    "Location adjacent to a variable definition."
-    SCHEMA = "schema"
-    "Location adjacent to a schema definition."
-    SCALAR = "scalar"
-    "Location adjacent to a scalar definition."
-    OBJECT = "object"
-    "Location adjacent to an object type definition."
-    FIELD_DEFINITION = "field definition"
-    "Location adjacent to a field definition."
-    ARGUMENT_DEFINITION = "argument definition"
-    "Location adjacent to an argument definition."
-    INTERFACE = "interface"
-    "Location adjacent to an interface definition."
-    UNION = "union"
-    "Location adjacent to a union definition."
-    ENUM = "enum"
-    "Location adjacent to an enum definition."
-    ENUM_VALUE = "enum value"
-    "Location adjacent to an enum value definition."
-    INPUT_OBJECT = "input object"
-    "Location adjacent to an input object type definition."
-    INPUT_FIELD_DEFINITION = "input field definition"
-    "Location adjacent to an input object field definition."
-
-
 @strawberry.input
 class StringQueryOperatorInput:
     eq: Optional[str]
@@ -173,12 +107,8 @@ class Query:
         return None
 
 
-Country.update_forward_refs()
-
-
 @strawberry.type
 class _Service:
     sdl: Optional[str] = strawberry.field(
         description="The sdl representing the federated service capabilities. Includes federation directives, removes federation types, and includes rest of full schema after schema directives have been applied"
     )
-Query.update_forward_refs()

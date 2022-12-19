@@ -64,8 +64,8 @@ def merge_class(generated: cst.ClassDef, existing: cst.ClassDef):
             name = retrieve_symbol_name(node)
             if name is not None:
                 if name in body_symbols:
-                    new_body.append(merge_statements(body_symbols[name], node))
                     body_symbol_position[name] = len(new_body)
+                    new_body.append(merge_statements(body_symbols[name], node))
                     body_implemented_symbols.append(name)
                 else:
                     new_body.append(node)
@@ -75,9 +75,9 @@ def merge_class(generated: cst.ClassDef, existing: cst.ClassDef):
         elif isinstance(node, cst.FunctionDef):
             if node.name.value in body_symbols:
                 x = body_symbols[node.name.value]
+                body_symbol_position[node.name.value] = len(new_body)
                 new_body.append(merge_functions(x, node))
                 body_implemented_symbols.append(node.name.value)
-                body_symbol_position[node.name.value] = len(new_body)
             else:
                 new_body.append(node)
 
@@ -111,8 +111,8 @@ def merge_class(generated: cst.ClassDef, existing: cst.ClassDef):
 
     updated_body = []
     for index, node in enumerate(new_body):
-        if (index + 1) in beforemap:
-            for missingkey in beforemap[index + 1]:
+        if index in beforemap:
+            for missingkey in beforemap[index]:
                 updated_body.append(body_symbols[missingkey])
         updated_body.append(node)
         if index in aftermap:
@@ -132,6 +132,103 @@ def merge_class(generated: cst.ClassDef, existing: cst.ClassDef):
 
 class MergeProcessorConfig(ProcessorConfig):
     type = "turms.processors.merge.MergeProcessor"
+
+
+def merge_code(old_code: str, new_code: str, config: MergeProcessorConfig):
+
+    existing_module = cst.parse_module(old_code)
+    new_module = cst.parse_module(new_code)
+
+    symbols = OrderedDict()
+
+    existing_symbols = set()
+    implemented_symbols = []
+    new_symbols = set()
+
+    new_body = []
+
+    # merge the two ast.Module
+    for node in new_module.body:
+
+        if isinstance(node, cst.ClassDef):
+            symbols[node.name.value] = node
+            new_symbols.add(node.name.value)
+
+        if isinstance(node, cst.FunctionDef):
+            symbols[node.name.value] = node
+            new_symbols.add(node.name.value)
+
+    symbol_position = {}
+
+    for node in existing_module.body:
+        if isinstance(node, cst.ClassDef):
+            if node.name.value in symbols:
+                x = symbols[node.name.value]
+                # merge the two classes
+
+                symbol_position[node.name.value] = len(new_body)
+                new_body.append(merge_class(x, node))
+                implemented_symbols.append(node.name.value)
+            else:
+                new_body.append(node)
+
+        elif isinstance(node, cst.FunctionDef):
+            if node.name.value in symbols:
+                # merge the two functions
+                x = symbols[node.name.value]
+
+                symbol_position[node.name.value] = len(new_body)
+                new_body.append(merge_functions(x, node))
+                implemented_symbols.append(node.name.value)
+            else:
+                new_body.append(node)
+
+        else:
+            new_body.append(node)
+
+    # add the missing classes at the right position
+
+    missing_symbols = [key for key in symbols.keys() if key not in implemented_symbols]
+
+    print(missing_symbols)
+    beforemap = {}  # a map index and a list of symbols to insert before
+    aftermap = {}
+
+    # add the missing classes at the right position
+    last_key = None
+    for existingkey in implemented_symbols:
+        last_key = existingkey
+        for key, value in symbols.items():
+            if existingkey == key:
+                break
+            if key in missing_symbols:
+                missing_symbols.remove(key)
+                beforemap.setdefault(symbol_position[existingkey], []).append(
+                    key
+                )  # we need to reverse
+
+    if last_key is not None:
+        aftermap[symbol_position[last_key]] = missing_symbols
+        print(aftermap)
+
+    updated_body = []
+    for index, node in enumerate(new_body):
+        print(index)
+        if index in beforemap:
+            for missingkey in beforemap[index]:
+                updated_body.append(symbols[missingkey])
+        updated_body.append(node)
+        if index in aftermap:
+            for missingkey in aftermap[index]:
+                updated_body.append(symbols[missingkey])
+
+    if last_key is None:
+        for missingkey in missing_symbols:
+            updated_body.append(symbols[missingkey])
+
+    md = cst.Module(body=updated_body)
+
+    return md.code
 
 
 class MergeProcessor(Processor):
@@ -167,95 +264,9 @@ class MergeProcessor(Processor):
 
         # the one we want to merge into
         with open(old_generated_file) as f:
-            existing_module = cst.parse_module(f.read())
+            existing_code = f.read()
 
         # the vanilla generated code
-        new_module = cst.parse_module(gen_file)
+        new_code = cst.parse_module(gen_file)
 
-        symbols = OrderedDict()
-
-        existing_symbols = set()
-        implemented_symbols = []
-        new_symbols = set()
-
-        new_body = []
-
-        # merge the two ast.Module
-        for node in new_module.body:
-
-            if isinstance(node, cst.ClassDef):
-                symbols[node.name.value] = node
-                new_symbols.add(node.name.value)
-
-            if isinstance(node, cst.FunctionDef):
-                symbols[node.name.value] = node
-                new_symbols.add(node.name.value)
-
-        symbol_position = {}
-
-        for node in existing_module.body:
-            if isinstance(node, cst.ClassDef):
-                if node.name.value in symbols:
-                    x = symbols[node.name.value]
-                    # merge the two classes
-                    new_body.append(merge_class(x, node))
-                    symbol_position[node.name.value] = len(new_body)
-                    implemented_symbols.append(node.name.value)
-                else:
-                    new_body.append(node)
-
-            elif isinstance(node, cst.FunctionDef):
-                if node.name.value in symbols:
-                    # merge the two functions
-                    x = symbols[node.name.value]
-                    new_body.append(merge_functions(x, node))
-                    symbol_position[node.name.value] = len(new_body)
-                    implemented_symbols.append(node.name.value)
-                else:
-                    new_body.append(node)
-
-            else:
-                new_body.append(node)
-
-        # add the missing classes at the right position
-
-        missing_symbols = [
-            key for key in symbols.keys() if key not in implemented_symbols
-        ]
-
-        beforemap = {}  # a map index and a list of symbols to insert before
-        aftermap = {}
-
-        # add the missing classes at the right position
-        last_key = None
-        for existingkey in implemented_symbols:
-            last_key = existingkey
-            for key, value in symbols.items():
-                if existingkey == key:
-                    break
-                if key in missing_symbols:
-                    missing_symbols.remove(key)
-                    beforemap.setdefault(symbol_position[existingkey], []).append(
-                        key
-                    )  # we need to reverse
-
-        if last_key is not None:
-            aftermap[symbol_position[last_key]] = missing_symbols
-
-        updated_body = []
-        for index, node in enumerate(new_body):
-            if (index + 1) in beforemap:
-                for missingkey in beforemap[index + 1]:
-                    updated_body.append(symbols[missingkey])
-            updated_body.append(node)
-            if index in aftermap:
-                for missingkey in aftermap[index]:
-                    updated_body.append(symbols[missingkey])
-
-        if last_key is None:
-            for missingkey in missing_symbols:
-                updated_body.append(symbols[missingkey])
-
-        md = cst.Module(body=updated_body)
-
-        return md.code
+        return merge_code(existing_code, new_code, self.config)
