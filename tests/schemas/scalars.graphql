@@ -1,0 +1,7 @@
+directive @customScalar on SCALAR
+
+scalar MyCustomScalar @customScalar
+
+type Query {
+  getScalar: MyCustomScalar
+}

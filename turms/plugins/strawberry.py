@@ -35,7 +35,9 @@ from turms.config import GraphQLTypes
 class StrawberryPluginConfig(PluginConfig):
     type = "turms.plugins.strawberry.Strawberry"
     generate_directives: bool = True
+    generate_scalars: bool = True
     builtin_directives: List[str] = ["include", "skip", "deprecated", "specifiedBy"]
+    builtin_scalars: List[str] = ["String", "Boolean", "DateTime", "Int", "Float", "ID"]
     generate_enums: bool = True
     generate_types: bool = True
     generate_inputs: bool = True
@@ -926,9 +928,86 @@ def generate_directives(
                 bases=[],
                 decorator_list=[decorator],
                 keywords=[],
-                body=(fields or [ast.Pass()]) + generate_config_class(GraphQLTypes.DIRECTIVE, config, directive.name),
+                body=(fields or [ast.Pass()])
+                + generate_config_class(GraphQLTypes.DIRECTIVE, config, directive.name),
             )
         )
+
+    return tree
+
+
+def generate_scalars(
+    client_schema: GraphQLSchema,
+    config: GeneratorConfig,
+    plugin_config: StrawberryPluginConfig,
+    registry: ClassRegistry,
+):
+
+    objects = {
+        key: value
+        for key, value in client_schema.type_map.items()
+        if isinstance(value, GraphQLScalarType)
+        and not key in plugin_config.builtin_scalars
+    }
+
+    tree = []
+
+    for key, scalar in objects.items():
+
+        keywords = []
+        keywords += generate_directive_keywords(scalar.ast_node, plugin_config)
+        if scalar.description:
+            keywords.append(
+                ast.keyword(
+                    arg="description",
+                    value=ast.Constant(value=scalar.description),
+                )
+            )
+
+        keywords.append(
+            ast.keyword(
+                arg="serialize",
+                value=ast.Lambda(
+                    args=[
+                        ast.arg(
+                            arg="value",
+                        ),
+                    ],
+                    body=ast.Name(id="value", ctx=ast.Load()),
+                ),
+            )
+        )
+
+        keywords.append(
+            ast.keyword(
+                arg="parse_value",
+                value=ast.Lambda(
+                    args=[
+                        ast.arg(
+                            arg="value",
+                        ),
+                    ],
+                    body=ast.Name(id="value", ctx=ast.Load()),
+                ),
+            )
+        )
+
+        tree.append(
+            ast.Assign(
+                targets=[ast.Name(id=key, ctx=ast.Store())],
+                value=ast.Call(
+                    func=ast.Name(
+                        id="strawberry.scalar",
+                        ctx=ast.Load(),
+                    ),
+                    keywords=keywords,
+                    args=[
+                        ast.Constant(value=scalar.name),
+                    ],
+                ),
+            )
+        )
+        registry.register_scalar(key, key)
 
     return tree
 
@@ -962,6 +1041,12 @@ class StrawberryPlugin(Plugin):
             else []
         )
 
+        scalars = (
+            generate_scalars(client_schema, config, self.config, registry)
+            if self.config.generate_directives
+            else []
+        )
+
         enums = (
             generate_enums(client_schema, config, self.config, registry)
             if self.config.generate_enums
@@ -978,4 +1063,4 @@ class StrawberryPlugin(Plugin):
             else []
         )
 
-        return directives + enums + inputs + types
+        return directives + scalars + enums + inputs + types

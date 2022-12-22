@@ -34,6 +34,11 @@ def schema_directive_schema():
     return build_schema_from_glob(build_relative_glob("/schemas/directive.graphql"))
 
 
+@pytest.fixture()
+def scalar_schema():
+    return build_schema_from_glob(build_relative_glob("/schemas/scalars.graphql"))
+
+
 def test_countries_schema(countries_schema):
     config = GeneratorConfig(scalar_definitions={"_Any": "typing.Any"})
 
@@ -109,6 +114,29 @@ def test_schema_directive_generation(schema_directive_schema):
     generated_ast = generate_ast(
         config,
         schema_directive_schema,
+        stylers=[DefaultStyler()],
+        plugins=[
+            StrawberryPlugin(),
+        ],
+        skip_forwards=True,
+    )
+
+    unit_test_with(generated_ast, "")
+
+
+def test_custom_scalar_generation(scalar_schema):
+    config = GeneratorConfig(
+        scalar_definitions={
+            "QString": "str",
+            "Any": "str",
+            "UUID": "pydantic.UUID4",
+            "Callback": "str",
+        }
+    )
+
+    generated_ast = generate_ast(
+        config,
+        scalar_schema,
         stylers=[DefaultStyler()],
         plugins=[
             StrawberryPlugin(),
