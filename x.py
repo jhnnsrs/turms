@@ -15,7 +15,7 @@ import pydantic
 def test_custom_scalar_generation():
 
     scalar_schema = build_schema_from_glob(
-        build_relative_glob("/schemas/scalars.graphql")
+        build_relative_glob("/schemas/beasts.graphql")
     )
     config = GeneratorConfig(
         scalar_definitions={
@@ -36,7 +36,8 @@ def test_custom_scalar_generation():
         skip_forwards=True,
     )
 
-    print(parse_to_code(generated_ast))
+    with open("l.py", "w") as f:
+        f.write(parse_to_code(generated_ast))
 
 
 test_custom_scalar_generation()

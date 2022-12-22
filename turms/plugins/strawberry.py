@@ -9,6 +9,7 @@ from graphql import (
     GraphQLType,
     GraphQLUnionType,
     is_wrapping_type,
+    Undefined,
     GraphQLArgument,
     ObjectTypeDefinitionNode,
 )
@@ -654,30 +655,42 @@ def generate_types(
             else []
         )
 
-        if key in ["Query", "Mutation", "Subscription"]:
-            for value_key, value in object_type.fields.items():
-                value: GraphQLField
+        for value_key, value in object_type.fields.items():
+            value: GraphQLField
 
-                keywords = []
-                if value.description:
-                    keywords.append(
-                        ast.keyword(
-                            arg="description",
-                            value=ast.Constant(value=value.description),
-                        )
+            keywords = []
+
+            if value.description:
+                keywords.append(
+                    ast.keyword(
+                        arg="description",
+                        value=ast.Constant(value=value.description),
                     )
+                )
 
-                if value.deprecation_reason:
-                    keywords.append(
-                        ast.keyword(
-                            arg="deprecation_reason",
-                            value=ast.Constant(value=value.deprecation_reason),
-                        )
+            if value.deprecation_reason:
+                keywords.append(
+                    ast.keyword(
+                        arg="deprecation_reason",
+                        value=ast.Constant(value=value.deprecation_reason),
                     )
+                )
 
-                additional_args = []
+            additional_args = []
+            kwdefaults = []
+            if value.args:
 
-                for argkey, arg in value.args.items():
+                sorted_args = {
+                    key: value
+                    for key, value in sorted(
+                        value.args.items(),
+                        key=lambda item: item[1].default_value == Undefined,
+                        reverse=True,
+                    )
+                }
+
+                for argkey, arg in sorted_args.items():
+
                     additional_args.append(
                         ast.arg(
                             arg=registry.generate_parameter_name(argkey),
@@ -687,30 +700,37 @@ def generate_types(
                                 config,
                                 plugin_config,
                                 registry=registry,
-                                is_optional=True,
+                                is_optional=arg.default_value == Undefined,
                             ),
                         )
                     )
 
-                body = []
+                    if arg.default_value != Undefined:
+                        kwdefaults.append(ast.Constant(value=arg.default_value))
 
-                if value.description:
-                    body.append(ast.Expr(value=ast.Constant(value=value.description)))
+            body = []
 
-                body.append(ast.Return(value=ast.Constant(value=None)))
+            if value.description:
+                body.append(ast.Expr(value=ast.Constant(value=value.description)))
 
-                returns = generate_object_field_annotation(
-                    value.type,
-                    classname,
-                    config,
-                    plugin_config,
-                    registry,
-                    is_optional=True,
-                )
+            body.append(ast.Return(value=ast.Constant(value=None)))
 
-                keywords += generate_directive_keywords(value.ast_node, plugin_config)
+            returns = generate_object_field_annotation(
+                value.type,
+                classname,
+                config,
+                plugin_config,
+                registry,
+                is_optional=True,
+            )
 
-                if key == "Query":
+            keywords += generate_directive_keywords(value.ast_node, plugin_config)
+
+            if not additional_args and key not in ["Mutation", "Subscription", "Query"]:
+
+                if not keywords:
+                    assign_value = None
+                else:
                     assign_value = ast.Call(
                         func=ast.Name(
                             id="strawberry.field",
@@ -719,29 +739,26 @@ def generate_types(
                         keywords=keywords,
                         args=[],
                     )
-                    function_def = ast.FunctionDef
-                    returns = returns
-                elif key == "Mutation":
-                    assign_value = ast.Call(
-                        func=ast.Name(
-                            id="strawberry.mutation",
-                            ctx=ast.Load(),
-                        ),
-                        keywords=keywords,
-                        args=[],
-                    )
-                    function_def = ast.FunctionDef
-                    returns = returns
 
+                # lets create a simple field
+                assign = ast.AnnAssign(
+                    target=ast.Name(
+                        registry.generate_node_name(value_key), ctx=ast.Store()
+                    ),
+                    annotation=returns,
+                    value=assign_value,
+                    simple=1,
+                )
+
+            else:
+                if key == "Mutation":
+                    decorator_name = ast.Name(id="strawberry.mutation", ctx=ast.Load())
+                    function_def = ast.FunctionDef
+                    returns = returns
                 elif key == "Subscription":
                     registry.register_import("typing.AsyncGenerator")
-                    assign_value = ast.Call(
-                        func=ast.Name(
-                            id="strawberry.subscription",
-                            ctx=ast.Load(),
-                        ),
-                        keywords=keywords,
-                        args=[],
+                    decorator_name = ast.Name(
+                        id="strawberry.subscription", ctx=ast.Load()
                     )
                     function_def = ast.AsyncFunctionDef
                     returns = ast.Subscript(
@@ -751,6 +768,16 @@ def generate_types(
                         ),
                         ctx=ast.Load(),
                     )
+                else:
+                    decorator_name = ast.Name(id="strawberry.field", ctx=ast.Load())
+                    function_def = ast.FunctionDef
+                    returns = returns
+
+                field_decorator = ast.Call(
+                    func=decorator_name,
+                    keywords=keywords,
+                    args=[],
+                )
 
                 assign = function_def(
                     name=registry.generate_node_name(value_key),
@@ -760,68 +787,14 @@ def generate_types(
                         posonlyargs=[],
                         kwonlyargs=[],
                         kw_defaults=[],
-                        defaults=[],
+                        defaults=kwdefaults,
                     ),
                     body=body,
-                    decorator_list=[assign_value],
+                    decorator_list=[field_decorator],
                     simple=1,
                 )
 
-                fields += [assign]
-
-        else:
-            for value_key, value in object_type.fields.items():
-                value: GraphQLField
-
-                keywords = []
-
-                keywords += generate_directive_keywords(value.ast_node, plugin_config)
-
-                if value.description:
-                    keywords.append(
-                        ast.keyword(
-                            arg="description",
-                            value=ast.Constant(value=value.description),
-                        )
-                    )
-
-                if value.deprecation_reason:
-                    keywords.append(
-                        ast.keyword(
-                            arg="deprecation_reason",
-                            value=ast.Constant(value=value.deprecation_reason),
-                        )
-                    )
-
-                if keywords:
-                    assign_value = ast.Call(
-                        func=ast.Name(
-                            id="strawberry.field",
-                            ctx=ast.Load(),
-                        ),
-                        keywords=keywords,
-                        args=[],
-                    )
-                else:
-                    assign_value = None
-
-                assign = ast.AnnAssign(
-                    target=ast.Name(
-                        registry.generate_node_name(value_key), ctx=ast.Store()
-                    ),
-                    annotation=generate_object_field_annotation(
-                        value.type,
-                        classname,
-                        config,
-                        plugin_config,
-                        registry,
-                        is_optional=True,
-                    ),
-                    value=assign_value,
-                    simple=1,
-                )
-
-                fields += [assign]
+            fields += [assign]
 
         tree.append(
             ast.ClassDef(

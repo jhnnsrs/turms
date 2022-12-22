@@ -10,7 +10,7 @@ type Beast {
   "taxonomy grouping"
   taxClass: String
   "a beast's prey"
-  eats: [Beast]
+  eats(filter: String = "nnn", t: Boolean): [Beast]
   "a beast's predators"
   isEatenBy: [Beast]
 }
