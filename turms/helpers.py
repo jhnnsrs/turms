@@ -54,12 +54,12 @@ def introspect_url(
     Returns:
         dict: The introspection query response.
     """
-    try:
-        import requests
-    except ImportError:
+    try:  # pragma: no cover
+        import requests  # pragma: no cover
+    except ImportError:  # pragma: no cover
         raise GenerationError(
             "The requests library is required to introspect a schema from a url"
-        )
+        )  # pragma: no cover
 
     jdata = json.dumps({"query": get_introspection_query()}).encode("utf-8")
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
