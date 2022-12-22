@@ -952,6 +952,9 @@ def generate_scalars(
 
     tree = []
 
+    if objects:
+        registry.register_import("typing.NewType")
+
     for key, scalar in objects.items():
 
         keywords = []
@@ -1002,7 +1005,14 @@ def generate_scalars(
                     ),
                     keywords=keywords,
                     args=[
-                        ast.Constant(value=scalar.name),
+                        ast.Call(
+                            func=ast.Name(id="NewType", ctx=ast.Load()),
+                            args=[
+                                ast.Constant(value=key),
+                                ast.Name(id="str", ctx=ast.Load()),
+                            ],
+                            keywords=[],
+                        ),
                     ],
                 ),
             )
