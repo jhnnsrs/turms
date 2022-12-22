@@ -57,6 +57,11 @@ class ExtraArg(BaseModel):
 """
 
 
+def parse_to_code(tree: List[ast.AST]) -> str:
+    md = ast.Module(body=tree, type_ignores=[])
+    return ast.unparse(ast.fix_missing_locations(md))
+
+
 def unit_test_with(generated_ast: List[ast.AST], test_string: str):
 
     added_code = ast.parse(test_string).body

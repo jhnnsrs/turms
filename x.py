@@ -1,14 +1,46 @@
-from tests.utils import build_relative_glob
-from turms.processors.merge import merge_code, MergeProcessorConfig
+import ast
 
-with open(build_relative_glob("/merge_pairs/old.py"), "r") as f:
-    old_code = f.read()
+import pytest
+from turms.config import GeneratorConfig
+from turms.run import generate_ast
+from turms.plugins.enums import EnumsPlugin
+from turms.plugins.inputs import InputsPlugin
+from turms.plugins.strawberry import StrawberryPlugin
+from turms.stylers.default import DefaultStyler
+from turms.helpers import build_schema_from_glob, build_schema_from_introspect_url
+from tests.utils import build_relative_glob, unit_test_with, ExecuteError, parse_to_code
+import pydantic
 
-with open(build_relative_glob("/merge_pairs/new.py"), "r") as f:
-    new_code = f.read()
+schema_directive_schema = build_schema_from_glob(
+    build_relative_glob("/schemas/arkitekt.graphql")
+)
 
-result = merge_code(old_code, new_code, MergeProcessorConfig())
-assert result
+countries_schema = build_schema_from_introspect_url(
+    "https://countries.trevorblades.com/"
+)
 
-with open(build_relative_glob("/merge_pairs/updated.py"), "w") as f:
-    f.write(result)
+
+config = GeneratorConfig(
+    scalar_definitions={
+        "QString": "str",
+        "Any": "str",
+        "_Any": "typing.Any",
+        "UUID": "pydantic.UUID4",
+        "Callback": "str",
+    }
+)
+
+generated_ast = generate_ast(
+    config,
+    countries_schema,
+    stylers=[DefaultStyler()],
+    plugins=[
+        StrawberryPlugin(),
+    ],
+    skip_forwards=True,
+)
+
+code = parse_to_code(generated_ast)
+
+with open("l.py", "w") as f:
+    f.write(code)

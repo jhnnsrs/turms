@@ -35,6 +35,7 @@ class GraphQLTypes(str, Enum):
     MUTATION = "mutation"
     QUERY = "query"
     SUBSCRIPTION = "subscription"
+    DIRECTIVE: str = "directive"
 
 
 class FreezeConfig(BaseSettings):

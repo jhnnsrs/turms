@@ -224,14 +224,17 @@ class ClassRegistry(object):
             typename += "_"
         return typename
 
-    def generate_interface(self, typename: str):
+    def generate_interface(self, typename: str, with_base: bool = True):
         assert (
             typename not in self.interface_baseclass_map
         ), "Type was already registered, cannot register annew"
         classname = self.style_interface_class(typename)
-        self.interface_baseclass_map[typename] = classname + "Base"
+        if with_base:
+            self.interface_baseclass_map[typename] = classname + "Base"
+        else:
+            self.interface_baseclass_map[typename] = classname
         self.interface_reference_map[typename] = classname
-        return classname + "Base"
+        return self.interface_baseclass_map[typename]
 
     def inherit_interface(self, typename: str, allow_forward=True) -> ast.AST:
         if typename not in self.interface_baseclass_map:

@@ -24,6 +24,11 @@
       "type": "shell",
       "label": "Coverage",
       "command": "source venv/bin/activate && poetry run pytest --cov --cov-report xml:cov.xml"
+    },
+    {
+      "type": "shell",
+      "label": "Coverage W",
+      "command": "source venv/Scripts/activate && poetry run pytest --cov --cov-report xml:cov.xml"
     }
   ]
 }
