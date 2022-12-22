@@ -456,6 +456,9 @@ class ClassRegistry(object):
     def get_fragment_document(self, typename: str):
         return self.fragment_document_map[typename]
 
+    def register_scalar(self, scalar_type: str, python_type: str):
+        self.scalar_map[scalar_type] = python_type
+
     def reference_scalar(self, scalar_type: str):
         if scalar_type in self.scalar_map:
             python_type = self.scalar_map[scalar_type]
