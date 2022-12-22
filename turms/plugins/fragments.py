@@ -154,7 +154,9 @@ def generate_fragment(
                 inline_fragment_fields = []
 
                 inline_fragment_fields += [
-                    generate_typename_field(sub_node.type_condition.name.value)
+                    generate_typename_field(
+                        sub_node.type_condition.name.value, registry
+                    )
                 ]
 
                 for sub_sub_node in sub_node.selection_set.selections:
@@ -170,15 +172,16 @@ def generate_fragment(
                         field_type = sub_sub_node_type.fields[sub_sub_node.name.value]
                         inline_fragment_fields += type_field_node(
                             sub_sub_node,
+                            inline_name,
                             field_type,
                             client_schema,
                             config,
                             tree,
-                            parent_name=inline_name,
+                            registry,
                         )
 
                 additional_bases = get_additional_bases_for_type(
-                    sub_node.type_condition.name.value, config
+                    sub_node.type_condition.name.value, config, registry
                 )
                 cls = ast.ClassDef(
                     inline_name,
@@ -189,7 +192,11 @@ def generate_fragment(
                     decorator_list=[],
                     keywords=[],
                     body=inline_fragment_fields
-                    + generate_config_class(GraphQLTypes.FRAGMENT, config),
+                    + generate_config_class(
+                        GraphQLTypes.FRAGMENT,
+                        config,
+                        sub_node.type_condition.name.value,
+                    ),
                 )
 
                 tree.append(cls)
