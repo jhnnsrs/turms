@@ -65,11 +65,8 @@ def parse_to_code(tree: List[ast.AST]) -> str:
 def unit_test_with(generated_ast: List[ast.AST], test_string: str):
 
     added_code = ast.parse(test_string).body
-
-    md = ast.Module(body=generated_ast + added_code, type_ignores=[])
-
     # We need to unparse before otherwise there might be complaints with missing lineno
-    parsed_code = ast.unparse(ast.fix_missing_locations(md))
+    parsed_code = parse_to_code(generated_ast + added_code)
 
     with tempfile.TemporaryDirectory() as tmpdirname:
 
