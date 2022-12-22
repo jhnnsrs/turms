@@ -190,7 +190,6 @@ def merge_code(old_code: str, new_code: str, config: MergeProcessorConfig):
 
     missing_symbols = [key for key in symbols.keys() if key not in implemented_symbols]
 
-    print(missing_symbols)
     beforemap = {}  # a map index and a list of symbols to insert before
     aftermap = {}
 
@@ -209,7 +208,6 @@ def merge_code(old_code: str, new_code: str, config: MergeProcessorConfig):
 
     if last_key is not None:
         aftermap[symbol_position[last_key]] = missing_symbols
-        print(aftermap)
 
     updated_body = []
     for index, node in enumerate(new_body):
@@ -266,7 +264,4 @@ class MergeProcessor(Processor):
         with open(old_generated_file) as f:
             existing_code = f.read()
 
-        # the vanilla generated code
-        new_code = cst.parse_module(gen_file)
-
-        return merge_code(existing_code, new_code, self.config)
+        return merge_code(existing_code, gen_file, self.config)
