@@ -68,12 +68,6 @@ fragment KwargNode on KwargNode {
   extra
 }
 
-fragment ReturnNode on ReturnNode {
-  ...FlowNodeCommons
-  __typename
-  extra
-}
-
 fragment FlowNode on FlowNode {
   id
   position {
@@ -85,7 +79,10 @@ fragment FlowNode on FlowNode {
   ...ReactiveNode
   ...ArgNode
   ...KwargNode
-  ...ReturnNode
+  ... on ReturnNode {
+    __typename
+    extra
+  }
 }
 
 fragment FlowEdgeCommons on FlowEdgeCommons {

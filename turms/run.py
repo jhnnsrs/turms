@@ -280,6 +280,7 @@ def generate(project: GraphQLProject) -> str:
         schema,
         plugins=plugins,
         stylers=stylers,
+        skip_forwards=gen_config.skip_forwards,
     )
 
     for styler in parsers:
@@ -289,7 +290,7 @@ def generate(project: GraphQLProject) -> str:
     generated = ast.unparse(ast.fix_missing_locations(module))
 
     for processor in processors:
-        generated = processor.run(generated)
+        generated = processor.run(generated, gen_config)
 
     return generated
 
@@ -299,6 +300,7 @@ def generate_ast(
     schema: GraphQLSchema,
     plugins: Optional[List[Plugin]] = None,
     stylers: Optional[List[Styler]] = None,
+    skip_forwards: bool = False,
 ) -> List[ast.AST]:
     """Generates the ast from the schema
 
@@ -328,10 +330,9 @@ def generate_ast(
             raise GenerationError(f"Plugin:{plugin} failed!") from e
 
     global_tree = (
-        registry.generate_imports()
-        + registry.generate_builtins()
-        + global_tree
-        + registry.generate_forward_refs()
+        registry.generate_imports() + registry.generate_builtins() + global_tree
     )
+    if not skip_forwards:
+        global_tree += registry.generate_forward_refs()
 
     return global_tree

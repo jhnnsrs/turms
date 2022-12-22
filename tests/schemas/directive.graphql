@@ -1,0 +1,20 @@
+directive @testing_schema(
+  reason: String = "No longer supported"
+) on FIELD_DEFINITION | ARGUMENT_DEFINITION | INPUT_FIELD_DEFINITION | ENUM_VALUE
+
+directive @user_directive(object: String = "No longer supported") on OBJECT
+
+directive @enum_directive(no: String) on ENUM
+
+enum TestEnum @enum_directive(no: "No longer supported") {
+  A
+  B
+}
+
+type User {
+  johannes: String @testing_schema(reason: "No longer supported")
+}
+
+type Karl @user_directive(object: "No longer supported") {
+  johannes: String @testing_schema
+}

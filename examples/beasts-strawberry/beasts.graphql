@@ -2,7 +2,7 @@ type Beast {
   "ID of beast (taken from binomial initial)"
   id: ID
   "number of legs beast has"
-  legs: Int @deprecated(reason: "use legsCount instead")
+  legs: Int
   "a beast's name in Latin"
   binomial: String
   "a beast's name to you and I"

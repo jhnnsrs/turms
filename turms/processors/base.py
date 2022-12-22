@@ -1,6 +1,7 @@
 from abc import abstractmethod
 
 from pydantic import BaseModel, BaseSettings
+from turms.config import GeneratorConfig
 
 
 class ProcessorConfig(BaseSettings):
@@ -21,5 +22,5 @@ class Processor(BaseModel):
     config: ProcessorConfig
 
     @abstractmethod
-    def run(gen_file: str):
+    def run(gen_file: str, config: GeneratorConfig):
         ...  # pragma: no cover

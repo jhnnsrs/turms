@@ -3,9 +3,20 @@ sidebar_position: 5
 sidebar_label: "Operations Funcs"
 ---
 
-# Operations Funcs (Experimental)
+# Operations Funcs
 
-Operations Funcs generated fully typed python functions that can call other functions (for example your GQL Clients execute function) and returns the typed response.
+This plugin generates functions for each operation in the schema.
+
+Contrary to the `operations` plugin, this plugin generates real python function
+with type annotations and docstrings according to the operation definition.
+
+These functions the can be used to call a proxy function (specified through the config)
+to execute the operation.
+
+You can also specify a list of extra arguments and keyword arguments that will be passed to the proxy function.
+
+Please consult the examples for some more explaination on how to use this plugin
+'gql-usage' and 'rath-usage'
 
 ### Default Configuration
 

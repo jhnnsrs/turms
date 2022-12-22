@@ -72,8 +72,6 @@ def test_snake_case_styler(hello_world_schema):
     ), "Automated Field aliasing not working"
 
 
-
-
 def test_beast_styler(beast_schema):
     config = GeneratorConfig()
     generated_ast = generate_ast(
@@ -125,7 +123,10 @@ def test_arkitekt_operations(arkitekt_schema):
 
     md = ast.Module(body=generated_ast, type_ignores=[])
     generated = ast.unparse(ast.fix_missing_locations(md))
-    unit_test_with(generated_ast,"Node(name='karl',package='inter', interface='x', description='nanana', type=NodeTypeInput.GENERATOR, id='dd')")
+    unit_test_with(
+        generated_ast,
+        "Node(name='karl',package='inter', interface='x', description='nanana', type=NodeTypeInput.GENERATOR, id='dd')",
+    )
     assert "from enum import Enum" in generated, "EnumPlugin not working"
     assert (
         "class Create_template(BaseModel):" in generated
@@ -156,4 +157,4 @@ def test_black_complex(arkitekt_schema):
         IsortProcessor(),
         BlackProcessor(),
     ]:
-        generated = processor.run(generated)
+        generated = processor.run(generated, config)

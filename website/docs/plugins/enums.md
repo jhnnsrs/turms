@@ -5,7 +5,14 @@ sidebar_label: "Enums"
 
 # Enums
 
-Enums generates python enums from Graphql Enums
+Enums generates python enums from Graphql Enums.
+
+# Usecases
+
+Enums generation can be run both in a schema generation (as a definition) or
+a document generation configuration (for validation). It generates
+pure python enums.
+
 
 ### Default Configuration
 
@@ -18,6 +25,7 @@ project:
         plugins:
           - type: turms.plugins.enums.EnumsPlugin
             skip_underscore: True
+            skip_double_underscore: True
             prepend: ""
             append: ""
 ```

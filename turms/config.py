@@ -35,6 +35,7 @@ class GraphQLTypes(str, Enum):
     MUTATION = "mutation"
     QUERY = "query"
     SUBSCRIPTION = "subscription"
+    DIRECTIVE: str = "directive"
 
 
 class FreezeConfig(BaseSettings):
@@ -117,6 +118,9 @@ class GeneratorConfig(BaseSettings):
         description="Configuration for freezing the generated models",
     )
     """Configuration for freezing the generated models: by default disabled"""
+
+    skip_forwards: bool = False
+    """Skip generating automatic forwards reference for the generated models"""
 
     additional_bases: Dict[str, List[PythonType]] = Field(
         default_factory=dict,
