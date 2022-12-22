@@ -47,9 +47,7 @@ def main(script: TurmsOptions, project=None):
             f.write(default_settings)
 
     if script == TurmsOptions.WATCH:
-        from turms.cli.watch import watch
-
-        watch(os.path.join(app_directory, "graphql.config.yaml"), project=project)
+        raise Exception("No longer supported")
 
     if script == TurmsOptions.GEN:
         gen(os.path.join(app_directory, "graphql.config.yaml"))
