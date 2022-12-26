@@ -42,7 +42,7 @@ class StrawberryGenerateFunc(ImportableFunctionMixin, Protocol):
         plugin_config: "StrawberryPluginConfig",
         registry: ClassRegistry,
     ) -> List[ast.AST]:
-        ...
+        ...  # pragma: no cover
 
 
 def default_generate_directives(

@@ -164,7 +164,8 @@ def test_custom_func_generation(scalar_schema):
         plugins=[
             StrawberryPlugin(
                 config=StrawberryPluginConfig(
-                    generate_directives_func="turms.plugins.strawberry.default_generate_directives"
+                    generate_directives_func="turms.plugins.strawberry.default_generate_directives",
+                    skip_underscore=True,
                 )
             ),
         ],
