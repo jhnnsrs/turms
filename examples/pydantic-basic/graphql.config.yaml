@@ -1,10 +1,10 @@
 projects:
   default:
     schema: https://countries.trevorblades.com/
-    documents: examples/pydantic-basic/your_documents/*.graphql
+    documents: your_documents/*.graphql
     extensions:
       turms:
-        out_dir: examples/pydantic-basic/your_library
+        out_dir: your_library
         stylers:
           - type: turms.stylers.capitalize.CapitalizeStyler
           - type: turms.stylers.snake_case.SnakeCaseStyler

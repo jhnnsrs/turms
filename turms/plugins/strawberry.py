@@ -17,8 +17,8 @@ from graphql import (
 from turms.errors import GenerationError
 from turms.plugins.base import Plugin, PluginConfig
 import ast
-from typing import Dict, List
-from turms.config import GeneratorConfig
+from typing import Dict, List, Protocol, runtime_checkable
+from turms.config import GeneratorConfig, ImportableFunctionMixin
 from graphql.utilities.build_client_schema import GraphQLSchema
 from pydantic import Field
 from graphql.type.definition import (
@@ -31,6 +31,203 @@ from turms.utils import (
     interface_is_extended_by_other_interfaces,
 )
 from turms.config import GraphQLTypes
+
+
+@runtime_checkable
+class StrawberryGenerateFunc(ImportableFunctionMixin, Protocol):
+    def __call__(
+        self,
+        client_schema: GraphQLSchema,
+        config: GeneratorConfig,
+        plugin_config: "StrawberryPluginConfig",
+        registry: ClassRegistry,
+    ) -> List[ast.AST]:
+        ...
+
+
+def default_generate_directives(
+    client_schema: GraphQLSchema,
+    config: GeneratorConfig,
+    plugin_config: "StrawberryPluginConfig",
+    registry: ClassRegistry,
+):
+
+    tree = []
+
+    directives = client_schema.directives
+
+    generatable_directives = [
+        directive
+        for directive in directives
+        if directive.name not in plugin_config.builtin_directives
+    ]
+
+    if not generatable_directives:
+        return []
+
+    registry.register_import("strawberry.schema_directive.Location")
+
+    for directive in generatable_directives:
+
+        if plugin_config.skip_underscore and directive.name.startswith("_"):
+            continue
+
+        if plugin_config.skip_double_underscore and directive.name.startswith("__"):
+            continue
+
+        keywords = []
+        fields = []
+
+        keywords.append(
+            ast.keyword(
+                arg="locations",
+                value=ast.List(
+                    elts=[
+                        ast.Attribute(
+                            value=ast.Name(id="Location", ctx=ast.Load()),
+                            attr=location.name,
+                            ctx=ast.Load(),
+                        )
+                        for location in directive.locations
+                    ],
+                    ctx=ast.Load(),
+                ),
+            )
+        )
+
+        for value_key, value in directive.args.items():
+            value: GraphQLArgument
+
+            type = value.type
+
+            if isinstance(value.type, GraphQLNonNull):
+                type = value.type.of_type
+
+            assert isinstance(
+                type, GraphQLScalarType
+            ), "Only scalar (or nonnull version of this) are supported"
+
+            if value.default_value:
+                default = ast.Constant(value=value.default_value)
+            else:
+                default = None
+            assign = ast.AnnAssign(
+                target=ast.Name(
+                    id=registry.generate_node_name(value_key), ctx=ast.Store()
+                ),
+                annotation=registry.reference_scalar(type.name),
+                value=default,
+                simple=1,
+            )
+
+            fields += [assign]
+
+        decorator = ast.Call(
+            func=ast.Name(
+                id="strawberry.schema_directive",
+                ctx=ast.Load(),
+            ),
+            keywords=keywords,
+            args=[],
+        )
+
+        tree.append(
+            ast.ClassDef(
+                name=directive.name,
+                bases=[],
+                decorator_list=[decorator],
+                keywords=[],
+                body=(fields or [ast.Pass()])
+                + generate_config_class(GraphQLTypes.DIRECTIVE, config, directive.name),
+            )
+        )
+
+    return tree
+
+
+def default_generate_enums(
+    client_schema: GraphQLSchema,
+    config: GeneratorConfig,
+    plugin_config: "StrawberryPluginConfig",
+    registry: ClassRegistry,
+):
+
+    tree = []
+
+    enum_types = {
+        key: value
+        for key, value in client_schema.type_map.items()
+        if isinstance(value, GraphQLEnumType)
+    }
+
+    registry.register_import("enum.Enum")
+
+    for key, type in enum_types.items():
+
+        directive_keywords = generate_directive_keywords(type.ast_node, plugin_config)
+        if directive_keywords:
+            decorator = ast.Call(
+                func=ast.Name(id="strawberry.enum", ctx=ast.Load()),
+                keywords=directive_keywords,
+                args=[],
+            )
+        else:
+            decorator = ast.Name(id="strawberry.enum", ctx=ast.Load())
+
+        if plugin_config.skip_underscore and key.startswith("_"):
+            continue
+
+        if plugin_config.skip_double_underscore and key.startswith("__"):
+            continue
+
+        classname = registry.generate_enum(key)
+
+        fields = (
+            [ast.Expr(value=ast.Constant(value=type.description))]
+            if type.description
+            else []
+        )
+
+        for value_key, value in type.values.items():
+
+            if isinstance(value.value, str):
+                servalue = value.value
+            else:
+                servalue = value.value.value
+
+            assign = ast.Assign(
+                targets=[ast.Name(id=str(value_key), ctx=ast.Store())],
+                value=ast.Constant(value=servalue),
+            )
+
+            potential_comment = (
+                value.description
+                if not value.deprecation_reason
+                else f"DEPRECATED: {value.description}"
+            )
+
+            if potential_comment:
+                fields += [
+                    assign,
+                    ast.Expr(value=ast.Constant(value=potential_comment)),
+                ]
+
+            else:
+                fields += [assign]
+
+        tree.append(
+            ast.ClassDef(
+                classname,
+                bases=[
+                    ast.Name(id="Enum", ctx=ast.Load()),
+                ],
+                decorator_list=[decorator],
+                keywords=[],
+                body=fields or [ast.Pass()],
+            )
+        )
+
+    return tree
 
 
 class StrawberryPluginConfig(PluginConfig):
@@ -46,6 +243,10 @@ class StrawberryPluginConfig(PluginConfig):
     inputtype_bases: List[str] = []
     skip_underscore: bool = False
     skip_double_underscore: bool = True
+
+    # Functional configuration:
+    generate_directives_func: StrawberryGenerateFunc = default_generate_directives
+    generate_enums_func: StrawberryGenerateFunc = default_generate_enums
 
     class Config:
         env_prefix = "TURMS_PLUGINS_STRAWBERRY_"
@@ -348,7 +549,12 @@ def generate_directive_keywords(
     if not ast_node:
         return []
 
-    directives = ast_node.directives
+    directives = [
+        directive
+        for directive in ast_node.directives
+        if directive.name.value not in plugin_config.builtin_directives
+    ]
+
     if directives:
         calls = [
             ast.Call(
@@ -363,7 +569,6 @@ def generate_directive_keywords(
                 args=[],
             )
             for directive in directives
-            if directive.name.value not in plugin_config.builtin_directives
         ]
 
         return [
@@ -374,91 +579,6 @@ def generate_directive_keywords(
         ]
 
     return []
-
-
-def generate_enums(
-    client_schema: GraphQLSchema,
-    config: GeneratorConfig,
-    plugin_config: StrawberryPluginConfig,
-    registry: ClassRegistry,
-):
-
-    tree = []
-
-    enum_types = {
-        key: value
-        for key, value in client_schema.type_map.items()
-        if isinstance(value, GraphQLEnumType)
-    }
-
-    registry.register_import("enum.Enum")
-
-    for key, type in enum_types.items():
-
-        directive_keywords = generate_directive_keywords(type.ast_node, plugin_config)
-        if directive_keywords:
-            decorator = ast.Call(
-                func=ast.Name(id="strawberry.enum", ctx=ast.Load()),
-                keywords=directive_keywords,
-                args=[],
-            )
-        else:
-            decorator = ast.Name(id="strawberry.enum", ctx=ast.Load())
-
-        if plugin_config.skip_underscore and key.startswith("_"):
-            continue
-
-        if plugin_config.skip_double_underscore and key.startswith("__"):
-            continue
-
-        classname = registry.generate_enum(key)
-
-        fields = (
-            [ast.Expr(value=ast.Constant(value=type.description))]
-            if type.description
-            else []
-        )
-
-        for value_key, value in type.values.items():
-
-            if isinstance(value.value, str):
-                servalue = value.value
-            else:
-                servalue = value.value.value
-
-            assign = ast.Assign(
-                targets=[ast.Name(id=str(value_key), ctx=ast.Store())],
-                value=ast.Constant(value=servalue),
-            )
-
-            potential_comment = (
-                value.description
-                if not value.deprecation_reason
-                else f"DEPRECATED: {value.description}"
-            )
-
-            if potential_comment:
-                fields += [
-                    assign,
-                    ast.Expr(value=ast.Constant(value=potential_comment)),
-                ]
-
-            else:
-                fields += [assign]
-
-        tree.append(
-            ast.ClassDef(
-                classname,
-                bases=[
-                    ast.Name(id="Enum", ctx=ast.Load()),
-                ],
-                decorator_list=[decorator],
-                keywords=[],
-                body=fields or [ast.Pass()],
-            )
-        )
-
-    return tree
 
 
 def generate_inputs(
@@ -809,106 +929,6 @@ def generate_types(
     return tree
 
 
-def generate_directives(
-    client_schema: GraphQLSchema,
-    config: GeneratorConfig,
-    plugin_config: StrawberryPluginConfig,
-    registry: ClassRegistry,
-):
-
-    tree = []
-
-    directives = client_schema.directives
-
-    generatable_directives = [
-        directive
-        for directive in directives
-        if directive.name not in plugin_config.builtin_directives
-    ]
-
-    if not generatable_directives:
-        return []
-
-    registry.register_import("strawberry.schema_directive.Location")
-
-    for directive in generatable_directives:
-
-        if plugin_config.skip_underscore and directive.name.startswith("_"):
-            continue
-
-        if plugin_config.skip_double_underscore and directive.name.startswith("__"):
-            continue
-
-        keywords = []
-        fields = []
-
-        keywords.append(
-            ast.keyword(
-                arg="locations",
-                value=ast.List(
-                    elts=[
-                        ast.Attribute(
-                            value=ast.Name(id="Location", ctx=ast.Load()),
-                            attr=location.name,
-                            ctx=ast.Load(),
-                        )
-                        for location in directive.locations
-                    ],
-                    ctx=ast.Load(),
-                ),
-            )
-        )
-
-        for value_key, value in directive.args.items():
-            value: GraphQLArgument
-
-            type = value.type
-
-            if isinstance(value.type, GraphQLNonNull):
-                type = value.type.of_type
-
-            assert isinstance(
-                type, GraphQLScalarType
-            ), "Only scalar (or nonnull version of this) are supported"
-
-            if value.default_value:
-                default = ast.Constant(value=value.default_value)
-            else:
-                default = None
-            assign = ast.AnnAssign(
-                target=ast.Name(
-                    id=registry.generate_node_name(value_key), ctx=ast.Store()
-                ),
-                annotation=registry.reference_scalar(type.name),
-                value=default,
-                simple=1,
-            )
-
-            fields += [assign]
-
-        decorator = ast.Call(
-            func=ast.Name(
-                id="strawberry.schema_directive",
-                ctx=ast.Load(),
-            ),
-            keywords=keywords,
-            args=[],
-        )
-
-        tree.append(
-            ast.ClassDef(
-                name=directive.name,
-                bases=[],
-                decorator_list=[decorator],
-                keywords=[],
-                body=(fields or [ast.Pass()])
-                + generate_config_class(GraphQLTypes.DIRECTIVE, config, directive.name),
-            )
-        )
-
-    return tree
-
-
 def generate_scalars(
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
@@ -1019,7 +1039,9 @@ class StrawberryPlugin(Plugin):
         registry.register_import("strawberry")
 
         directives = (
-            generate_directives(client_schema, config, self.config, registry)
+            self.config.generate_directives_func(
+                client_schema, config, self.config, registry
+            )
             if self.config.generate_directives
             else []
         )
@@ -1031,7 +1053,9 @@ class StrawberryPlugin(Plugin):
         )
 
         enums = (
-            generate_enums(client_schema, config, self.config, registry)
+            self.config.generate_enums_func(
+                client_schema, config, self.config, registry
+            )
             if self.config.generate_enums
             else []
         )

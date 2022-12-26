@@ -6,22 +6,6 @@ from typing import AsyncGenerator, List, Optional
 import strawberry
 
 
-@strawberry.input
-class BeastInput:
-    id: Optional[str]
-    legs: Optional[int]
-    binomial: Optional[str]
-    common_name: Optional[str]
-    tax_class: Optional[str]
-    eats: Optional[List[Optional[str]]]
-
-
-@strawberry.input
-class CountryInput:
-    id: Optional[str]
-    nana: Optional[str]
-
-
 @strawberry.type
 class Beast:
     id: Optional[str] = strawberry.field(
@@ -37,10 +21,8 @@ class Beast:
         description="a beast's prey"
     )
     is_eaten_by: Optional[List[Optional["Beast"]]] = strawberry.field(
-        description="should be a beast, but can be a plant"
+        description="a beast's predators"
     )
-    farts: Optional[bool] = strawberry.field(description="farts a lot")
-    maybe_ne_farts: Optional[bool]
 
 
 @strawberry.type
@@ -72,10 +54,6 @@ class Mutation:
         eats: Optional[List[Optional[str]]],
     ) -> Beast:
         """create a massive beast on the server"""
-        return None
-
-    @strawberry.mutation()
-    def create_beast_input(self, beast: BeastInput) -> Beast:
         return None
 
 

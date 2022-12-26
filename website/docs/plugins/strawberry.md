@@ -1,16 +1,12 @@
 ---
 sidebar_position: 5
-sidebar_label: "Operations Funcs"
+sidebar_label: "Strawberry Schema"
 ---
 
 # Strawberry
 
 This plugin generates a fully fledged strawberry schema from your
 SDL schema.
-
-It is best used in combination with the MergeProcessor to enable only
-updating type definitions and not overwriting added functionatly (like
-resolvers)
 
 
 ### Default Configuration
@@ -23,16 +19,28 @@ project:
       turms:
         plugins:
           - type: turms.plugins.strawberry.StrawberryPlugin
-            prepend_sync: ""
-            prepend_async: "a"
-            collapse_lonely: True #bool = True Collapses one operation query and return the collapsed type
-            global_args: #List[Arg] = [] global additional arguments for the functions to be called
-            global_kwargs: #List[Kwarg] = []
-            definitions: #List[FunctionDefinition] = []
+            generate_directives: True # should we generate directives
+            generate_scalars: True # should we generate scalars
+            builtin_directives: # directives that are builtin and will not be generated through strawberry.directive
+               - "include"
+               - "skip"
+               - "deprecated"
+               - "specifiedBy"
+            builtin_scalars:  #scalars that will not be created through stawberry.scalar
+              - "String",
+              - "Boolean"
+              - "DateTime"
+              - "Int"
+              - "Float"
+              - "ID"
+            generate_enums: True # should we generate enums
+            generate_types: True # should we generate types (objects, queries, mutations, subscriptiosn)
+            generate_inputs: True # should we generate input types
+            types_bases: [] # additional type bases
+            inputtype_bases: [] # additional inputtype bases
+            skip_underscore: False # skip generated underscored types
+            skip_double_underscore: True # skip generatind double underscored types
 ```
 
-Definitions Sepcify a strategy to generate a proxy function
 
 
-
-### Example Config

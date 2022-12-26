@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "gqlusage-example"
+version = "0.1.0"
+description = ""
+authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
+readme = "README.md"
+packages = [{include = "gqlusage_example"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pydantic = "^1.10.2"
+
+[tool.poetry.group.dev.dependencies]
+turms = "^0.2.10"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
