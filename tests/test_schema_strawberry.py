@@ -5,7 +5,7 @@ from turms.config import GeneratorConfig
 from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
-from turms.plugins.strawberry import StrawberryPlugin
+from turms.plugins.strawberry import StrawberryPlugin, StrawberryPluginConfig
 from turms.stylers.default import DefaultStyler
 from turms.helpers import build_schema_from_glob, build_schema_from_introspect_url
 from .utils import build_relative_glob, unit_test_with, ExecuteError, parse_to_code
@@ -140,6 +140,33 @@ def test_custom_scalar_generation(scalar_schema):
         stylers=[DefaultStyler()],
         plugins=[
             StrawberryPlugin(),
+        ],
+        skip_forwards=True,
+    )
+
+    unit_test_with(generated_ast, "")
+
+
+def test_custom_func_generation(scalar_schema):
+    config = GeneratorConfig(
+        scalar_definitions={
+            "QString": "str",
+            "Any": "str",
+            "UUID": "pydantic.UUID4",
+            "Callback": "str",
+        }
+    )
+
+    generated_ast = generate_ast(
+        config,
+        scalar_schema,
+        stylers=[DefaultStyler()],
+        plugins=[
+            StrawberryPlugin(
+                config=StrawberryPluginConfig(
+                    generate_directives_func="turms.plugins.strawberry.default_generate_directives"
+                )
+            ),
         ],
         skip_forwards=True,
     )
