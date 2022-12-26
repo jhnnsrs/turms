@@ -1,6 +1,6 @@
 import builtins
 from pydantic import AnyHttpUrl, BaseModel, BaseSettings, Field, validator
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Protocol
 from turms.helpers import import_string
 from enum import Enum
 
@@ -10,6 +10,32 @@ class ConfigProxy(BaseModel):
 
     class Config:
         extra = "allow"
+
+
+class ImportableFunctionMixin(Protocol):
+    @classmethod
+    def __get_validators__(cls):
+        # one or more validators may be yielded which will be called in the
+        # order to validate the input, each validator will receive as an input
+        # the value returned from the previous validator
+        yield cls.validate
+
+    @classmethod
+    def __modify_schema__(cls, field_schema):
+        # __modify_schema__ should mutate the dict it receives in place,
+        # the returned value will be ignored
+        pass
+
+    @classmethod
+    def validate(cls, v):
+        if not callable(v):
+            if not isinstance(v, str):
+                raise TypeError("string required")
+            assert "." in v, "You need to point to a module if its not a builtin type"
+            v = import_string(v)
+
+        assert callable(v)
+        return v
 
 
 class PythonType(str):

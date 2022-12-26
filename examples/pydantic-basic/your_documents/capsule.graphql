@@ -1,0 +1,14 @@
+fragment Continent on Continent {
+  code
+  name
+}
+
+query get_countries($filter: CountryFilterInput) {
+  countries(filter: $filter) {
+    code
+    name
+    continent {
+      ...Continent
+    }
+  }
+}

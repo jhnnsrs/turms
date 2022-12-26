@@ -7,6 +7,8 @@ __pycache__/
 docs/reference
 # C extensions
 *.so
+l.py
+x.py
 
 # Distribution / packaging
 .Python

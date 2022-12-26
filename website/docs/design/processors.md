@@ -14,3 +14,4 @@ Turms comes included with two processors that rely on external dependencies:
 
 - **Black** Applys the black codestyle
 - **ISort** Sort the imports according to isort
+- **Merge** Tries to merge the code (and comments) of the previous code generation run, with the newly generated code updating only schema fields
