@@ -24,6 +24,7 @@ from graphql.type.definition import (
     GraphQLObjectType,
     GraphQLScalarType,
     GraphQLType,
+    GraphQLUnionType,
 )
 
 from turms.config import GraphQLTypes
@@ -68,6 +69,103 @@ def recurse_annotation(
     Returns:
         ast.AST: The returned tree
     """
+
+    if isinstance(type, GraphQLUnionType):
+
+        union_class_names = []
+
+        for sub_node in node.selection_set.selections:
+
+            if isinstance(sub_node, FragmentSpreadNode):
+
+                fragment_name = registry.inherit_fragment(sub_node.name.value)
+                union_class_names.append(fragment_name)
+
+            if isinstance(sub_node, InlineFragmentNode):
+                inline_fragment_name = (
+                    f"{parent}{sub_node.type_condition.name.value}InlineFragment"
+                )
+                inline_fragment_fields = []
+
+                inline_fragment_fields += [
+                    generate_typename_field(
+                        sub_node.type_condition.name.value, registry
+                    )
+                ]
+
+                for sub_sub_node in sub_node.selection_set.selections:
+
+                    if isinstance(sub_sub_node, FieldNode):
+                        sub_sub_node_type = client_schema.get_type(
+                            sub_node.type_condition.name.value
+                        )
+
+                        if sub_sub_node.name.value == "__typename":
+                            continue
+
+                        field_type = sub_sub_node_type.fields[sub_sub_node.name.value]
+                        inline_fragment_fields += type_field_node(
+                            sub_sub_node,
+                            inline_fragment_name,
+                            field_type,
+                            client_schema,
+                            config,
+                            subtree,
+                            registry,
+                        )
+
+                additional_bases = get_additional_bases_for_type(
+                    sub_node.type_condition.name.value, config, registry
+                )
+                cls = ast.ClassDef(
+                    inline_fragment_name,
+                    bases=additional_bases,
+                    decorator_list=[],
+                    keywords=[],
+                    body=inline_fragment_fields
+                    + generate_config_class(GraphQLTypes.FRAGMENT, config),
+                )
+
+                subtree.append(cls)
+                union_class_names.append(inline_fragment_name)
+
+        assert (
+            len(union_class_names) != 0
+        ), f"You have set 'always_resolve_interfaces' to True but you have no sub-fragments in your query of {base_name}"
+
+        if len(union_class_names) > 1:
+            registry.register_import("typing.Union")
+            union_slice = ast.Tuple(
+                elts=[
+                    ast.Name(id=clsname, ctx=ast.Load())
+                    for clsname in union_class_names
+                ],
+                ctx=ast.Load(),
+            )
+
+            if is_optional:
+                registry.register_import("typing.Optional")
+
+                return ast.Subscript(
+                    value=ast.Name("Optional", ctx=ast.Load()),
+                    slice=ast.Subscript(
+                        value=ast.Name("Union", ctx=ast.Load()),
+                        slice=union_slice,
+                    ),
+                    ctx=ast.Load(),
+                )
+            else:
+                registry.register_import("typing.Union")
+                return ast.Subscript(
+                    value=ast.Name("Union", ctx=ast.Load()),
+                    slice=union_slice,
+                    ctx=ast.Load(),
+                )
+        else:
+            return ast.Name(id=union_class_names[0], ctx=ast.Load())
+
+
+
 
     if isinstance(type, GraphQLInterfaceType):
         # Lets Create Base Class to Inherit from for this
