@@ -3,9 +3,9 @@ sidebar_position: 2
 sidebar_label: "InputType"
 ---
 
-# Enums
+# InputType
 
-Enums generates python objects from Graphql InputTypes
+InputType generates python objects from Graphql InputTypes
 
 ### Default Configuration
 
