@@ -89,12 +89,16 @@ def inspect_operation_for_documentation(operation: OperationDefinitionNode):
     return "\n".join(doc) if doc else None
 
 
-def generate_typename_field(typename: str, registry: ClassRegistry):
+def generate_typename_field(typename: str, registry: ClassRegistry, config: GeneratorConfig):
     """Generates the typename field a specific type, this will be used to determine the type of the object in the response"""
 
     registry.register_import("pydantic.Field")
     registry.register_import("typing.Optional")
     registry.register_import("typing.Literal")
+
+    keywords = [ast.keyword(arg="alias", value=ast.Constant(value="__typename"))]
+    if config.exclude_typenames:
+        keywords.append(ast.keyword(arg="exclude", value=ast.Constant(value=True)))
 
     return ast.AnnAssign(
         target=ast.Name(id="typename", ctx=ast.Store()),
@@ -110,7 +114,7 @@ def generate_typename_field(typename: str, registry: ClassRegistry):
         value=ast.Call(
             func=ast.Name(id="Field", ctx=ast.Load()),
             args=[],
-            keywords=[ast.keyword(arg="alias", value=ast.Constant(value="__typename"))],
+            keywords=keywords,
         ),
         simple=1,
     )
@@ -145,6 +149,78 @@ def generate_config_class(
                         value=ast.Constant(value=True),
                     )
                 )
+
+    if config.options.enabled:
+        if graphQLType in config.options.types:
+            if config.options.exclude and typename in config.options.exclude:
+                pass
+            elif config.options.include and typename not in config.options.include:
+                pass
+            else:
+                if config.options.allow_mutation is not None:
+                    config_fields.append(
+                        ast.Assign(
+                            targets=[ast.Name(id="allow_mutation", ctx=ast.Store())],
+                            value=ast.Constant(value=config.options.allow_mutation),
+                        )
+                    )
+
+                if config.options.extra is not None:
+                    config_fields.append(
+                        ast.Assign(
+                            targets=[ast.Name(id="extra", ctx=ast.Store())],
+                            value=ast.Constant(value=config.options.extra),
+                        )
+                    )
+
+                if config.options.validate_assignment is not None:
+                    config_fields.append(
+                        ast.Assign(
+                            targets=[
+                                ast.Name(id="validate_assignment", ctx=ast.Store())
+                            ],
+                            value=ast.Constant(
+                                value=config.options.validate_assignment
+                            ),
+                        )
+                    )
+                
+                if config.options.allow_population_by_field_name is not None:
+                    config_fields.append(
+                        ast.Assign(
+                            targets=[
+                                ast.Name(id="allow_population_by_field_name", ctx=ast.Store())
+                            ],
+                            value=ast.Constant(
+                                value=config.options.allow_population_by_field_name
+                            ),
+                        )
+                    )
+
+                if config.options.orm_mode is not None:
+                    config_fields.append(
+                        ast.Assign(
+                            targets=[
+                                ast.Name(id="orm_mode", ctx=ast.Store())
+                            ],
+                            value=ast.Constant(
+                                value=config.options.orm_mode
+                            ),
+                        )
+                    )
+
+                if config.options.use_enum_values is not None:
+                    config_fields.append(
+                        ast.Assign(
+                            targets=[
+                                ast.Name(id="use_enum_values", ctx=ast.Store())
+                            ],
+                            value=ast.Constant(
+                                value=config.options.use_enum_values
+                            ),
+                        )
+                    )
+
 
     if typename:
         if typename in config.additional_config:

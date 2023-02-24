@@ -3,5 +3,6 @@ query Countries {
   countries {
     phone
     capital
+    emojiU
   }
 }

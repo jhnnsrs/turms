@@ -89,7 +89,7 @@ def recurse_annotation(
 
                 inline_fragment_fields += [
                     generate_typename_field(
-                        sub_node.type_condition.name.value, registry
+                        sub_node.type_condition.name.value, registry, config
                     )
                 ]
 
@@ -119,7 +119,10 @@ def recurse_annotation(
                 )
                 cls = ast.ClassDef(
                     inline_fragment_name,
-                    bases=additional_bases,
+                    bases=additional_bases + [
+                ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+                for base in config.object_bases
+            ],
                     decorator_list=[],
                     keywords=[],
                     body=inline_fragment_fields
@@ -262,7 +265,7 @@ def recurse_annotation(
 
                 inline_fragment_fields += [
                     generate_typename_field(
-                        sub_node.type_condition.name.value, registry
+                        sub_node.type_condition.name.value, registry, config
                     )
                 ]
 
@@ -353,7 +356,7 @@ def recurse_annotation(
         if type.description:
             pick_fields.append(ast.Expr(value=ast.Constant(value=type.description)))
 
-        pick_fields += [generate_typename_field(type.name, registry)]
+        pick_fields += [generate_typename_field(type.name, registry, config)]
 
         # Single Item collapse
         if len(node.selection_set.selections) == 1:

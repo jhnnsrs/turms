@@ -1,6 +1,6 @@
 import builtins
 from pydantic import AnyHttpUrl, BaseModel, BaseSettings, Field, validator
-from typing import Any, Dict, List, Optional, Union, Protocol
+from typing import Any, Dict, List, Optional, Union, Protocol, Literal
 from turms.helpers import import_string
 from enum import Enum
 
@@ -20,12 +20,7 @@ class ImportableFunctionMixin(Protocol):
         # the value returned from the previous validator
         yield cls.validate
 
-    @classmethod
-    def __modify_schema__(cls, field_schema):
-        # __modify_schema__ should mutate the dict it receives in place,
-        # the returned value will be ignored
-        pass
-
+        
     @classmethod
     def validate(cls, v):
         if not callable(v):
@@ -104,6 +99,55 @@ class FreezeConfig(BaseSettings):
     """Convert GraphQL List to tuple (with varying length)"""
 
 
+ExtraOptions = Optional[Union[Literal["ignore"], Literal["allow"], Literal["forbid"]]]
+
+
+
+class OptionsConfig(BaseSettings):
+    """Configuration for freezing the generated pydantic
+    models
+
+    This is useful for when you want to generate the models
+    that are faux immutable and hashable by default. The configuration
+    allows you to customize the way the models are frozen and specify
+    which types (operation, fragment, input,...) should be frozen.
+
+    """
+
+    enabled: bool = Field(False, description="Enabling this, will freeze the schema")
+    """Enabling this, will freeze the schema"""
+    extra: ExtraOptions
+    """Extra options for pydantic"""
+    allow_mutation: Optional[bool] 
+    """Allow mutation"""
+    allow_population_by_field_name: Optional[bool]
+    """Allow population by field name"""
+    orm_mode: Optional[bool]
+    """ORM mode"""
+    use_enum_values: Optional[bool]
+    """Use enum values"""
+
+    validate_assignment: Optional[bool]
+    """Validate assignment"""
+   
+    
+    types: List[GraphQLTypes] = Field(
+        [GraphQLTypes.INPUT, GraphQLTypes.FRAGMENT, GraphQLTypes.OBJECT],
+        description="The types to freeze",
+    )
+    """The core types (Input, Fragment, Object, Operation) to enable this option"""
+
+    exclude: Optional[List[str]] = Field(
+        description="List of types to exclude from setting this option"
+    )
+    """List of types to exclude from setting this option"""
+    include: Optional[List[str]] = Field(
+        description="List of types to include in setting these options"
+    )
+    """The types to freeze"""
+   
+
+
 class GeneratorConfig(BaseSettings):
     """Configuration for the generator
 
@@ -133,6 +177,8 @@ class GeneratorConfig(BaseSettings):
     """List of base classes for interfaces"""
     always_resolve_interfaces: bool = True
     """Always resolve interfaces to concrete types"""
+    exclude_typenames: bool = False
+    """Exclude __typename from generated models when calling dict or json"""
 
     scalar_definitions: Dict[str, PythonType] = Field(
         default_factory=dict,
@@ -144,6 +190,12 @@ class GeneratorConfig(BaseSettings):
         description="Configuration for freezing the generated models",
     )
     """Configuration for freezing the generated models: by default disabled"""
+
+    options: OptionsConfig = Field(
+        default_factory=OptionsConfig,
+        description="Configuration for pydantic options",
+    )
+    """Configuration for pydantic options: by default disabled"""
 
     skip_forwards: bool = False
     """Skip generating automatic forwards reference for the generated models"""

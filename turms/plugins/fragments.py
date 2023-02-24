@@ -155,7 +155,7 @@ def generate_fragment(
 
                 inline_fragment_fields += [
                     generate_typename_field(
-                        sub_node.type_condition.name.value, registry
+                        sub_node.type_condition.name.value, registry, config
                     )
                 ]
 
@@ -236,7 +236,7 @@ def generate_fragment(
             f.type_condition.name.value, config, registry
         )
 
-        fields += [generate_typename_field(type.name, registry)]
+        fields += [generate_typename_field(type.name, registry, config)]
 
         for field in f.selection_set.selections:
 
