@@ -52,6 +52,9 @@ def main(script: TurmsOptions, project=None):
     if script == TurmsOptions.GEN:
         gen(os.path.join(app_directory, "graphql.config.yaml"))
 
+    if script == TurmsOptions.DOWNLOAD:
+        gen(os.path.join(app_directory, "graphql.config.yaml"))
+
 
 def entrypoint():
     parser = argparse.ArgumentParser(description="Say hello")

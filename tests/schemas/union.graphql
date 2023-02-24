@@ -1,0 +1,16 @@
+"This is foo"
+type Foo {
+  "This is a forward ref"
+  forward: String!
+}
+
+type Bar {
+  "This is a forward ref"
+  nana: Int!
+}
+
+union Element = Foo | Bar
+
+type Query {
+  hallo: Element
+}

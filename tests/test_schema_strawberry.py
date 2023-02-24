@@ -28,6 +28,11 @@ def multi_interface_schema():
         build_relative_glob("/schemas/multi_interface.graphql")
     )
 
+@pytest.fixture()
+def union_schema():
+    return build_schema_from_glob(
+        build_relative_glob("/schemas/union.graphql")
+    )
 
 @pytest.fixture()
 def schema_directive_schema():
@@ -45,6 +50,21 @@ def test_countries_schema(countries_schema):
     generated_ast = generate_ast(
         config,
         countries_schema,
+        stylers=[DefaultStyler()],
+        plugins=[
+            StrawberryPlugin(),
+        ],
+        skip_forwards=True,
+    )
+
+    unit_test_with(generated_ast, "")
+
+def test_union_schema(union_schema):
+    config = GeneratorConfig(scalar_definitions={"_Any": "typing.Any"})
+
+    generated_ast = generate_ast(
+        config,
+        union_schema,
         stylers=[DefaultStyler()],
         plugins=[
             StrawberryPlugin(),

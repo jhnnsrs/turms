@@ -1,0 +1,10 @@
+query Nana {
+  hallo {
+    ... on Bar {
+      nana
+    }
+    ... on Foo {
+      forward
+    }
+  }
+}

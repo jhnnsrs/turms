@@ -77,4 +77,4 @@ def unit_test_with(generated_ast: List[ast.AST], test_string: str):
             return True
         else:
             # If the supbrocess failed we can break out of the sandbox and just return the actual error
-            raise ExecuteError(f"Failed with: {s.stderr.decode().strip()}")
+            raise ExecuteError(f"Failed with: {s.stderr.decode().strip()} Code: {parsed_code}" )

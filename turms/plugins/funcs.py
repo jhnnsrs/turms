@@ -899,13 +899,10 @@ class FuncsPlugin(Plugin):
 
         plugin_tree = []
 
-        try:
-            documents = parse_documents(
+        documents = parse_documents(
                 client_schema, self.config.funcs_glob or config.documents
-            )
-        except NoDocumentsFoundError as e:
-            logger.exception(e)
-            return plugin_tree
+        )
+       
 
         operations = [
             node
