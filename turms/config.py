@@ -258,6 +258,14 @@ class Extensions(BaseModel):
     "The turms configuration"
 
 
+class AdvancedSchemaField(BaseModel):
+    headers: Dict[str, str]
+
+
+
+SchemaField = Union[AnyHttpUrl, str, Dict[str, AdvancedSchemaField]]
+
+
 class GraphQLProject(BaseSettings):
     """Configuration for the GraphQL project
 
@@ -269,10 +277,8 @@ class GraphQLProject(BaseSettings):
     to the generator configuration under extensions.turms
     """
 
-    schema_url: Optional[Union[AnyHttpUrl, str]] = Field(alias="schema", env="schema")
+    schema_url: Optional[Union[SchemaField, List[SchemaField]]] = Field(alias="schema", env="schema")
     """The schema url or path to the schema file"""
-    bearer_token: Optional[str] = None
-    """The bearer token to use for the schema if retrieving it from a remote url"""
     documents: Optional[str]
     """The documents (operations,fragments) to parse"""
     extensions: Extensions

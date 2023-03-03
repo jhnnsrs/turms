@@ -12,6 +12,7 @@ from turms.config import (
     GraphQLConfigMultiple,
     GraphQLConfigSingle,
     GraphQLProject,
+    AdvancedSchemaField,
 )
 from turms.helpers import (
     build_schema_from_glob,
@@ -215,6 +216,54 @@ def instantiate(module_path: str, **kwargs):
     return import_string(module_path)(**kwargs)
 
 
+
+def build_schema_from_project(project: GraphQLProject) -> GraphQLSchema:
+    """Builds a schema from a project
+
+    Args:
+        project (GraphQLProject): The project
+
+    Returns:
+        GraphQLSchema: The schema
+    """
+    schema = project.schema_url
+    if not isinstance(schema, list):
+        schema = [schema]
+
+
+
+        if isinstance(project.schema_url, AnyHttpUrl):
+            return build_schema_from_introspect_url(
+                project.schema_url
+            )
+        if isinstance(project.schema_url, dict):
+            raise NotImplementedError("Advanced Schema Fields are not supported yet")
+
+        if isinstance(project.schema_url, str):
+            return build_schema_from_glob(project.schema_url)
+
+
+
+    if not isinstance(project.schema_url, list):
+        if isinstance(project.schema_url, AnyHttpUrl):
+            return build_schema_from_introspect_url(
+                project.schema_url
+            )
+        if isinstance(project.schema_url, dict):
+            raise NotImplementedError("Advanced Schema Fields are not supported yet")
+
+        if isinstance(project.schema_url, str):
+            return build_schema_from_glob(project.schema_url)
+
+    else:
+            
+            return build_schema_from_glob(project.schema_url)
+
+
+
+
+
+
 def generate(project: GraphQLProject) -> str:
     """Genrates the code according to the configugration
 
@@ -234,12 +283,7 @@ def generate(project: GraphQLProject) -> str:
         str: The generated code
     """
 
-    if isinstance(project.schema_url, AnyHttpUrl):
-        schema = build_schema_from_introspect_url(
-            project.schema_url, project.bearer_token
-        )
-    else:
-        schema = build_schema_from_glob(project.schema_url)
+    schema = build_schema_from_project(project.schema_url)
 
     gen_config = project.extensions.turms
 
