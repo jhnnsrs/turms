@@ -1,9 +1,8 @@
 import ast
 
-import pytest
 from .utils import build_relative_glob, unit_test_with
 from turms.config import GeneratorConfig
-from turms.run import generate_ast, build_schema_from_schema_type
+from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
 from turms.plugins.fragments import FragmentsPlugin

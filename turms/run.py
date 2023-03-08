@@ -1,6 +1,6 @@
 import ast
 import os
-from typing import Dict, List, Optional, Callable, Any, Union
+from typing import Dict, List, Optional, Callable
 
 import yaml
 from graphql import GraphQLSchema, parse, build_ast_schema, build_client_schema
@@ -12,7 +12,6 @@ from turms.config import (
     GraphQLConfigMultiple,
     GraphQLConfigSingle,
     GraphQLProject,
-    AdvancedSchemaField,
     SchemaType,
 )
 from turms.helpers import (

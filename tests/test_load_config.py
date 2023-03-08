@@ -3,7 +3,7 @@ import pytest
 
 from turms.config import GeneratorConfig
 from .utils import build_relative_glob
-from turms.run import scan_folder_for_configs, scan_folder_for_single_config
+from turms.run import scan_folder_for_single_config
 
 from turms.errors import GenerationError
 from turms.run import load_projects_from_configpath
@@ -39,9 +39,9 @@ def test_load_single_config():
 
 def test_failure_on_wrong_scalars():
     with pytest.raises(pydantic.error_wrappers.ValidationError):
-        x = GeneratorConfig(scalar_definitions={"X": "zzzzz"})
+        GeneratorConfig(scalar_definitions={"X": "zzzzz"})
     with pytest.raises(pydantic.error_wrappers.ValidationError):
-        x = GeneratorConfig(scalar_definitions={"X": 15})
+        GeneratorConfig(scalar_definitions={"X": 15})
 
 
 def test_load_multi_schemea_fields(multi_schema_field_config):

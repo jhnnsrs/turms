@@ -15,8 +15,13 @@ from pydantic import Field
 from graphql.type.definition import (
     GraphQLEnumType,
 )
+from turms.referencer import create_reference_registry_from_documents
 from turms.registry import ClassRegistry
-from turms.utils import generate_config_class, get_additional_bases_for_type
+from turms.utils import (
+    generate_config_class,
+    get_additional_bases_for_type,
+    parse_documents,
+)
 from turms.config import GraphQLTypes
 
 
@@ -24,6 +29,7 @@ class InputsPluginConfig(PluginConfig):
     type = "turms.plugins.inputs.InputsPlugin"
     inputtype_bases: List[str] = ["pydantic.BaseModel"]
     skip_underscore: bool = True
+    skip_unreferenced: bool = False
 
     class Config:
         env_prefix = "TURMS_PLUGINS_INPUTS_"
@@ -83,16 +89,21 @@ def generate_input_annotation(
             and config.freeze.convert_list_to_tuple
         ):
             registry.register_import("typing.Tuple")
-            list_builder = lambda x: ast.Subscript(
-                value=ast.Name("Tuple", ctx=ast.Load()),
-                slice=ast.Tuple(elts=[x, ast.Ellipsis()], ctx=ast.Load()),
-                ctx=ast.Load(),
-            )
+
+            def list_builder(x):
+                return ast.Subscript(
+                    value=ast.Name("Tuple", ctx=ast.Load()),
+                    slice=ast.Tuple(elts=[x, ast.Ellipsis()], ctx=ast.Load()),
+                    ctx=ast.Load(),
+                )
+
         else:
             registry.register_import("typing.List")
-            list_builder = lambda x: ast.Subscript(
-                value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
-            )
+
+            def list_builder(x):
+                return ast.Subscript(
+                    value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
+                )
 
         if is_optional:
 
@@ -136,10 +147,20 @@ def generate_inputs(
         if isinstance(value, GraphQLInputObjectType)
     }
 
+    if plugin_config.skip_unreferenced:
+        ref_registry = create_reference_registry_from_documents(
+            client_schema, parse_documents(client_schema, config.documents)
+        )
+    else:
+        ref_registry = None
+
     for base in plugin_config.inputtype_bases:
         registry.register_import(base)
 
     for key, type in inputobjects_type.items():
+
+        if ref_registry and key not in ref_registry.inputs:
+            continue
 
         if plugin_config.skip_underscore and key.startswith("_"):  # pragma: no cover
             continue

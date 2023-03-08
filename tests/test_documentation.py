@@ -1,6 +1,4 @@
-import ast
 
-import pytest
 from .utils import build_relative_glob, unit_test_with
 from turms.config import GeneratorConfig
 from turms.run import generate_ast
@@ -15,7 +13,7 @@ from turms.plugins.funcs import (
 )
 from turms.stylers.snake_case import SnakeCaseStyler
 from turms.stylers.capitalize import CapitalizeStyler
-from turms.run import generate_ast, build_schema_from_schema_type
+from turms.run import generate_ast
 
 
 def test_documentatoin(nested_input_schema):

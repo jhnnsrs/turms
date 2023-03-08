@@ -1,15 +1,10 @@
-import ast
 
-import pytest
 from turms.config import GeneratorConfig
 from turms.run import generate_ast
-from turms.plugins.enums import EnumsPlugin
-from turms.plugins.inputs import InputsPlugin
 from turms.plugins.strawberry import StrawberryPlugin, StrawberryPluginConfig
 from turms.stylers.default import DefaultStyler
-from turms.run import generate_ast, build_schema_from_schema_type
-from .utils import build_relative_glob, unit_test_with, ExecuteError, parse_to_code
-import pydantic
+from turms.run import generate_ast
+from .utils import unit_test_with
 
 
 def test_countries_schema(countries_schema):

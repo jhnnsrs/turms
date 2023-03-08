@@ -1,0 +1,51 @@
+projects:
+  default:
+    schema: 
+      - https://countries.trevorblades.com/:
+          headers:
+              Hallo: str
+    documents: tests/documents/countries/*.graphql
+    extensions:
+      turms:
+        out_dir: examples/api
+        parsers:
+          - type: turms.parsers.polyfill.PolyfillParser
+            python_version: 3.7
+        stylers:
+          - type: turms.stylers.capitalize.CapitalizeStyler
+          - type: turms.stylers.snake_case.SnakeCaseStyler
+        plugins:
+          - type: turms.plugins.enums.EnumsPlugin
+            skip_unreferenced: true
+          - type: turms.plugins.inputs.InputsPlugin
+            skip_unreferenced: true
+          - type: turms.plugins.fragments.FragmentsPlugin
+          - type: turms.plugins.operations.OperationsPlugin
+          - type: turms.plugins.funcs.FuncsPlugin
+            global_kwargs:
+              - type: mikro.mikro.MikroRath
+                key: mikrorath
+                description: "The mikro rath client"
+            definitions:
+              - type: subscription
+                is_async: True
+                use: mikro.funcs.asubscribe
+              - type: query
+                is_async: True
+                use: mikro.funcs.aexecute
+              - type: mutation
+                is_async: True
+                use: mikro.funcs.aexecute
+              - type: subscription
+                use: mikro.funcs.subscribe
+              - type: query
+                use: mikro.funcs.execute
+              - type: mutation
+                use: mikro.funcs.execute
+        processors:
+          - type: turms.processors.black.BlackProcessor
+          - type: turms.processors.isort.IsortProcessor
+        scalar_definitions:
+          uuid: str
+          timestamptz: str
+          Date: str

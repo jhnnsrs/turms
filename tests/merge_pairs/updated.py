@@ -11,7 +11,7 @@ class SchemaClass:
 
 
 def schema_function(x: str) -> str:
-    length = len(x)
+    len(x)
     return None
 
 

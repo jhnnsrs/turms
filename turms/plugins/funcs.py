@@ -3,39 +3,19 @@ from __future__ import annotations
 import ast
 import logging
 import re
-from ctypes import Union
-from enum import Enum
 from typing import Any, List, Optional, Tuple
-from graphql.language.print_location import print_location
 
 
 from graphql import (
-    BooleanValueNode,
-    FieldDefinitionNode,
-    FloatValueNode,
     FragmentSpreadNode,
-    GraphQLField,
-    GraphQLInputType,
-    GraphQLNamedType,
-    GraphQLNonNull,
-    GraphQLObjectType,
-    GraphQLScalarType,
-    IntValueNode,
-    NamedTypeNode,
-    NullValueNode,
-    StringValueNode,
-    ValueNode,
-    VariableDefinitionNode,
     is_wrapping_type,
 )
 from graphql.language.ast import (
     FieldNode,
-    ListTypeNode,
     NonNullTypeNode,
     OperationDefinitionNode,
     OperationType,
 )
-from graphql.type.definition import GraphQLList
 from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.utilities.get_operation_root_type import get_operation_root_type
 from graphql.utilities.type_info import get_field_def
@@ -44,7 +24,6 @@ from turms.config import GeneratorConfig
 from turms.plugins.base import Plugin, PluginConfig
 from turms.registry import ClassRegistry
 from turms.utils import (
-    NoDocumentsFoundError,
     inspect_operation_for_documentation,
     parse_documents,
     parse_value_node,
@@ -432,7 +411,7 @@ def generate_query_doc(
     x = get_operation_root_type(client_schema, o)
     o.__annotations__
 
-    o_name = get_operation_class_name(o, registry)
+    get_operation_class_name(o, registry)
 
     return_type = get_return_type_string(o, client_schema, registry, collapse)
 

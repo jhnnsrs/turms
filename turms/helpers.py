@@ -1,16 +1,12 @@
 import json
 from importlib import import_module
-from typing import Any, Dict, Optional, List, Tuple
+from typing import Any, Dict, Optional, Tuple
 import glob
-import graphql
 from pydantic import AnyHttpUrl
 from turms.errors import GenerationError
 
 from graphql import (
-    build_ast_schema,
-    build_client_schema,
     get_introspection_query,
-    parse,
 )
 
 IntrospectionResult = Dict[str, Any]
@@ -72,7 +68,7 @@ def load_introspection_from_url(
     try:
         req = requests.post(url, data=jdata, headers=default_headers)
         x = req.json()
-    except Exception as e:
+    except Exception:
         raise GenerationError(f"Failed to fetch schema from {url}")
     if "errors" in x:  # pragma: no cover
         raise GenerationError(
@@ -95,7 +91,7 @@ def load_dsl_from_url(url: AnyHttpUrl, headers: Dict[str, str]) -> DSLString:
     try:
         req = requests.get(url, headers=default_headers)
         x = req.text()
-    except Exception as e:
+    except Exception:
         raise GenerationError(f"Failed to fetch schema from {url}")
     return x
 

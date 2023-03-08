@@ -1,8 +1,6 @@
 import pytest
 from turms.errors import GenerationError
-from turms.run import generate_ast, build_schema_from_schema_type
 from turms.helpers import load_introspection_from_url
-from pydantic import AnyHttpUrl
 from graphql import build_client_schema
 
 

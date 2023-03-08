@@ -1,4 +1,4 @@
-from gql import Client, gql
+from gql import Client
 from gql.transport.aiohttp import AIOHTTPTransport
 from your_library.schema import get_capsules
 

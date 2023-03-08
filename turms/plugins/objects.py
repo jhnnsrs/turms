@@ -8,7 +8,6 @@ from graphql import (
     GraphQLScalarType,
     GraphQLType,
     GraphQLUnionType,
-    is_wrapping_type,
 )
 from turms.errors import GenerationError
 from turms.plugins.base import Plugin, PluginConfig
@@ -158,17 +157,13 @@ def generate_object_field_annotation(
             and config.freeze.convert_list_to_tuple
         ):
             registry.register_import("typing.Tuple")
-            list_builder = lambda x: ast.Subscript(
-                value=ast.Name("Tuple", ctx=ast.Load()),
-                slice=ast.Tuple(elts=[x, ast.Ellipsis()], ctx=ast.Load()),
-                ctx=ast.Load(),
-            )
+            def list_builder(x):
+                return ast.Subscript(value=ast.Name("Tuple", ctx=ast.Load()), slice=ast.Tuple(elts=[x, ast.Ellipsis()], ctx=ast.Load()), ctx=ast.Load())
         else:
 
             registry.register_import("typing.List")
-            list_builder = lambda x: ast.Subscript(
-                value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
-            )
+            def list_builder(x):
+                return ast.Subscript(value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load())
 
         if is_optional:
             registry.register_import("typing.Optional")

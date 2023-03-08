@@ -63,7 +63,7 @@ def entrypoint():
     args = parser.parse_args()
     try:
         main(script=args.script, project=args.project)
-    except Exception as e:
+    except Exception:
         get_console().print_exception()
 
 

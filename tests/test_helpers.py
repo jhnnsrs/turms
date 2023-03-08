@@ -3,7 +3,7 @@ import pytest
 from .utils import DIR_NAME
 
 from turms.helpers import import_string
-from turms.run import generate_ast, build_schema_from_schema_type
+from turms.run import build_schema_from_schema_type
 
 
 def test_faulty_import():

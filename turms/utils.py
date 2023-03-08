@@ -1,6 +1,6 @@
 import glob
 import re
-from typing import Dict, List, Optional, Set, Union
+from typing import List, Optional, Set, Union
 from turms.config import GeneratorConfig
 from turms.errors import GenerationError
 from graphql.utilities.build_client_schema import GraphQLSchema
@@ -10,10 +10,7 @@ from graphql import (
     BooleanValueNode,
     FloatValueNode,
     GraphQLEnumType,
-    GraphQLField,
-    GraphQLInputType,
     GraphQLList,
-    GraphQLNamedOutputType,
     GraphQLNonNull,
     GraphQLObjectType,
     GraphQLOutputType,
@@ -26,11 +23,8 @@ from graphql import (
     OperationDefinitionNode,
     StringValueNode,
     ValueNode,
-    VariableDefinitionNode,
-    is_wrapping_type,
     parse,
     validate,
-    build_client_schema,
     GraphQLInterfaceType,
 )
 import ast
@@ -40,10 +34,8 @@ from turms.errors import (
     NoEnumFound,
     NoInputTypeFound,
     NoScalarFound,
-    RegistryError,
 )
 from .config import GraphQLTypes
-from graphql.language import print_location
 import re
 
 
@@ -89,7 +81,9 @@ def inspect_operation_for_documentation(operation: OperationDefinitionNode):
     return "\n".join(doc) if doc else None
 
 
-def generate_typename_field(typename: str, registry: ClassRegistry, config: GeneratorConfig):
+def generate_typename_field(
+    typename: str, registry: ClassRegistry, config: GeneratorConfig
+):
     """Generates the typename field a specific type, this will be used to determine the type of the object in the response"""
 
     registry.register_import("pydantic.Field")
@@ -184,12 +178,14 @@ def generate_config_class(
                             ),
                         )
                     )
-                
+
                 if config.options.allow_population_by_field_name is not None:
                     config_fields.append(
                         ast.Assign(
                             targets=[
-                                ast.Name(id="allow_population_by_field_name", ctx=ast.Store())
+                                ast.Name(
+                                    id="allow_population_by_field_name", ctx=ast.Store()
+                                )
                             ],
                             value=ast.Constant(
                                 value=config.options.allow_population_by_field_name
@@ -200,27 +196,18 @@ def generate_config_class(
                 if config.options.orm_mode is not None:
                     config_fields.append(
                         ast.Assign(
-                            targets=[
-                                ast.Name(id="orm_mode", ctx=ast.Store())
-                            ],
-                            value=ast.Constant(
-                                value=config.options.orm_mode
-                            ),
+                            targets=[ast.Name(id="orm_mode", ctx=ast.Store())],
+                            value=ast.Constant(value=config.options.orm_mode),
                         )
                     )
 
                 if config.options.use_enum_values is not None:
                     config_fields.append(
                         ast.Assign(
-                            targets=[
-                                ast.Name(id="use_enum_values", ctx=ast.Store())
-                            ],
-                            value=ast.Constant(
-                                value=config.options.use_enum_values
-                            ),
+                            targets=[ast.Name(id="use_enum_values", ctx=ast.Store())],
+                            value=ast.Constant(value=config.options.use_enum_values),
                         )
                     )
-
 
     if typename:
         if typename in config.additional_config:

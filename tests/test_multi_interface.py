@@ -1,8 +1,6 @@
-import ast
 
-import pytest
 from turms.config import GeneratorConfig
-from turms.run import generate_ast, build_schema_from_schema_type
+from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.fragments import FragmentsPlugin
 from turms.plugins.funcs import FuncsPlugin, FuncsPluginConfig, FunctionDefinition

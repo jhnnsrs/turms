@@ -5,8 +5,8 @@ from turms.run import (
     load_projects_from_configpath,
 )
 from .utils import build_relative_glob
-from pydantic import AnyHttpUrl
-from turms.helpers import load_introspection_from_url, build_client_schema
+from graphql import build_client_schema
+from turms.helpers import load_introspection_from_url
 
 
 @pytest.fixture(scope="session")
@@ -145,4 +145,11 @@ def multi_schema_projects():
 def test_countries_projects():
     return load_projects_from_configpath(
         build_relative_glob("/configs/test_countries.yaml")
+    )
+
+
+@pytest.fixture(scope="session")
+def skip_unreferenced_project():
+    return load_projects_from_configpath(
+        build_relative_glob("/configs/test_unreferenced.yaml")
     )
