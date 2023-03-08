@@ -211,7 +211,6 @@ def merge_code(old_code: str, new_code: str, config: MergeProcessorConfig):
 
     updated_body = []
     for index, node in enumerate(new_body):
-        print(index)
         if index in beforemap:
             for missingkey in beforemap[index]:
                 updated_body.append(symbols[missingkey])

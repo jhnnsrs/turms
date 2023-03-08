@@ -8,18 +8,11 @@ from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
 from turms.plugins.objects import ObjectsPlugin
 from turms.stylers.default import DefaultStyler
-from turms.helpers import build_schema_from_glob
-
-@pytest.fixture()
-def mro_test_schema():
-    return build_schema_from_glob(
-        build_relative_glob("/schemas/mro.graphql")
-    )
+from turms.run import generate_ast, build_schema_from_schema_type
 
 
 def test_generation(mro_test_schema):
-    config = GeneratorConfig(
-    )
+    config = GeneratorConfig()
 
     generated_ast = generate_ast(
         config,

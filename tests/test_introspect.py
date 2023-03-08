@@ -1,18 +1,19 @@
 import pytest
-from turms.helpers import build_schema_from_introspect_url
 from turms.errors import GenerationError
+from turms.run import generate_ast, build_schema_from_schema_type
+from turms.helpers import load_introspection_from_url
+from pydantic import AnyHttpUrl
+from graphql import build_client_schema
 
 
 def test_introspect():
-    build_schema_from_introspect_url("https://countries.trevorblades.com/")
-
-
-def test_introspect_bearer():
-    build_schema_from_introspect_url(
-        "https://countries.trevorblades.com/", bearer_token="oisnoinsosin"
+    return build_client_schema(
+        load_introspection_from_url("https://countries.trevorblades.com/")
     )
 
 
 def test_introspect_wrong():
     with pytest.raises(GenerationError):
-        build_schema_from_introspect_url("https://countries.sddfdf.com/")
+        return build_client_schema(
+            load_introspection_from_url("https://countries.sddfdf.com/")
+        )

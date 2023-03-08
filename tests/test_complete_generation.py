@@ -3,31 +3,15 @@ import ast
 import pytest
 from .utils import build_relative_glob, unit_test_with
 from turms.config import GeneratorConfig
-from turms.run import generate_ast
+from turms.run import generate_ast, build_schema_from_schema_type
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
 from turms.plugins.fragments import FragmentsPlugin
 from turms.plugins.operations import OperationsPlugin
 from turms.stylers.snake_case import SnakeCaseStyler
 from turms.stylers.capitalize import CapitalizeStyler
-from turms.helpers import build_schema_from_glob
 from turms.processors.black import BlackProcessor
 from turms.processors.isort import IsortProcessor
-
-
-@pytest.fixture()
-def hello_world_schema():
-    return build_schema_from_glob(build_relative_glob("/schemas/helloworld.graphql"))
-
-
-@pytest.fixture()
-def beast_schema():
-    return build_schema_from_glob(build_relative_glob("/schemas/beasts.graphql"))
-
-
-@pytest.fixture()
-def arkitekt_schema():
-    return build_schema_from_glob(build_relative_glob("/schemas/arkitekt.graphql"))
 
 
 def test_unparse():

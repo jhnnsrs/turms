@@ -15,12 +15,7 @@ from turms.plugins.funcs import (
 )
 from turms.stylers.snake_case import SnakeCaseStyler
 from turms.stylers.capitalize import CapitalizeStyler
-from turms.helpers import build_schema_from_glob
-
-
-@pytest.fixture()
-def nested_input_schema():
-    return build_schema_from_glob(build_relative_glob("/schemas/nested_inputs.graphql"))
+from turms.run import generate_ast, build_schema_from_schema_type
 
 
 def test_documentatoin(nested_input_schema):

@@ -7,41 +7,9 @@ from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
 from turms.plugins.strawberry import StrawberryPlugin, StrawberryPluginConfig
 from turms.stylers.default import DefaultStyler
-from turms.helpers import build_schema_from_glob, build_schema_from_introspect_url
+from turms.run import generate_ast, build_schema_from_schema_type
 from .utils import build_relative_glob, unit_test_with, ExecuteError, parse_to_code
 import pydantic
-
-
-@pytest.fixture()
-def countries_schema():
-    return build_schema_from_introspect_url("https://countries.trevorblades.com/")
-
-
-@pytest.fixture()
-def arkitekt_schema():
-    return build_schema_from_glob(build_relative_glob("/schemas/arkitekt.graphql"))
-
-
-@pytest.fixture()
-def multi_interface_schema():
-    return build_schema_from_glob(
-        build_relative_glob("/schemas/multi_interface.graphql")
-    )
-
-@pytest.fixture()
-def union_schema():
-    return build_schema_from_glob(
-        build_relative_glob("/schemas/union.graphql")
-    )
-
-@pytest.fixture()
-def schema_directive_schema():
-    return build_schema_from_glob(build_relative_glob("/schemas/directive.graphql"))
-
-
-@pytest.fixture()
-def scalar_schema():
-    return build_schema_from_glob(build_relative_glob("/schemas/scalars.graphql"))
 
 
 def test_countries_schema(countries_schema):
@@ -58,6 +26,7 @@ def test_countries_schema(countries_schema):
     )
 
     unit_test_with(generated_ast, "")
+
 
 def test_union_schema(union_schema):
     config = GeneratorConfig(scalar_definitions={"_Any": "typing.Any"})

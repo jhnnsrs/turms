@@ -1,9 +1,10 @@
 projects:
   default:
-    schema:
-      - tests/schemas/multi_schema/beast_duo.graphql
-      - tests/schemas/multi_schema/beast_uno.graphql
-    documents: tests/documents/beasts/*.graphql
+    schema: 
+      - https://countries.trevorblades.com/:
+          headers:
+              Hallo: str
+    documents: tests/documents/countries/*.graphql
     extensions:
       turms:
         out_dir: examples/api

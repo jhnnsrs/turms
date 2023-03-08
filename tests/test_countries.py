@@ -14,12 +14,7 @@ from turms.plugins.inputs import InputsPlugin
 from turms.plugins.fragments import FragmentsPlugin
 from turms.plugins.operations import OperationsPlugin
 from turms.stylers.default import DefaultStyler
-from turms.helpers import build_schema_from_introspect_url
-
-
-@pytest.fixture()
-def countries_schema():
-    return build_schema_from_introspect_url("https://countries.trevorblades.com/")
+from turms.run import generate_ast, build_schema_from_schema_type
 
 
 def test_complex_operations(countries_schema):

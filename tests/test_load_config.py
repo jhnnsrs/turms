@@ -9,38 +9,14 @@ from turms.errors import GenerationError
 from turms.run import load_projects_from_configpath
 
 
-@pytest.fixture()
-def parsable_configs():
-    return scan_folder_for_configs(build_relative_glob("/configs/parsable"))
-
-
-@pytest.fixture()
-def unparsable_configs():
-    return scan_folder_for_configs(build_relative_glob("/configs/unparsable"))
-
-
-@pytest.fixture()
-def parsable_configs_single():
-    return scan_folder_for_configs(build_relative_glob("/configs/parsable_single"))
-
-@pytest.fixture()
-def parsable_configs_single():
-    return scan_folder_for_configs(build_relative_glob("/configs/parsable_single"))
-
-@pytest.fixture()
-def multi_schema_field_config():
-    return scan_folder_for_configs(build_relative_glob("/configs/multi_schema"))
-
-
-
 def test_load_projects(parsable_configs):
     assert parsable_configs, "No parsable configs found"
     for config in parsable_configs:
         projects = load_projects_from_configpath(config)
-        assert len(projects) > 1, "Should have at least one project"
+        assert len(projects) >= 1, "Should have at least one project"
 
 
-def test_load_projects(parsable_configs_single):
+def test_load_projects_single(parsable_configs_single):
     assert parsable_configs_single, "No parsable configs found"
     for config in parsable_configs_single:
         projects = load_projects_from_configpath(config)
@@ -68,8 +44,7 @@ def test_failure_on_wrong_scalars():
         x = GeneratorConfig(scalar_definitions={"X": 15})
 
 
-
-def test_load_projects(multi_schema_field_config):
+def test_load_multi_schemea_fields(multi_schema_field_config):
     assert multi_schema_field_config, "No parsable configs found"
     for config in multi_schema_field_config:
         projects = load_projects_from_configpath(config)

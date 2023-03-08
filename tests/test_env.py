@@ -11,19 +11,9 @@ from turms.plugins.fragments import FragmentsPlugin
 from turms.plugins.operations import OperationsPlugin
 from turms.stylers.snake_case import SnakeCaseStyler
 from turms.stylers.capitalize import CapitalizeStyler
-from turms.helpers import build_schema_from_glob
+from turms.run import generate_ast, build_schema_from_schema_type
 from turms.processors.black import BlackProcessor
 from turms.processors.isort import IsortProcessor
-
-
-@pytest.fixture()
-def hello_world_schema():
-    return build_schema_from_glob(build_relative_glob("/schemas/helloworld.graphql"))
-
-
-@pytest.fixture()
-def arkitekt_schema():
-    return build_schema_from_glob(build_relative_glob("/schemas/arkitekt.graphql"))
 
 
 def test_small(hello_world_schema, monkeypatch):

@@ -7,13 +7,8 @@ from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
 from turms.plugins.objects import ObjectsPlugin
 from turms.stylers.default import DefaultStyler
-from turms.helpers import build_schema_from_introspect_url
+from turms.run import generate_ast, build_schema_from_schema_type
 from .utils import unit_test_with
-
-
-@pytest.fixture()
-def countries_schema():
-    return build_schema_from_introspect_url("https://countries.trevorblades.com/")
 
 
 def test_complex_operations(countries_schema):

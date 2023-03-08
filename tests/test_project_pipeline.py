@@ -8,7 +8,7 @@ from turms.plugins.inputs import InputsPlugin
 from turms.plugins.objects import ObjectsPlugin
 from turms.stylers.default import DefaultStyler
 from turms.parsers.polyfill import PolyfillParser
-from turms.helpers import build_schema_from_glob, build_schema_from_introspect_url
+from turms.run import generate_ast, build_schema_from_schema_type
 from .utils import build_relative_glob, unit_test_with, ExecuteError
 import pydantic
 

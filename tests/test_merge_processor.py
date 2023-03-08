@@ -12,7 +12,7 @@ from turms.plugins.operations import OperationsPlugin
 from turms.processors.merge import MergeProcessor, merge_code, MergeProcessorConfig
 from turms.stylers.snake_case import SnakeCaseStyler
 from turms.stylers.capitalize import CapitalizeStyler
-from turms.helpers import build_schema_from_glob
+from turms.run import generate_ast, build_schema_from_schema_type
 from turms.parsers.polyfill import PolyfillParser, PolyfillPluginConfig
 
 
