@@ -49,6 +49,8 @@ class FragmentNotFoundError(GenerationError):
 class NoDocumentsFoundError(GenerationError):
     pass
 
+class InvalidDocuments(GenerationError):
+    pass
 
 class NoScalarEquivalentDefined(GenerationError):
     pass
@@ -257,7 +259,7 @@ def parse_documents(client_schema: GraphQLSchema, scan_glob) -> DocumentNode:
 
     errors = validate(client_schema, nodes)
     if len(errors) > 0:
-        raise Exception(errors)
+        raise InvalidDocuments("Invalid Documents \n" + "\n".join(str(e) for e in errors))
 
     return nodes
 

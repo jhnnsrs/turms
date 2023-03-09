@@ -211,7 +211,6 @@ def recurse_type_annotation(
     elif isinstance(graphql_type, NamedTypeNode):
 
         z = schema.get_type(graphql_type.name.value)
-        print(z)
         if isinstance(z, GraphQLScalarType):
             registry.register_scalar(z.name)
 

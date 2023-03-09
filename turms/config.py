@@ -1,6 +1,6 @@
 import builtins
 from pydantic import AnyHttpUrl, BaseModel, BaseSettings, Field, validator
-from typing import Any, Dict, List, Optional, Union, Protocol, Literal
+from typing import Any, Dict, List, Optional, Union, Protocol, Literal, runtime_checkable
 from turms.helpers import import_string
 from enum import Enum
 
@@ -56,6 +56,20 @@ class GraphQLTypes(str, Enum):
     QUERY = "query"
     SUBSCRIPTION = "subscription"
     DIRECTIVE: str = "directive"
+
+
+class LogLevel(str, Enum):
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+@runtime_checkable
+class LogFunction(Protocol):
+
+    def __call__(self, message, level: LogLevel = LogLevel.INFO):
+        pass
 
 
 class FreezeConfig(BaseSettings):

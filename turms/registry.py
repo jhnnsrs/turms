@@ -1,6 +1,6 @@
 import ast
 from typing import Dict, List
-from turms.config import GeneratorConfig
+from turms.config import GeneratorConfig, LogFunction
 from keyword import iskeyword
 from turms.errors import (
     NoEnumFound,
@@ -78,7 +78,7 @@ class ClassRegistry(object):
     yet been defined). Class Registry provides a facade to the rest of the code to abstract
     the logic behind the stylers."""
 
-    def __init__(self, config: GeneratorConfig, stylers: List[Styler]):
+    def __init__(self, config: GeneratorConfig, stylers: List[Styler], log: LogFunction):
         self.stylers = stylers
         self._imports = set()
         self._builtins = set()
@@ -103,7 +103,7 @@ class ClassRegistry(object):
         self.forward_references = set()
 
         self.interfacefragments_class_map = {}
-        self.console = get_console()
+        self.log = log
 
     def style_inputtype_class(self, typename: str):
         for styler in self.stylers:
@@ -475,4 +475,4 @@ class ClassRegistry(object):
         )
 
     def warn(self, message):
-        self.console.print("[r]" + message)
+        self.log(message, level="WARN")

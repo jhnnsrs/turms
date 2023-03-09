@@ -13,6 +13,7 @@ from turms.config import (
     GraphQLConfigSingle,
     GraphQLProject,
     SchemaType,
+    LogFunction
 )
 from turms.helpers import (
     load_introspection_from_glob,
@@ -127,7 +128,7 @@ def scan_folder_for_configs(folder_path: str = None) -> List[str]:
     ]
 
 
-def scan_folder_for_single_config(folder_path: str = None) -> List[str]:
+def scan_folder_for_single_config(folder_path: str = None) -> str:
     """Scans a folder for one single config file
 
     Args:
@@ -298,14 +299,13 @@ def build_schema_from_schema_type(
         except Exception as e:
             if allow_introspection:
                 intropection = load_introspection_from_glob(schema)
-                print(intropection)
                 return build_client_schema(intropection)
             raise e
 
     raise GenerationError("Could not build schema with type " + str(type(schema)))
 
 
-def generate(project: GraphQLProject) -> str:
+def generate(project: GraphQLProject, log: Optional[LogFunction] = None) -> str:
     """Genrates the code according to the configugration
 
     The code is generated in the following order:
@@ -323,6 +323,8 @@ def generate(project: GraphQLProject) -> str:
     Returns:
         str: The generated code
     """
+    if not log:
+        log = lambda x, **kwargs: print(x)   
 
     gen_config = project.extensions.turms
 
@@ -340,25 +342,25 @@ def generate(project: GraphQLProject) -> str:
     processors = []
 
     for parser_config in gen_config.parsers:
-        styler = instantiate(parser_config.type, config=parser_config.dict())
+        styler = instantiate(parser_config.type, config=parser_config.dict(), log=log)
         if verbose:
             get_console().print(f"Using Parser {styler}")
         parsers.append(styler)
 
     for plugins_config in gen_config.plugins:
-        styler = instantiate(plugins_config.type, config=plugins_config.dict())
+        styler = instantiate(plugins_config.type, config=plugins_config.dict(), log=log)
         if verbose:
             get_console().print(f"Using Plugin {styler}")
         plugins.append(styler)
 
     for styler_config in gen_config.stylers:
-        styler = instantiate(styler_config.type, config=styler_config.dict())
+        styler = instantiate(styler_config.type, config=styler_config.dict(), log=log)
         if verbose:
             get_console().print(f"Using Styler {styler}")
         stylers.append(styler)
 
     for proc_config in gen_config.processors:
-        styler = instantiate(proc_config.type, config=proc_config.dict())
+        styler = instantiate(proc_config.type, config=proc_config.dict(), log=log)
         if verbose:
             get_console().print(f"Using Processor {styler}")
         processors.append(styler)
@@ -369,6 +371,7 @@ def generate(project: GraphQLProject) -> str:
         plugins=plugins,
         stylers=stylers,
         skip_forwards=gen_config.skip_forwards,
+        log=log,
     )
 
     for styler in parsers:
@@ -389,6 +392,7 @@ def generate_ast(
     plugins: Optional[List[Plugin]] = None,
     stylers: Optional[List[Styler]] = None,
     skip_forwards: bool = False,
+    log: LogFunction = lambda *args, **kwargs: print,
 ) -> List[ast.AST]:
     """Generates the ast from the schema
 
@@ -409,13 +413,13 @@ def generate_ast(
     stylers = stylers or []
 
     global_tree = []
-    registry = ClassRegistry(config, stylers)
+    registry = ClassRegistry(config, stylers, log)
 
     for plugin in plugins:
         try:
             global_tree += plugin.generate_ast(schema, config, registry)
         except Exception as e:
-            raise GenerationError(f"Plugin:{plugin} failed!") from e
+            raise GenerationError(f"{plugin.__class__.__name__} failed!\n {str(e)}") from e
 
     global_tree = (
         registry.generate_imports() + registry.generate_builtins() + global_tree

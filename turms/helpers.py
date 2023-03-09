@@ -77,7 +77,7 @@ def load_introspection_from_url(
     return x["data"]
 
 
-def load_dsl_from_url(url: AnyHttpUrl, headers: Dict[str, str]) -> DSLString:
+def load_dsl_from_url(url: AnyHttpUrl, headers: Dict[str, str] = None) -> DSLString:
     try:  # pragma: no cover
         import requests  # pragma: no cover
     except ImportError:  # pragma: no cover
