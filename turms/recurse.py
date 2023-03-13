@@ -554,6 +554,12 @@ def type_field_node(
     target = target_from_node(node)
     field_name = registry.generate_node_name(target)
 
+    field_description = (
+        field.description
+        if not field.deprecation_reason
+        else f"DEPRECATED {field.deprecation_reason}: : {field.description} "
+    )
+
     if target != field_name:
         registry.register_import("pydantic.Field")
         assign = ast.AnnAssign(
@@ -571,7 +577,10 @@ def type_field_node(
             value=ast.Call(
                 func=ast.Name(id="Field", ctx=ast.Load()),
                 args=[],
-                keywords=[ast.keyword(arg="alias", value=ast.Constant(value=target))],
+                keywords=[
+                    ast.keyword(arg="alias", value=ast.Constant(value=target)),
+                    ast.keyword(arg="description", value=ast.Constant(value=field_description)),
+                ],
             ),
             simple=1,
         )
@@ -588,21 +597,19 @@ def type_field_node(
                 registry,
                 is_optional=is_optional,
             ),
+            value=ast.Call(
+                func=ast.Name(id="Field", ctx=ast.Load()),
+                args=[],
+                keywords=[
+                    ast.keyword(arg="description", value=ast.Constant(value=field_description)),
+                ],
+            ),
             simple=1,
         )
-
-    potential_comment = (
-        field.description
-        if not field.deprecation_reason
-        else f"DEPRECATED {field.deprecation_reason}: : {field.description} "
-    )
 
     if field.deprecation_reason:
         registry.warn(
             f"Field {node.name.value} on {parent} is deprecated: {field.deprecation_reason}"
         )
-
-    if potential_comment:
-        return [assign, ast.Expr(value=ast.Constant(value=potential_comment))]
 
     return [assign]
