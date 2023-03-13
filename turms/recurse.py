@@ -269,6 +269,10 @@ def recurse_annotation(
                     )
                 ]
 
+                additional_bases = get_additional_bases_for_type(
+                    sub_node.type_condition.name.value, config, registry
+                )
+
                 for sub_sub_node in sub_node.selection_set.selections:
 
                     if isinstance(sub_sub_node, FieldNode):
@@ -290,9 +294,11 @@ def recurse_annotation(
                             registry,
                         )
 
-                additional_bases = get_additional_bases_for_type(
-                    sub_node.type_condition.name.value, config, registry
-                )
+                    elif isinstance(sub_sub_node, FragmentSpreadNode):
+                        additional_bases.append(registry.reference_fragment(
+                            sub_sub_node.name.value, parent
+                        ))
+
                 cls = ast.ClassDef(
                     inline_fragment_name,
                     bases=additional_bases
