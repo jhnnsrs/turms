@@ -18,6 +18,7 @@ from turms.run import (
 from .watch import stream_changes
 from graphql import print_schema
 from functools import wraps
+
 click.rich_click.USE_RICH_MARKUP = True
 
 directory = os.getcwd()
@@ -44,7 +45,6 @@ https://gihub.com/jhnnsrs/turms
 """
 
 
-
 default_settings = """
 projects:
   default:
@@ -66,41 +66,35 @@ projects:
 """
 
 
-
 def generate_projects(projects, title="Turms"):
     generation_message = f"Generating the {'.'.join(projects.keys())} projects. This may take a while...\n"
-   
-   
 
     tree = Tree("Generating projects", style="bold green")
-    panel_group = Group(
-        generation_message,
-        tree
+    panel_group = Group(generation_message, tree)
+
+    panel = Panel(
+        panel_group,
+        title=title,
+        title_align="left",
+        border_style="green",
+        padding=(1, 1),
     )
-
-
-    panel = Panel(panel_group, title=title, title_align="left", border_style="green", padding=(1, 1))
     with Live(panel, screen=False) as live:
         for key, project in projects.items():
 
-            project_tree = Tree(f"{key}", style="not bold white")   
+            project_tree = Tree(f"{key}", style="not bold white")
             tree.add(project_tree)
             live.update(panel)
-
 
             def log(message, level):
                 if level == "WARN":
                     project_tree.add(Tree(message, style="yellow"))
 
-            
-
             try:
                 generated_code = generate(project, log=log)
 
-
                 project_tree.label = f"{key} ✔️"
                 live.update(panel)
-            
 
                 write_code_to_file(
                     generated_code,
@@ -115,63 +109,60 @@ def generate_projects(projects, title="Turms"):
                 live.update(panel)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 def with_projects(func):
-
     @click.argument("project", default=None, required=False)
     @click.option("--config", default=None)
-
     @wraps(func)
-    def wrapper(*args, config = None, project = None, yes= False, **kwargs):
+    def wrapper(*args, config=None, project=None, **kwargs):
         try:
             app_directory = os.getcwd()
             config = config or scan_folder_for_single_config(app_directory)
             if not config:
-                raise Exception(f"No config file found. Please run `turms init` in {app_directory} to create a default config file or specify a config file with the --config flag")
+                raise Exception(
+                    f"No config file found. Please run `turms init` in {app_directory} to create a default config file or specify a config file with the --config flag"
+                )
 
-            projects = load_projects_from_configpath(config)
+            try:
+                projects = load_projects_from_configpath(config)
+            except Exception as e:
+                get_console().print_exception()
+                raise e
 
             if project:
-                projects = {key: value for key, value in projects.items() if key == project}
+                projects = {
+                    key: value for key, value in projects.items() if key == project
+                }
                 if not projects:
                     raise Exception(f"Project {project} not found in {config}")
-                
-        except Exception as e:
-            raise click.ClickException(str(e))
 
-        return func(*args, projects=projects, config=config, yes=yes, **kwargs)
+        except Exception as e:
+            raise click.ClickException(str(e)) from e
+
+        return func(*args, projects=projects, **kwargs)
 
     return wrapper
 
 
 def watch_projects(projects, title="Turms"):
     if len(projects) > 1:
-        raise click.ClickException("Watching multiple projects is not supported. Please specify a single project!")
+        raise click.ClickException(
+            "Watching multiple projects is not supported. Please specify a single project!"
+        )
 
     project = list(projects.values())[0]
 
     generation_message = f"Watching the {'.'.join(projects.keys())} project. Changes will be automatically generated and added to [b]{project.extensions.turms.out_dir}/{project.extensions.turms.generated_name}[/b] when you save a file in the project's documents folder."
-   
 
     tree = Panel("Watching....", style="bold green")
-    panel_group = Group(
-        generation_message,
-        tree
+    panel_group = Group(generation_message, tree)
+
+    panel = Panel(
+        panel_group,
+        title=title,
+        title_align="left",
+        border_style="green",
+        padding=(1, 1),
     )
-
-
-    panel = Panel(panel_group, title=title, title_align="left", border_style="green", padding=(1, 1))
     with Live(panel, screen=False) as live:
 
         tree.renderable = f"Watching {project.documents}..."
@@ -186,10 +177,9 @@ def watch_projects(projects, title="Turms"):
                 tree.style = "blue"
                 live.update(panel)
 
-                generated_code = generate(project,)
-
-                
-            
+                generated_code = generate(
+                    project,
+                )
 
                 write_code_to_file(
                     generated_code,
@@ -197,21 +187,18 @@ def watch_projects(projects, title="Turms"):
                     project.extensions.turms.generated_name,
                 )
 
-
                 tree.renderable = f"Generation Successfull"
                 tree.border_style = "green"
                 tree.style = "green"
                 live.update(panel)
 
             except Exception as e:
-            
+
                 tree.renderable = f"[red] {str(e)} [/],"
                 tree.border_style = "not bold red"
                 tree.style = "not bold red"
                 live.update(panel)
                 continue
-
-
 
 
 @click.group()
@@ -222,7 +209,7 @@ def cli(ctx):
     Welcome to Turms! Turms is a GraphQL code generator that generates code from your GraphQL schema and documents.
 
     For more information, visit [link=https://gihub.com/jhnnsrs/turms] https://gihub.com/jhnnsrs/turms [/link]"""
-    
+
 
 @cli.command()
 @click.option("--config", default="graphql.config.yaml", help="The config file to use")
@@ -234,7 +221,10 @@ def init(config):
 
     app_directory = os.getcwd()
     if os.path.exists(os.path.join(app_directory, "graphql.config.yaml")):
-        if not click.confirm(f"Config file already exists in {app_directory}. Do you want to overwrite it?", default=False):
+        if not click.confirm(
+            f"Config file already exists in {app_directory}. Do you want to overwrite it?",
+            default=False,
+        ):
             get_console().print("Aborting")
             return
 
@@ -243,18 +233,11 @@ def init(config):
         f.write(default_settings)
 
 
-
-
-
-
-
-
 @cli.command()
 @with_projects
 def gen(projects):
     """Generate the graphql project"""
     generate_projects(projects)
-    
 
 
 @cli.command()
@@ -264,26 +247,35 @@ def watch(projects):
     watch_projects(projects)
 
 
-
-
-
-
 @cli.command()
 @with_projects
-@click.option("--out", default=".schema.graphql", help="The output file extension (will be appended to the project name)")
-@click.option("--dir", default=None, help="The output directory for the schema files (will default to the current working directory)")
-def download(config, projects, out, yes, dir):
+@click.option(
+    "--out",
+    default=".schema.graphql",
+    help="The output file extension (will be appended to the project name)",
+)
+@click.option(
+    "--dir",
+    default=None,
+    help="The output directory for the schema files (will default to the current working directory)",
+)
+def download(projects, out, dir):
     """Download the graphql projects schema as a sdl file"""
 
-    app_directory = dir or os.getcwd()
-    for key, project in projects.items():
-        filename = f"{key}{out}"
-        get_console().print(f"Downloading schema for project {key} to {app_directory}/{filename}")
-        schema = build_schema_from_schema_type(
-            project.schema_url, allow_introspection=True
-        )
-        with open(os.path.join(app_directory, filename), "w") as f:
-            f.write(print_schema(schema))
+    try:
+        app_directory = dir or os.getcwd()
+        for key, project in projects.items():
+            filename = f"{key}{out}"
+            get_console().print(
+                f"Downloading schema for project {key} to {app_directory}/{filename}"
+            )
+            schema = build_schema_from_schema_type(
+                project.schema_url, allow_introspection=True
+            )
+            with open(os.path.join(app_directory, filename), "w") as f:
+                f.write(print_schema(schema))
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
 
 
 if __name__ == "__main__":

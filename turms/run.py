@@ -13,7 +13,7 @@ from turms.config import (
     GraphQLConfigSingle,
     GraphQLProject,
     SchemaType,
-    LogFunction
+    LogFunction,
 )
 from turms.helpers import (
     load_introspection_from_glob,
@@ -30,6 +30,7 @@ from pydantic.error_wrappers import ValidationError
 from .errors import GenerationError
 import json
 import os
+
 
 try:
     # If toml is installed, use it to load the config file
@@ -324,7 +325,7 @@ def generate(project: GraphQLProject, log: Optional[LogFunction] = None) -> str:
         str: The generated code
     """
     if not log:
-        log = lambda x, **kwargs: print(x)   
+        log = lambda x, **kwargs: print(x)
 
     gen_config = project.extensions.turms
 
@@ -419,7 +420,9 @@ def generate_ast(
         try:
             global_tree += plugin.generate_ast(schema, config, registry)
         except Exception as e:
-            raise GenerationError(f"{plugin.__class__.__name__} failed!\n {str(e)}") from e
+            raise GenerationError(
+                f"{plugin.__class__.__name__} failed!\n {str(e)}"
+            ) from e
 
     global_tree = (
         registry.generate_imports() + registry.generate_builtins() + global_tree
