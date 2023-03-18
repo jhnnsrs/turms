@@ -1,6 +1,6 @@
 import builtins
 from pydantic import AnyHttpUrl, BaseModel, BaseSettings, Field, validator
-from typing import Any, Dict, List, Optional, Union, Protocol, Literal
+from typing import Any, Dict, List, Optional, Union, Protocol, Literal, runtime_checkable
 from turms.helpers import import_string
 from enum import Enum
 
@@ -20,7 +20,6 @@ class ImportableFunctionMixin(Protocol):
         # the value returned from the previous validator
         yield cls.validate
 
-        
     @classmethod
     def validate(cls, v):
         if not callable(v):
@@ -57,6 +56,20 @@ class GraphQLTypes(str, Enum):
     QUERY = "query"
     SUBSCRIPTION = "subscription"
     DIRECTIVE: str = "directive"
+
+
+class LogLevel(str, Enum):
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+@runtime_checkable
+class LogFunction(Protocol):
+
+    def __call__(self, message, level: LogLevel = LogLevel.INFO):
+        pass
 
 
 class FreezeConfig(BaseSettings):
@@ -102,7 +115,6 @@ class FreezeConfig(BaseSettings):
 ExtraOptions = Optional[Union[Literal["ignore"], Literal["allow"], Literal["forbid"]]]
 
 
-
 class OptionsConfig(BaseSettings):
     """Configuration for freezing the generated pydantic
     models
@@ -118,7 +130,7 @@ class OptionsConfig(BaseSettings):
     """Enabling this, will freeze the schema"""
     extra: ExtraOptions
     """Extra options for pydantic"""
-    allow_mutation: Optional[bool] 
+    allow_mutation: Optional[bool]
     """Allow mutation"""
     allow_population_by_field_name: Optional[bool]
     """Allow population by field name"""
@@ -129,8 +141,7 @@ class OptionsConfig(BaseSettings):
 
     validate_assignment: Optional[bool]
     """Validate assignment"""
-   
-    
+
     types: List[GraphQLTypes] = Field(
         [GraphQLTypes.INPUT, GraphQLTypes.FRAGMENT, GraphQLTypes.OBJECT],
         description="The types to freeze",
@@ -145,7 +156,6 @@ class OptionsConfig(BaseSettings):
         description="List of types to include in setting these options"
     )
     """The types to freeze"""
-   
 
 
 class GeneratorConfig(BaseSettings):
@@ -169,6 +179,9 @@ class GeneratorConfig(BaseSettings):
     """The documents to parse. Setting this will overwrite the documents in the graphql config"""
     verbose: bool = False
     """Enable verbose logging"""
+
+    allow_introspection: bool = True
+    """Allow introspection queries"""
 
     object_bases: List[str] = ["pydantic.BaseModel"]
     """The base classes for the generated objects. This is useful if you want to change the base class from BaseModel to something else"""
@@ -258,6 +271,14 @@ class Extensions(BaseModel):
     "The turms configuration"
 
 
+class AdvancedSchemaField(BaseModel):
+    headers: Dict[str, str]
+
+
+SchemaField = Union[AnyHttpUrl, str, Dict[str, AdvancedSchemaField]]
+SchemaType = Union[SchemaField, List[SchemaField]]
+
+
 class GraphQLProject(BaseSettings):
     """Configuration for the GraphQL project
 
@@ -269,10 +290,8 @@ class GraphQLProject(BaseSettings):
     to the generator configuration under extensions.turms
     """
 
-    schema_url: Optional[Union[AnyHttpUrl, str]] = Field(alias="schema", env="schema")
+    schema_url: SchemaType = Field(alias="schema", env="TURMS_GRAPHQL_SCHEMA")
     """The schema url or path to the schema file"""
-    bearer_token: Optional[str] = None
-    """The bearer token to use for the schema if retrieving it from a remote url"""
     documents: Optional[str]
     """The documents (operations,fragments) to parse"""
     extensions: Extensions

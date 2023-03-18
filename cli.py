@@ -1,4 +1,4 @@
-from turms.run import gen
+from turms.cli.main import cli
 
 
-gen("graphql.config.yaml")
+cli()

@@ -1,4 +1,3 @@
-from enum import Enum
 from typing import List, Literal, Optional
 
 from gql import Client

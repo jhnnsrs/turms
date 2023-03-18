@@ -1,0 +1,236 @@
+fragment StringArgPort on StringArgPort {
+  key
+}
+
+fragment IntArgPort on IntArgPort {
+  key
+}
+
+fragment StructureArgPort on StructureArgPort {
+  key
+  identifier
+}
+
+fragment ListArgPort on ListArgPort {
+  key
+  child {
+    __typename
+    ... on StructureArgPort {
+      __typename
+      identifier
+    }
+    ... on IntArgPort {
+      __typename
+    }
+    ... on BoolArgPort {
+      __typename
+    }
+    ... on StringArgPort {
+      __typename
+    }
+  }
+}
+
+fragment DictArgPort on DictArgPort {
+  key
+  child {
+    __typename
+    ... on StructureArgPort {
+      __typename
+      identifier
+    }
+    ... on IntArgPort {
+      __typename
+    }
+    ... on BoolArgPort {
+      __typename
+    }
+    ... on StringArgPort {
+      __typename
+    }
+  }
+}
+
+fragment DictKwargPort on DictKwargPort {
+  key
+  defaultDict
+  child {
+    __typename
+    ... on StructureKwargPort {
+      __typename
+      identifier
+    }
+    ... on IntKwargPort {
+      __typename
+    }
+    ... on BoolKwargPort {
+      __typename
+    }
+    ... on StringKwargPort {
+      __typename
+    }
+  }
+}
+
+fragment BoolKwargPort on BoolKwargPort {
+  key
+  defaultBool
+}
+
+fragment IntKwargPort on IntKwargPort {
+  key
+  defaultInt
+}
+
+fragment StringKwargPort on StringKwargPort {
+  key
+  defaultString
+}
+
+fragment ListKwargPort on ListKwargPort {
+  key
+  child {
+    __typename
+    ... on StructureKwargPort {
+      __typename
+      identifier
+    }
+    ... on IntKwargPort {
+      __typename
+    }
+    ... on BoolKwargPort {
+      __typename
+    }
+    ... on StringKwargPort {
+      __typename
+    }
+  }
+  defaultList
+}
+
+fragment ListReturnPort on ListReturnPort {
+  key
+  child {
+    __typename
+    ... on StructureReturnPort {
+      __typename
+      identifier
+    }
+    ... on StringReturnPort {
+      __typename
+    }
+    ... on IntReturnPort {
+      __typename
+    }
+    ... on BoolReturnPort {
+      __typename
+    }
+  }
+}
+
+fragment DictReturnPort on DictReturnPort {
+  key
+  child {
+    __typename
+    ... on StructureReturnPort {
+      __typename
+      identifier
+    }
+    ... on StringReturnPort {
+      __typename
+    }
+    ... on IntReturnPort {
+      __typename
+    }
+    ... on BoolReturnPort {
+      __typename
+    }
+  }
+}
+
+fragment StructureReturnPort on StructureReturnPort {
+  __typename
+  key
+  identifier
+}
+
+fragment StringReturnPort on StringReturnPort {
+  __typename
+  key
+}
+
+fragment IntReturnPort on IntReturnPort {
+  __typename
+  key
+}
+
+fragment ReturnPort on ReturnPort {
+  __typename
+  key
+  description
+  ...ListReturnPort
+  ...StructureReturnPort
+  ...StringReturnPort
+  ...IntReturnPort
+  ...DictReturnPort
+}
+
+fragment KwargPort on KwargPort {
+  __typename
+  key
+  description
+  ...DictKwargPort
+  ...BoolKwargPort
+  ...IntKwargPort
+  ...ListKwargPort
+  ...StringKwargPort
+}
+
+fragment ArgPort on ArgPort {
+  __typename
+  key
+  description
+  ...StringArgPort
+  ...StructureArgPort
+  ...ListArgPort
+  ...IntArgPort
+  ...DictArgPort
+}
+
+
+
+fragment Node on Node {
+  name
+  interface
+  package
+  description
+  type
+  id
+  args {
+    ...ArgPort
+  }
+  kwargs {
+    ...KwargPort
+  }
+  returns {
+    ...ReturnPort
+  }
+}
+
+query find(
+  $id: ID
+  $package: String
+  $interface: String
+  $template: ID
+  $q: QString
+) {
+  node(
+    id: $id
+    package: $package
+    interface: $interface
+    template: $template
+    q: $q
+  ) {
+    ...Node
+  }
+}

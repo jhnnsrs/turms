@@ -13,6 +13,7 @@ def build_relative_glob(path):
     return DIR_NAME + path
 
 
+
 class ExecuteError(Exception):
     pass
 
@@ -71,7 +72,7 @@ def unit_test_with(generated_ast: List[ast.AST], test_string: str):
     with tempfile.TemporaryDirectory() as tmpdirname:
 
         filename = write_code_to_file(parsed_code, tmpdirname, "minimal.py")
-        mocksfile = write_code_to_file(mocks_code, tmpdirname, "mocks.py")
+        write_code_to_file(mocks_code, tmpdirname, "mocks.py")
         s = subprocess.run([sys.executable, filename], capture_output=True)
         if s.returncode == 0:
             return True

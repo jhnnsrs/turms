@@ -1,25 +1,14 @@
 import ast
 
-import pytest
 from .utils import build_relative_glob, unit_test_with
 from turms.config import GeneratorConfig
-from turms.plugins.funcs import (
-    FunctionDefinition,
-    FuncsPlugin,
-    FuncsPluginConfig,
-)
 from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
 from turms.plugins.fragments import FragmentsPlugin
 from turms.plugins.operations import OperationsPlugin
 from turms.stylers.default import DefaultStyler
-from turms.helpers import build_schema_from_introspect_url
-
-
-@pytest.fixture()
-def countries_schema():
-    return build_schema_from_introspect_url("https://countries.trevorblades.com/")
+from turms.run import generate_ast
 
 
 def test_complex_operations(countries_schema):

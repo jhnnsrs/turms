@@ -8,7 +8,6 @@ from pydantic import Field
 from graphql.language.ast import FragmentDefinitionNode
 from turms.registry import ClassRegistry
 from turms.utils import (
-    NoDocumentsFoundError,
     generate_config_class,
     generate_typename_field,
     get_additional_bases_for_type,

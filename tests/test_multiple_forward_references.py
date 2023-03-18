@@ -1,23 +1,14 @@
 import ast
 
-import pytest
 
 from .utils import (
-    build_relative_glob,
     unit_test_with,
 )
 from turms.config import GeneratorConfig
-from turms.helpers import build_schema_from_glob
+from turms.run import generate_ast
 from turms.plugins.objects import ObjectsPlugin
 from turms.run import generate_ast
 from turms.stylers.default import DefaultStyler
-
-
-@pytest.fixture()
-def multiple_forward_references_schema():
-    return build_schema_from_glob(
-        build_relative_glob("/schemas/multiple_forward_references.graphql")
-    )
 
 
 def test_generation(multiple_forward_references_schema):

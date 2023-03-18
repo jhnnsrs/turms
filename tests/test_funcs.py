@@ -1,6 +1,4 @@
-import ast
 
-import pytest
 from .utils import build_relative_glob, unit_test_with
 from turms.config import GeneratorConfig
 from turms.run import generate_ast
@@ -16,17 +14,7 @@ from turms.plugins.funcs import (
 )
 from turms.plugins.fragments import FragmentsPlugin
 from turms.stylers.default import DefaultStyler
-from turms.helpers import build_schema_from_glob, build_schema_from_introspect_url
-
-
-@pytest.fixture()
-def arkitekt_schema():
-    return build_schema_from_glob(build_relative_glob("/schemas/arkitekt.graphql"))
-
-
-@pytest.fixture()
-def beasts_schema():
-    return build_schema_from_glob(build_relative_glob("/schemas/beasts.graphql"))
+from turms.run import generate_ast
 
 
 def test_arkitekt_schema(arkitekt_schema):
@@ -95,7 +83,7 @@ def test_arkitekt_schema(arkitekt_schema):
     )
 
 
-def test_beasts_schema(beasts_schema):
+def test_beasts_schema(beast_schema):
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/beasts/**/*.graphql"),
         scalar_definitions={
@@ -109,7 +97,7 @@ def test_beasts_schema(beasts_schema):
 
     generated_ast = generate_ast(
         config,
-        beasts_schema,
+        beast_schema,
         stylers=[DefaultStyler()],
         plugins=[
             EnumsPlugin(),
@@ -161,7 +149,7 @@ def test_beasts_schema(beasts_schema):
     )
 
 
-def test_extra_args(beasts_schema):
+def test_extra_args(beast_schema):
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/beasts/**/*.graphql"),
     )
@@ -185,7 +173,7 @@ def test_extra_args(beasts_schema):
 
     generated_ast = generate_ast(
         config,
-        beasts_schema,
+        beast_schema,
         stylers=[DefaultStyler()],
         plugins=[
             EnumsPlugin(),

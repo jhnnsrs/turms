@@ -1,9 +1,9 @@
 import ast
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Callable
 
 import yaml
-from graphql import GraphQLSchema
+from graphql import GraphQLSchema, parse, build_ast_schema, build_client_schema
 from pydantic import AnyHttpUrl, ValidationError
 from rich import get_console
 
@@ -12,10 +12,14 @@ from turms.config import (
     GraphQLConfigMultiple,
     GraphQLConfigSingle,
     GraphQLProject,
+    SchemaType,
+    LogFunction,
 )
 from turms.helpers import (
-    build_schema_from_glob,
-    build_schema_from_introspect_url,
+    load_introspection_from_glob,
+    load_introspection_from_url,
+    load_dsl_from_glob,
+    load_dsl_from_url,
     import_string,
 )
 from turms.plugins.base import Plugin
@@ -26,6 +30,7 @@ from pydantic.error_wrappers import ValidationError
 from .errors import GenerationError
 import json
 import os
+
 
 try:
     # If toml is installed, use it to load the config file
@@ -44,16 +49,32 @@ def json_loader(file):
     return json.loads(file.read())
 
 
+SCANNABLE_FILE_NAMES = [
+    "graphql.config.yaml",
+    ".graphqlrc.yaml",
+    "graphql.config.yml",
+    ".graphqlrc.yml",
+    "graphql.config.toml",
+    ".graphqlrc.toml",
+    "graphql.config.json",
+    ".graphqlrc.json",
+]
+
 FILE_NAME_LOADERS = {
-    "graphql.config.yaml": yaml.safe_load,
-    ".graphqlrc.yaml": yaml.safe_load,
-    "graphql.config.yml": yaml.safe_load,
-    ".graphqlrc.yml": yaml.safe_load,
-    "graphql.config.toml": toml_loader,
-    ".graphqlrc.toml": toml_loader,
-    "graphql.config.json": json_loader,
-    ".graphqlrc.json": json_loader,
+    "yaml": yaml.safe_load,
+    "yml": yaml.safe_load,
+    "toml": toml_loader,
+    "json": json_loader,
 }
+
+
+def get_file_loader(file_name: str) -> Callable:
+    try:
+        return FILE_NAME_LOADERS[file_name.lower().split(".")[-1]]
+    except AttributeError as err:
+        raise GenerationError(
+            f"File {file_name} is not supported. Please use one of {FILE_NAME_LOADERS.keys()}"
+        ) from err
 
 
 def load_projects_from_configpath(
@@ -70,13 +91,7 @@ def load_projects_from_configpath(
     file_path, file_name = os.path.split(config_path)
 
     with open(config_path, "r", encoding="utf-8") as file:
-
-        try:
-            loaded_dict = FILE_NAME_LOADERS[file_name.lower()](file)
-        except AttributeError as err:
-            raise GenerationError(
-                f"File {file_name} is not supported. Please use one of {FILE_NAME_LOADERS.keys()}"
-            ) from err
+        loaded_dict = get_file_loader(config_path)(file)
 
     try:
         if "projects" in loaded_dict:
@@ -110,11 +125,11 @@ def scan_folder_for_configs(folder_path: str = None) -> List[str]:
     return [
         os.path.join(folder_path, file_name)
         for file_name in os.listdir(folder_path)
-        if file_name.lower() in FILE_NAME_LOADERS.keys()
+        if file_name.lower() in SCANNABLE_FILE_NAMES
     ]
 
 
-def scan_folder_for_single_config(folder_path: str = None) -> List[str]:
+def scan_folder_for_single_config(folder_path: str = None) -> str:
     """Scans a folder for one single config file
 
     Args:
@@ -128,12 +143,12 @@ def scan_folder_for_single_config(folder_path: str = None) -> List[str]:
 
     if len(configs) == 0:
         raise GenerationError(
-            f"No config files found in {folder_path}. Please use one of {FILE_NAME_LOADERS.keys()}"
+            f"No config files found in {folder_path}. Please use one of {SCANNABLE_FILE_NAMES}. Or use the --config flag to specify a config file."
         )
 
     if len(configs) != 1:
         raise GenerationError(
-            f"Multiple config files found in {folder_path}. Please only have one of {FILE_NAME_LOADERS.keys()}"
+            f"Multiple config files found in {folder_path}. Please only have one of {SCANNABLE_FILE_NAMES}. Or use the --config flag to specify a config file."
         )
 
     return configs[0]
@@ -215,7 +230,83 @@ def instantiate(module_path: str, **kwargs):
     return import_string(module_path)(**kwargs)
 
 
-def generate(project: GraphQLProject) -> str:
+def build_schema_from_schema_type(
+    schema: SchemaType, allow_introspection: bool = False
+) -> GraphQLSchema:
+    """Builds a schema from a project
+
+    Args:
+        project (GraphQLProject): The project
+
+    Returns:
+        GraphQLSchema: The schema
+    """
+    if isinstance(schema, dict):
+
+        if len(schema.values()) == 1:
+            key, value = list(schema.items())[0]
+            try:
+                dsl_string = load_dsl_from_url(key, value.headers)
+                return build_ast_schema(parse(dsl_string))
+            except Exception as e:
+                if allow_introspection:
+                    intropection = load_introspection_from_url(key, value.headers)
+                    return build_client_schema(intropection)
+                raise e
+        else:
+            # Multiple schemas, now we only support dsl
+            dsl_subschemas = []
+
+            for key, value in schema.items():
+                dsl_subschemas.append(load_dsl_from_url(key, value.headers))
+
+            return build_ast_schema(parse(" ".join(dsl_subschemas)))
+
+    if isinstance(schema, list):
+        if len(schema) == 1:
+            # Only one schema, probably because of aesthetic reasons
+            return build_schema_from_schema_type(
+                schema[0], allow_introspection=allow_introspection
+            )
+
+        else:
+            dsl_subschemas = []
+
+            for item in schema:
+                if isinstance(item, AnyHttpUrl):
+                    dsl_subschemas.append(load_dsl_from_url(item))
+                if isinstance(item, dict):
+                    for key, value in item.items():
+                        dsl_subschemas.append(load_dsl_from_url(key, value.headers))
+                if isinstance(item, str):
+                    dsl_subschemas.append(load_dsl_from_glob(item))
+
+            return build_ast_schema(parse(" ".join(dsl_subschemas)))
+
+    if isinstance(schema, AnyHttpUrl):
+        try:
+            dsl_string = load_dsl_from_url(schema)
+            return build_ast_schema(parse(dsl_string))
+        except Exception as e:
+            if allow_introspection:
+                intropection = load_introspection_from_url(schema)
+                return build_client_schema(intropection)
+            raise e
+
+    if isinstance(schema, str):
+        try:
+            dsl_string = load_dsl_from_glob(schema)
+            return build_ast_schema(parse(dsl_string))
+        except Exception as e:
+            if allow_introspection:
+                intropection = load_introspection_from_glob(schema)
+                return build_client_schema(intropection)
+            raise e
+
+    raise GenerationError("Could not build schema with type " + str(type(schema)))
+
+
+def generate(project: GraphQLProject, log: Optional[LogFunction] = None) -> str:
     """Genrates the code according to the configugration
 
     The code is generated in the following order:
@@ -233,15 +324,17 @@ def generate(project: GraphQLProject) -> str:
     Returns:
         str: The generated code
     """
+    if not log:
 
-    if isinstance(project.schema_url, AnyHttpUrl):
-        schema = build_schema_from_introspect_url(
-            project.schema_url, project.bearer_token
-        )
-    else:
-        schema = build_schema_from_glob(project.schema_url)
+        def log(x, **kwargs):
+            return print(x)
 
     gen_config = project.extensions.turms
+
+    schema = build_schema_from_schema_type(
+        project.schema_url,
+        allow_introspection=project.extensions.turms.allow_introspection,
+    )
 
     gen_config.documents = gen_config.documents or project.documents
     verbose = gen_config.verbose
@@ -252,25 +345,25 @@ def generate(project: GraphQLProject) -> str:
     processors = []
 
     for parser_config in gen_config.parsers:
-        styler = instantiate(parser_config.type, config=parser_config.dict())
+        styler = instantiate(parser_config.type, config=parser_config.dict(), log=log)
         if verbose:
             get_console().print(f"Using Parser {styler}")
         parsers.append(styler)
 
     for plugins_config in gen_config.plugins:
-        styler = instantiate(plugins_config.type, config=plugins_config.dict())
+        styler = instantiate(plugins_config.type, config=plugins_config.dict(), log=log)
         if verbose:
             get_console().print(f"Using Plugin {styler}")
         plugins.append(styler)
 
     for styler_config in gen_config.stylers:
-        styler = instantiate(styler_config.type, config=styler_config.dict())
+        styler = instantiate(styler_config.type, config=styler_config.dict(), log=log)
         if verbose:
             get_console().print(f"Using Styler {styler}")
         stylers.append(styler)
 
     for proc_config in gen_config.processors:
-        styler = instantiate(proc_config.type, config=proc_config.dict())
+        styler = instantiate(proc_config.type, config=proc_config.dict(), log=log)
         if verbose:
             get_console().print(f"Using Processor {styler}")
         processors.append(styler)
@@ -281,18 +374,23 @@ def generate(project: GraphQLProject) -> str:
         plugins=plugins,
         stylers=stylers,
         skip_forwards=gen_config.skip_forwards,
+        log=log,
     )
 
     for styler in parsers:
         generated_ast = styler.parse_ast(generated_ast)
 
-    module = ast.Module(body=generated_ast, type_ignores=[])
-    generated = ast.unparse(ast.fix_missing_locations(module))
+    generated = parse_asts_to_string(generated_ast)
 
     for processor in processors:
         generated = processor.run(generated, gen_config)
 
     return generated
+
+
+def parse_asts_to_string(generated_ast: List[ast.AST]) -> str:
+    module = ast.Module(body=generated_ast, type_ignores=[])
+    return ast.unparse(ast.fix_missing_locations(module))
 
 
 def generate_ast(
@@ -301,6 +399,7 @@ def generate_ast(
     plugins: Optional[List[Plugin]] = None,
     stylers: Optional[List[Styler]] = None,
     skip_forwards: bool = False,
+    log: LogFunction = lambda *args, **kwargs: print,
 ) -> List[ast.AST]:
     """Generates the ast from the schema
 
@@ -321,13 +420,15 @@ def generate_ast(
     stylers = stylers or []
 
     global_tree = []
-    registry = ClassRegistry(config, stylers)
+    registry = ClassRegistry(config, stylers, log)
 
     for plugin in plugins:
         try:
             global_tree += plugin.generate_ast(schema, config, registry)
         except Exception as e:
-            raise GenerationError(f"Plugin:{plugin} failed!") from e
+            raise GenerationError(
+                f"{plugin.__class__.__name__} failed!\n {str(e)}"
+            ) from e
 
     global_tree = (
         registry.generate_imports() + registry.generate_builtins() + global_tree

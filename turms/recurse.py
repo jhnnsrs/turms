@@ -1,4 +1,3 @@
-from xml.dom.expatbuilder import parseFragment
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.language.ast import (
@@ -477,18 +476,14 @@ def recurse_annotation(
 
         if config.freeze.enabled:
             registry.register_import("typing.Tuple")
-            list_builder = lambda x: ast.Subscript(
-                value=ast.Name("Tuple", ctx=ast.Load()),
-                slice=ast.Tuple(elts=[x, ast.Ellipsis()], ctx=ast.Load()),
-                ctx=ast.Load(),
-            )
+            def list_builder(x):
+                return ast.Subscript(value=ast.Name("Tuple", ctx=ast.Load()), slice=ast.Tuple(elts=[x, ast.Ellipsis()], ctx=ast.Load()), ctx=ast.Load())
 
         else:
 
             registry.register_import("typing.List")
-            list_builder = lambda x: ast.Subscript(
-                value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
-            )
+            def list_builder(x):
+                return ast.Subscript(value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load())
 
         if is_optional:
             registry.register_import("typing.Optional")

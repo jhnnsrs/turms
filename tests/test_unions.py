@@ -1,6 +1,4 @@
-import ast
 
-import pytest
 from .utils import build_relative_glob, unit_test_with
 from turms.config import GeneratorConfig
 from turms.run import generate_ast
@@ -15,12 +13,7 @@ from turms.plugins.funcs import (
 )
 from turms.stylers.snake_case import SnakeCaseStyler
 from turms.stylers.capitalize import CapitalizeStyler
-from turms.helpers import build_schema_from_glob
-
-
-@pytest.fixture()
-def union_schema():
-    return build_schema_from_glob(build_relative_glob("/schemas/union.graphql"))
+from turms.run import generate_ast
 
 
 def test_nested_input_funcs(union_schema):
@@ -55,6 +48,7 @@ def test_nested_input_funcs(union_schema):
         ],
     )
 
-    unit_test_with(generated_ast, 'Nana(hallo={"__typename": "Foo","forward": "yes"}).hallo.forward')
-
-
+    unit_test_with(
+        generated_ast,
+        'Nana(hallo={"__typename": "Foo","forward": "yes"}).hallo.forward',
+    )

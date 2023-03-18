@@ -1,6 +1,4 @@
-import ast
 
-import pytest
 from .utils import build_relative_glob, unit_test_with
 from turms.config import GeneratorConfig
 from turms.run import generate_ast
@@ -10,12 +8,7 @@ from turms.plugins.operations import OperationsPlugin
 from turms.plugins.funcs import FuncsPlugin, FuncsPluginConfig, FunctionDefinition
 from turms.plugins.fragments import FragmentsPlugin
 from turms.stylers.default import DefaultStyler
-from turms.helpers import build_schema_from_glob, build_schema_from_introspect_url
-
-
-@pytest.fixture()
-def arkitekt_schema():
-    return build_schema_from_glob(build_relative_glob("/schemas/arkitekt.graphql"))
+from turms.run import generate_ast
 
 
 def test_different_plugin_order(arkitekt_schema):

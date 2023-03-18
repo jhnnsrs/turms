@@ -1,7 +1,5 @@
 from pydantic import Field
 from turms.processors.base import Processor, ProcessorConfig
-from pydantic import BaseModel
-from enum import Enum
 import libcst as cst
 from collections import OrderedDict
 from turms.config import GeneratorConfig
@@ -141,7 +139,6 @@ def merge_code(old_code: str, new_code: str, config: MergeProcessorConfig):
 
     symbols = OrderedDict()
 
-    existing_symbols = set()
     implemented_symbols = []
     new_symbols = set()
 
@@ -211,7 +208,6 @@ def merge_code(old_code: str, new_code: str, config: MergeProcessorConfig):
 
     updated_body = []
     for index, node in enumerate(new_body):
-        print(index)
         if index in beforemap:
             for missingkey in beforemap[index]:
                 updated_body.append(symbols[missingkey])

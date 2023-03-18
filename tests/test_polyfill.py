@@ -1,7 +1,6 @@
 import ast
 import json
 
-import pytest
 from .utils import build_relative_glob
 from turms.config import GeneratorConfig
 from turms.run import generate_ast
@@ -11,18 +10,8 @@ from turms.plugins.fragments import FragmentsPlugin
 from turms.plugins.operations import OperationsPlugin
 from turms.stylers.snake_case import SnakeCaseStyler
 from turms.stylers.capitalize import CapitalizeStyler
-from turms.helpers import build_schema_from_glob
+from turms.run import generate_ast
 from turms.parsers.polyfill import PolyfillParser, PolyfillPluginConfig
-
-
-@pytest.fixture()
-def hello_world_schema():
-    return build_schema_from_glob(build_relative_glob("/schemas/helloworld.graphql"))
-
-
-@pytest.fixture()
-def arkitekt_schema():
-    return build_schema_from_glob(build_relative_glob("/schemas/arkitekt.graphql"))
 
 
 def test_small(hello_world_schema, monkeypatch):
@@ -66,4 +55,3 @@ def test_polyfill_seven(arkitekt_schema, monkeypatch):
     md = ast.Module(body=generated_ast, type_ignores=[])
     generated = ast.unparse(ast.fix_missing_locations(md))
     assert "from typing_extensions import Literal" in generated
-    

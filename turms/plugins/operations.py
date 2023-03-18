@@ -19,7 +19,6 @@ import re
 from graphql import NonNullTypeNode, language
 from turms.registry import ClassRegistry
 from turms.utils import (
-    NoDocumentsFoundError,
     generate_config_class,
     inspect_operation_for_documentation,
     parse_documents,

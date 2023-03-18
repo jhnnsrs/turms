@@ -8,8 +8,8 @@ from pydantic import Field
 from graphql.type.definition import (
     GraphQLEnumType,
 )
-import keyword
-
+from turms.referencer import create_reference_registry_from_documents
+from turms.utils import parse_documents
 from turms.registry import ClassRegistry
 
 
@@ -21,6 +21,7 @@ class EnumsPluginConfig(PluginConfig):
     type = "turms.plugins.enums.EnumsPlugin"
     skip_underscore: bool = False
     skip_double_underscore: bool = True
+    skip_unreferenced: bool = False
     prepend: str = ""
     append: str = ""
 
@@ -43,7 +44,17 @@ def generate_enums(
         if isinstance(value, GraphQLEnumType)
     }
 
+    if plugin_config.skip_unreferenced:
+        ref_registry = create_reference_registry_from_documents(
+            client_schema, parse_documents(client_schema, config.documents)
+        )
+    else:
+        ref_registry = None
+
     for key, type in enum_types.items():
+
+        if ref_registry and key not in ref_registry.enums:
+            continue
 
         if plugin_config.skip_underscore and key.startswith("_"):
             continue

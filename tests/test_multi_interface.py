@@ -1,8 +1,6 @@
-import ast
 
-import pytest
 from turms.config import GeneratorConfig
-from turms.helpers import build_schema_from_glob
+from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.fragments import FragmentsPlugin
 from turms.plugins.funcs import FuncsPlugin, FuncsPluginConfig, FunctionDefinition
@@ -14,13 +12,6 @@ from turms.stylers.default import DefaultStyler
 from turms.stylers.snake_case import SnakeCaseStyler
 
 from .utils import build_relative_glob, unit_test_with
-
-
-@pytest.fixture()
-def multi_interface_schema():
-    return build_schema_from_glob(
-        build_relative_glob("/schemas/multi_interface.graphql")
-    )
 
 
 def test_multi_interface_funcs(multi_interface_schema):

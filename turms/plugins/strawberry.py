@@ -8,13 +8,11 @@ from graphql import (
     GraphQLScalarType,
     GraphQLType,
     GraphQLUnionType,
-    is_wrapping_type,
     Undefined,
     GraphQLArgument,
     ObjectTypeDefinitionNode,
 )
 
-from turms.errors import GenerationError
 from turms.plugins.base import Plugin, PluginConfig
 import ast
 from typing import Dict, List, Protocol, runtime_checkable
@@ -367,9 +365,8 @@ def generate_object_field_annotation(
     if isinstance(graphql_type, GraphQLList):
 
         registry.register_import("typing.List")
-        list_builder = lambda x: ast.Subscript(
-            value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
-        )
+        def list_builder(x):
+            return ast.Subscript(value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load())
 
         if is_optional:
             registry.register_import("typing.Optional")
@@ -507,9 +504,8 @@ def recurse_argument_annotation(
     if isinstance(graphql_type, GraphQLList):
 
         registry.register_import("typing.List")
-        list_builder = lambda x: ast.Subscript(
-            value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
-        )
+        def list_builder(x):
+            return ast.Subscript(value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load())
 
         if is_optional:
             registry.register_import("typing.Optional")
@@ -940,7 +936,7 @@ def generate_scalars(
         key: value
         for key, value in client_schema.type_map.items()
         if isinstance(value, GraphQLScalarType)
-        and not key in plugin_config.builtin_scalars
+        and key not in plugin_config.builtin_scalars
     }
 
     tree = []
