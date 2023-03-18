@@ -325,6 +325,7 @@ def generate(project: GraphQLProject, log: Optional[LogFunction] = None) -> str:
         str: The generated code
     """
     if not log:
+
         def log(x, **kwargs):
             return print(x)
 
@@ -379,13 +380,17 @@ def generate(project: GraphQLProject, log: Optional[LogFunction] = None) -> str:
     for styler in parsers:
         generated_ast = styler.parse_ast(generated_ast)
 
-    module = ast.Module(body=generated_ast, type_ignores=[])
-    generated = ast.unparse(ast.fix_missing_locations(module))
+    generated = parse_asts_to_string(generated_ast)
 
     for processor in processors:
         generated = processor.run(generated, gen_config)
 
     return generated
+
+
+def parse_asts_to_string(generated_ast: List[ast.AST]) -> str:
+    module = ast.Module(body=generated_ast, type_ignores=[])
+    return ast.unparse(ast.fix_missing_locations(module))
 
 
 def generate_ast(
