@@ -52,6 +52,36 @@ def test_run_gen_multiple(tmp_path):
         assert result.exit_code == 0
 
 
+def test_run_gen_display_errors(tmp_path):
+    runner = CliRunner()
+
+    c = build_relative_glob("/configs/test_cli_multi_projects.yaml")
+    country_documents = build_relative_glob("/documents/countries")
+    # nested_input_documents = build_relative_glob("/documents/nested_inputs")
+    # This test is to ensure that the cli will display errors when documents are missing
+    nested_schema = build_relative_glob("/schemas/nested_inputs.graphql")
+
+    # Move config file to temp dir
+
+    with runner.isolated_filesystem(temp_dir=tmp_path) as td:
+
+        schema_dir = os.path.join(td, "schema")
+        graphql_dir = os.path.join(td, "graphql")
+        os.mkdir(schema_dir)
+        os.mkdir(graphql_dir)
+
+        shutil.copyfile(c, os.path.join(td, "graphql.config.yaml"))
+        shutil.copyfile(
+            nested_schema, os.path.join(schema_dir, "nested_inputs.graphql")
+        )
+        shutil.copytree(country_documents, os.path.join(graphql_dir, "countries"))
+
+        result = runner.invoke(cli, ["gen"])
+        print(result.output)
+        assert result.exit_code == 0
+        assert "*.graphql" in result.output
+
+
 def test_run_gen_multiple_but_one(tmp_path):
     runner = CliRunner()
 
@@ -116,3 +146,16 @@ def test_run_download_multiple(tmp_path):
         assert os.path.exists(
             os.path.join(td, "nested_inputs.schema.graphql")
         ), "nested_inputs schema not found"
+
+
+def test_run_init(tmp_path):
+    runner = CliRunner()
+
+    # Move config file to temp dir
+
+    with runner.isolated_filesystem(temp_dir=tmp_path) as td:
+
+        result = runner.invoke(cli, ["init"])
+
+        assert os.path.exists(os.path.join(td, "graphql.config.yaml"))
+        assert result.exit_code == 0
