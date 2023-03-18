@@ -57,7 +57,9 @@ def recurse_find_references(
     registry: ReferenceRegistry,
     is_optional=True,
 ):
-    if isinstance(graphql_type, GraphQLUnionType):
+    if isinstance(
+        graphql_type, (GraphQLUnionType, GraphQLObjectType, GraphQLInterfaceType)
+    ):
 
         for sub_node in node.selection_set.selections:
 
@@ -77,85 +79,6 @@ def recurse_find_references(
 
                         field_type = sub_sub_node_type.fields[sub_sub_node.name.value]
                         return recurse_find_references(
-                            sub_sub_node,
-                            field_type.type,
-                            client_schema,
-                            registry,
-                        )
-
-    elif isinstance(graphql_type, GraphQLInterfaceType):
-        # Lets Create Base Class to Inherit from for this
-
-        for sub_node in node.selection_set.selections:
-
-            if isinstance(sub_node, FieldNode):
-                if sub_node.name.value == "__typename":
-                    continue
-
-                field_type = graphql_type.fields[sub_node.name.value]
-                recurse_find_references(
-                    sub_node,
-                    field_type.type,
-                    client_schema,
-                    registry,
-                )
-
-            if isinstance(sub_node, FragmentSpreadNode):
-                registry.register_fragment(sub_node.name.value)
-
-            if isinstance(sub_node, InlineFragmentNode):
-
-                for sub_sub_node in sub_node.selection_set.selections:
-
-                    if isinstance(sub_sub_node, FieldNode):
-                        sub_sub_node_type = client_schema.get_type(
-                            sub_node.type_condition.name.value
-                        )
-
-                        if sub_sub_node.name.value == "__typename":
-                            continue
-
-                        field_type = sub_sub_node_type.fields[sub_sub_node.name.value]
-                        recurse_find_references(
-                            sub_sub_node,
-                            field_type.type,
-                            client_schema,
-                            registry,
-                        )
-
-    elif isinstance(graphql_type, GraphQLObjectType):
-
-        for sub_node in node.selection_set.selections:
-
-            if isinstance(sub_node, FieldNode):
-                if sub_node.name.value == "__typename":
-                    continue
-
-                field_type = graphql_type.fields[sub_node.name.value]
-                recurse_find_references(
-                    sub_node,
-                    field_type.type,
-                    client_schema,
-                    registry,
-                )
-
-            if isinstance(sub_node, FragmentSpreadNode):
-                registry.register_fragment(sub_node.name.value)
-
-            if isinstance(sub_node, InlineFragmentNode):
-
-                for sub_sub_node in sub_node.selection_set.selections:
-
-                    if isinstance(sub_sub_node, FieldNode):
-                        sub_sub_node_type = client_schema.get_type(
-                            sub_node.type_condition.name.value
-                        )
-
-                        if sub_sub_node.name.value == "__typename":
-                            continue
-
-                        field_type = sub_sub_node_type.fields[sub_sub_node.name.value]
-                        recurse_find_references(
                             sub_sub_node,
                             field_type.type,
                             client_schema,
