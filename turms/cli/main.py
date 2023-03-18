@@ -140,7 +140,7 @@ def with_projects(func):
     return wrapper
 
 
-def watch_projects(projects, title="Turms"):
+def watch_projects(projects, title="Turms"):  # pragma: no cover
     if len(projects) > 1:
         raise click.ClickException(
             "Watching multiple projects is not supported. Please specify a single project!"
@@ -239,7 +239,7 @@ def gen(projects):
 
 @cli.command()
 @with_projects
-def watch(projects):
+def watch(projects):  # pragma: no cover
     """Watch the graphql project"""
     watch_projects(projects)
 
