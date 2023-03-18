@@ -23,7 +23,6 @@ from graphql.language.ast import (
     FragmentSpreadNode,
     InlineFragmentNode,
 )
-from turms.utils import parse_documents
 
 
 class ReferenceRegistry:

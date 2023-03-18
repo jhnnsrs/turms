@@ -1,12 +1,9 @@
-import argparse
 from enum import Enum
 import os
 from turms.run import generate, write_code_to_file
 from rich import get_console
-from rich.prompt import Prompt
 from rich.panel import Panel
 from rich.live import Live
-from rich.layout import Layout
 from rich.tree import Tree
 from rich.console import Group
 import rich_click as click
@@ -172,7 +169,7 @@ def watch_projects(projects, title="Turms"):
             live.update(panel)
 
             try:
-                tree.renderable = f"Generating..."
+                tree.renderable = "Generating..."
                 tree.border_style = "blue"
                 tree.style = "blue"
                 live.update(panel)
@@ -187,7 +184,7 @@ def watch_projects(projects, title="Turms"):
                     project.extensions.turms.generated_name,
                 )
 
-                tree.renderable = f"Generation Successfull"
+                tree.renderable = "Generation Successfull"
                 tree.border_style = "green"
                 tree.style = "green"
                 live.update(panel)

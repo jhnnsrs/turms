@@ -9,7 +9,6 @@ from turms.errors import (
     RegistryError,
 )
 from turms.stylers.base import Styler
-from rich import get_console
 
 SCALAR_DEFAULTS = {
     "ID": "str",

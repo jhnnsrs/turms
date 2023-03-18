@@ -53,6 +53,7 @@ turms = "turms.cli.main:entrypoint"
 
 [tool.poetry.group.dev.dependencies]
 libcst = "^0.4.9"
+ruff = "^0.0.257"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

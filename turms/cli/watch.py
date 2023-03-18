@@ -1,4 +1,4 @@
-from watchfiles.filters import BaseFilter, PythonFilter
+from watchfiles.filters import BaseFilter
 from watchfiles import watch
 import os
 

@@ -325,7 +325,8 @@ def generate(project: GraphQLProject, log: Optional[LogFunction] = None) -> str:
         str: The generated code
     """
     if not log:
-        log = lambda x, **kwargs: print(x)
+        def log(x, **kwargs):
+            return print(x)
 
     gen_config = project.extensions.turms
 
