@@ -2,6 +2,7 @@ import builtins
 from pydantic import AnyHttpUrl, BaseModel, BaseSettings, Field, validator
 from typing import Any, Dict, List, Optional, Union, Protocol, Literal, runtime_checkable
 from turms.helpers import import_string
+from graphql import DirectiveLocation
 from enum import Enum
 
 
@@ -10,7 +11,6 @@ class ConfigProxy(BaseModel):
 
     class Config:
         extra = "allow"
-
 
 class ImportableFunctionMixin(Protocol):
     @classmethod
@@ -70,6 +70,10 @@ class LogFunction(Protocol):
 
     def __call__(self, message, level: LogLevel = LogLevel.INFO):
         pass
+
+@runtime_checkable
+class DirectiveFunction(ImportableFunctionMixin, Protocol):
+    pass
 
 
 class FreezeConfig(BaseSettings):
@@ -157,6 +161,25 @@ class OptionsConfig(BaseSettings):
     )
     """The types to freeze"""
 
+DescriptionLocation = Literal["field", "docstring", "both"]
+ArgType = Literal["string", "int", "float"]
+
+class TurmsDirective(BaseModel):
+    """A directive resolver"""
+
+    type: DirectiveFunction
+    """The type of the resolver"""
+    locations: List[DirectiveLocation] = Field(
+        [], description="The location of the directive"
+    )
+    args: Optional[Dict[str, ArgType]] = Field(
+        default_factory=dict, description="The arguments of the directive"
+    )
+
+    
+
+
+
 
 class GeneratorConfig(BaseSettings):
     """Configuration for the generator
@@ -183,6 +206,13 @@ class GeneratorConfig(BaseSettings):
     allow_introspection: bool = True
     """Allow introspection queries"""
 
+    description: DescriptionLocation = "docstring"
+    turms_directives: Dict[str, TurmsDirective] = Field(
+        default_factory=dict,
+        description="Mapping directives to a resolver e.g @upper: path.to.upper_resolver, @lower: path.to.lower_resolver",
+    )
+
+
     object_bases: List[str] = ["pydantic.BaseModel"]
     """The base classes for the generated objects. This is useful if you want to change the base class from BaseModel to something else"""
 
@@ -192,7 +222,14 @@ class GeneratorConfig(BaseSettings):
     """Always resolve interfaces to concrete types"""
     exclude_typenames: bool = False
     """Exclude __typename from generated models when calling dict or json"""
-
+    default_factories: Dict[str, PythonType] = Field(
+        default_factory=dict,
+        description="Mapping arguments to a default factories e.g ID: uuid.uuid4, Date: datetime.date.today, if you want to generated a default value for a list of a Type you can use standard graphql syntax like [Date]: path.to.list.factory",
+    )
+    argument_validators: Dict[str, PythonType] = Field(
+        default_factory=dict,
+        description="Will generate a validator for arguments that will always be called. This is useful for validating arguments that are not part of the schema. e.g. ID: path.to.validator",
+    )
     scalar_definitions: Dict[str, PythonType] = Field(
         default_factory=dict,
         description="Additional config for mapping scalars to python types (e.g. ID: str). Can use dotted paths to import types from other modules.",

@@ -35,6 +35,9 @@ from turms.errors import (
     NoInputTypeFound,
     NoScalarFound,
 )
+from copy import copy
+
+from graphql import NonNullTypeNode, language
 from .config import GraphQLTypes
 import re
 
@@ -337,6 +340,28 @@ def interface_is_extended_by_other_interfaces(
     return interface in interfaces_implemented_by_other_interfaces
 
 
+def print_operation(operation: OperationDefinitionNode, config: GeneratorConfig, registry: ClassRegistry) -> str:
+
+    directive_resolvers = list(config.turms_directives.keys())
+    
+    new_variables = []
+    for variable in operation.variable_definitions:
+        new_variable = copy(variable)
+        if variable.directives:
+            new_variable.directives = tuple(dir for dir in variable.directives if dir.name.value not in directive_resolvers)
+        new_variables.append(new_variable)
+
+    new_operation = copy(operation)
+    new_operation.variable_definitions = tuple(new_variables)
+
+
+    query_document = language.print_ast(new_operation)
+    return replace_iteratively(query_document, registry)
+
+
+
+
+
 def recurse_type_annotation(
     type: NamedTypeNode,
     registry: ClassRegistry,
@@ -378,7 +403,7 @@ def recurse_type_annotation(
         else:
             try:
                 x = registry.reference_scalar(type.name.value)
-            except NoScalarFound:
+            except NoScalarFound as scalar_error:
                 try:
                     x = registry.reference_inputtype(
                         type.name.value, "", allow_forward=False
@@ -389,7 +414,7 @@ def recurse_type_annotation(
                             type.name.value, "", allow_forward=False
                         )
                     except NoEnumFound:
-                        raise NotImplementedError("Not implemented")
+                        raise NotImplementedError("Could not find correspondig Type for " + type.name.value) from scalar_error
 
         if not x:
             raise Exception(f"Could not set value for {type}")
