@@ -76,6 +76,9 @@ def generate_projects(projects, title="Turms"):
         border_style="green",
         padding=(1, 1),
     )
+
+    raised_exceptions = []
+
     with Live(panel, screen=False) as live:
         for key, project in projects.items():
 
@@ -103,7 +106,14 @@ def generate_projects(projects, title="Turms"):
                 project_tree.style = "red"
                 project_tree.label = f"{key} 💥"
                 project_tree.add(Tree(str(e), style="red"))
+                if project.extensions.turms.exit_on_error:
+                    raised_exceptions.append(e)
                 live.update(panel)
+
+    if raised_exceptions:
+        raise click.ClickException(
+            "One or more projects failed to generate. First error"
+        ) from raised_exceptions[0]
 
 
 def with_projects(func):
@@ -160,6 +170,7 @@ def watch_projects(projects, title="Turms"):  # pragma: no cover
         border_style="green",
         padding=(1, 1),
     )
+
     with Live(panel, screen=False) as live:
 
         tree.renderable = f"Watching {project.documents}..."

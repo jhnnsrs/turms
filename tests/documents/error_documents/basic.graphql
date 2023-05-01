@@ -1,0 +1,9 @@
+# Write your query or mutation here
+query FaultyConuntries {
+  countries {
+    phone
+    capital
+    thisWillError
+    emojiU
+  }
+}
