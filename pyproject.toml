@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "turms"
-version = "0.3.1a0"
+version = "0.4.1"
 description = "graphql-codegen powered by pydantic"
 authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
 license = "CC BY-NC 3.0"
@@ -49,7 +49,7 @@ isort = ["isort"]
 merge = ["libcst"]
 
 [tool.poetry.scripts]
-turms = "turms.cli.main:entrypoint"
+turms = "turms.cli.main:cli"
 
 [tool.poetry.group.dev.dependencies]
 libcst = "^0.4.9"
