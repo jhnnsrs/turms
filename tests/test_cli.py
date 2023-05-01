@@ -160,19 +160,6 @@ def test_run_init(tmp_path):
         assert result.exit_code == 0
 
 
-def test_run_init(tmp_path):
-    runner = CliRunner()
-
-    # Move config file to temp dir
-
-    with runner.isolated_filesystem(temp_dir=tmp_path) as td:
-
-        result = runner.invoke(cli, ["init"])
-
-        assert os.path.exists(os.path.join(td, "graphql.config.yaml"))
-        assert result.exit_code == 0
-
-
 def test_run_error_code(tmp_path):
     runner = CliRunner()
 
