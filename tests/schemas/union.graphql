@@ -13,4 +13,5 @@ union Element = Foo | Bar
 
 type Query {
   hallo: Element
+  x: Element!
 }
