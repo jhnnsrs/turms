@@ -188,3 +188,20 @@ def test_run_error_code(tmp_path):
 
         result = runner.invoke(cli, ["gen"])
         assert result.exit_code == 1
+
+
+def test_run_no_error_code(tmp_path):
+    runner = CliRunner()
+
+    c = build_relative_glob("/configs/test_cli_no_error.yaml")
+    d = build_relative_glob("/documents/error_documents")
+
+    # Move config file to temp dir
+
+    with runner.isolated_filesystem(temp_dir=tmp_path) as td:
+
+        shutil.copyfile(c, os.path.join(td, "graphql.config.yaml"))
+        shutil.copytree(d, os.path.join(td, "graphql"))
+
+        result = runner.invoke(cli, ["gen"])
+        assert result.exit_code == 0
