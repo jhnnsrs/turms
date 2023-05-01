@@ -1,6 +1,15 @@
 import builtins
 from pydantic import AnyHttpUrl, BaseModel, BaseSettings, Field, validator
-from typing import Any, Dict, List, Optional, Union, Protocol, Literal, runtime_checkable
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    Union,
+    Protocol,
+    Literal,
+    runtime_checkable,
+)
 from turms.helpers import import_string
 from enum import Enum
 
@@ -65,9 +74,9 @@ class LogLevel(str, Enum):
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
 
+
 @runtime_checkable
 class LogFunction(Protocol):
-
     def __call__(self, message, level: LogLevel = LogLevel.INFO):
         pass
 
@@ -179,6 +188,9 @@ class GeneratorConfig(BaseSettings):
     """The documents to parse. Setting this will overwrite the documents in the graphql config"""
     verbose: bool = False
     """Enable verbose logging"""
+
+    exit_on_error: bool = True
+    """Will cause a sys.exit(1) if an error occurs"""
 
     allow_introspection: bool = True
     """Allow introspection queries"""

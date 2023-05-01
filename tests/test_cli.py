@@ -77,8 +77,7 @@ def test_run_gen_display_errors(tmp_path):
         shutil.copytree(country_documents, os.path.join(graphql_dir, "countries"))
 
         result = runner.invoke(cli, ["gen"])
-        print(result.output)
-        assert result.exit_code == 0
+        assert result.exit_code == 1
         assert "*.graphql" in result.output
 
 
@@ -158,4 +157,38 @@ def test_run_init(tmp_path):
         result = runner.invoke(cli, ["init"])
 
         assert os.path.exists(os.path.join(td, "graphql.config.yaml"))
+        assert result.exit_code == 0
+
+
+def test_run_error_code(tmp_path):
+    runner = CliRunner()
+
+    c = build_relative_glob("/configs/test_cli.yaml")
+    d = build_relative_glob("/documents/error_documents")
+
+    # Move config file to temp dir
+
+    with runner.isolated_filesystem(temp_dir=tmp_path) as td:
+
+        shutil.copyfile(c, os.path.join(td, "graphql.config.yaml"))
+        shutil.copytree(d, os.path.join(td, "graphql"))
+
+        result = runner.invoke(cli, ["gen"])
+        assert result.exit_code == 1
+
+
+def test_run_no_error_code(tmp_path):
+    runner = CliRunner()
+
+    c = build_relative_glob("/configs/test_cli_no_error.yaml")
+    d = build_relative_glob("/documents/error_documents")
+
+    # Move config file to temp dir
+
+    with runner.isolated_filesystem(temp_dir=tmp_path) as td:
+
+        shutil.copyfile(c, os.path.join(td, "graphql.config.yaml"))
+        shutil.copytree(d, os.path.join(td, "graphql"))
+
+        result = runner.invoke(cli, ["gen"])
         assert result.exit_code == 0
