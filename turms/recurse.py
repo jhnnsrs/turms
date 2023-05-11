@@ -350,6 +350,14 @@ def recurse_annotation(
                     ctx=ast.Load(),
                 )
         else:
+            if is_optional:
+                registry.register_import("typing.Optional")
+
+                return ast.Subscript(
+                    value=ast.Name("Optional", ctx=ast.Load()),
+                    slice=ast.Name(id=union_class_names[0], ctx=ast.Load()),
+                    ctx=ast.Load(),
+                )
             return ast.Name(id=union_class_names[0], ctx=ast.Load())
 
     if isinstance(type, GraphQLObjectType):
