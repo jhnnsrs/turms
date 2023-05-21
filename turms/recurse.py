@@ -268,6 +268,10 @@ def recurse_annotation(
                     )
                 ]
 
+                additional_bases = get_additional_bases_for_type(
+                    sub_node.type_condition.name.value, config, registry
+                )
+
                 for sub_sub_node in sub_node.selection_set.selections:
 
                     if isinstance(sub_sub_node, FieldNode):
@@ -289,9 +293,11 @@ def recurse_annotation(
                             registry,
                         )
 
-                additional_bases = get_additional_bases_for_type(
-                    sub_node.type_condition.name.value, config, registry
-                )
+                    elif isinstance(sub_sub_node, FragmentSpreadNode):
+                        additional_bases.append(registry.reference_fragment(
+                            sub_sub_node.name.value, parent
+                        ))
+
                 cls = ast.ClassDef(
                     inline_fragment_name,
                     bases=additional_bases
@@ -343,6 +349,14 @@ def recurse_annotation(
                     ctx=ast.Load(),
                 )
         else:
+            if is_optional:
+                registry.register_import("typing.Optional")
+
+                return ast.Subscript(
+                    value=ast.Name("Optional", ctx=ast.Load()),
+                    slice=ast.Name(id=union_class_names[0], ctx=ast.Load()),
+                    ctx=ast.Load(),
+                )
             return ast.Name(id=union_class_names[0], ctx=ast.Load())
 
     if isinstance(type, GraphQLObjectType):
