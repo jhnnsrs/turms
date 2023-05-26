@@ -103,6 +103,7 @@ def generate_projects(projects, title="Turms"):
                 )
 
             except Exception as e:
+                get_console().print_exception()
                 project_tree.style = "red"
                 project_tree.label = f"{key} 💥"
                 project_tree.add(Tree(str(e), style="red"))

@@ -532,6 +532,7 @@ def recurse_annotation(
             )
 
 
+
 def type_field_node(
     node: FieldNode,
     parent: str,
@@ -563,7 +564,26 @@ def type_field_node(
     target = target_from_node(node)
     field_name = registry.generate_node_name(target)
 
+    potential_comment = (
+        field.description
+        if not field.deprecation_reason
+        else f"DEPRECATED {field.deprecation_reason}: : {field.description} "
+    )
+
+    keywords = []
+
+    if field.deprecation_reason:
+        registry.warn(
+            f"Field {node.name.value} on {parent} is deprecated: {field.deprecation_reason}"
+        )
+
+    if config.description == "both" or config.description == "field" and potential_comment:
+        keywords.append(ast.keyword(arg="description", value=ast.Constant(value=potential_comment)))
+
     if target != field_name:
+        keywords.append(ast.keyword(arg="alias", value=ast.Constant(value=target)))
+
+    if keywords:
         registry.register_import("pydantic.Field")
         assign = ast.AnnAssign(
             target=ast.Name(field_name, ctx=ast.Store()),
@@ -580,7 +600,7 @@ def type_field_node(
             value=ast.Call(
                 func=ast.Name(id="Field", ctx=ast.Load()),
                 args=[],
-                keywords=[ast.keyword(arg="alias", value=ast.Constant(value=target))],
+                keywords=keywords,
             ),
             simple=1,
         )
@@ -600,18 +620,9 @@ def type_field_node(
             simple=1,
         )
 
-    potential_comment = (
-        field.description
-        if not field.deprecation_reason
-        else f"DEPRECATED {field.deprecation_reason}: : {field.description} "
-    )
+    
 
-    if field.deprecation_reason:
-        registry.warn(
-            f"Field {node.name.value} on {parent} is deprecated: {field.deprecation_reason}"
-        )
-
-    if potential_comment:
+    if config.description == "both" or config.description == "docstring" and potential_comment:
         return [assign, ast.Expr(value=ast.Constant(value=potential_comment))]
 
     return [assign]

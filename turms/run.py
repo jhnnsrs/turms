@@ -3,7 +3,7 @@ import os
 from typing import Dict, List, Optional, Callable
 
 import yaml
-from graphql import GraphQLSchema, parse, build_ast_schema, build_client_schema
+from graphql import GraphQLSchema, parse, build_ast_schema, build_client_schema, GraphQLDirective, DirectiveLocation, print_schema, GraphQLArgument, GraphQLString, GraphQLInt
 from pydantic import AnyHttpUrl, ValidationError
 from rich import get_console
 
@@ -306,6 +306,44 @@ def build_schema_from_schema_type(
     raise GenerationError("Could not build schema with type " + str(type(schema)))
 
 
+
+
+
+def expand_schema(schema: GraphQLSchema, project: GraphQLProject) -> GraphQLSchema:
+    """Expands a schema with the schema extensions
+
+    Args:
+        schema (GraphQLSchema): The schema
+        project (GraphQLProject): The project
+
+    Returns:
+        GraphQLSchema: The expanded schema
+    """
+    additional_directives = []
+    for key, directive in project.extensions.turms.turms_directives.items():
+
+        additional_directives.append(GraphQLDirective(
+            name=key,
+            locations=directive.locations,
+            args={
+                arg: GraphQLArgument(
+                    GraphQLString if value == "string" else GraphQLInt,
+                    description="A custom argument for the directive. Faked for now.",
+                )
+                for arg, value in directive.args.items()
+            },
+            description="Marks an element of a GraphQL schema as no longer supported.",
+        ))
+
+
+    schema.directives = tuple(additional_directives) + schema.directives
+
+
+    return schema
+
+    
+
+
 def generate(project: GraphQLProject, log: Optional[LogFunction] = None) -> str:
     """Genrates the code according to the configugration
 
@@ -335,6 +373,7 @@ def generate(project: GraphQLProject, log: Optional[LogFunction] = None) -> str:
         project.schema_url,
         allow_introspection=project.extensions.turms.allow_introspection,
     )
+    scehma = expand_schema(schema, project)
 
     gen_config.documents = gen_config.documents or project.documents
     verbose = gen_config.verbose

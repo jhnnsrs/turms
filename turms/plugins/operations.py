@@ -10,6 +10,9 @@ from graphql.language.ast import (
     FieldNode,
     OperationDefinitionNode,
     OperationType,
+    VariableDefinitionNode,
+    NamedTypeNode,
+    ListTypeNode,
 )
 from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.utilities.get_operation_root_type import get_operation_root_type
@@ -27,7 +30,7 @@ from turms.utils import (
     parse_value_node,
 )
 import logging
-
+from turms.utils import print_operation
 
 logger = logging.getLogger(__name__)
 fragment_searcher = re.compile(r"\.\.\.(?P<fragment>[a-zA-Z]*)")
@@ -143,6 +146,15 @@ def get_subscription_bases(
             ]
 
 
+def represent_variable_definition(x: VariableDefinitionNode)-> str:
+    if isinstance(x, NamedTypeNode):
+        return x.name.value
+    if isinstance(x, NonNullTypeNode):
+        return f"{represent_variable_definition(x.type)}!"
+    if isinstance(x, ListTypeNode):
+        return f"[{represent_variable_definition(x.type)}]"
+    raise Exception(f"Unknown type {type(x)}")
+
 def generate_operation(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
@@ -197,16 +209,48 @@ def generate_operation(
             ),
         ]
 
-    query_document = language.print_ast(o)
-    merged_document = replace_iteratively(query_document, registry)
+    merged_document = print_operation(o, config, registry)
 
     if plugin_config.create_arguments:
 
         arguments_body = []
+        validators_body = []
 
         for v in o.variable_definitions:
-            if isinstance(v.type, NonNullTypeNode) and not v.default_value:
-                arguments_body += [
+
+            variable_def_body = []
+
+            type = v.type
+
+            keywords = []
+
+            if v.default_value:
+                keywords.append(ast.keyword(arg="default", value=ast.Constant(v.default_value.value, ctx=ast.Load())))
+                
+
+            if keywords:
+                registry.register_import("pydantic.Field")
+                variable_def_body += [
+                    ast.AnnAssign(
+                        target=ast.Name(
+                            id=registry.generate_parameter_name(v.variable.name.value),
+                            ctx=ast.Store(),
+                        ),
+                        annotation=recurse_type_annotation(
+                            v.type,
+                            registry,
+                        ),
+                        value=ast.Call(
+                            func=ast.Name(id="Field", ctx=ast.Load()),
+                            args=[],
+                            keywords=keywords,
+                        ),
+                        simple=1,
+                    )
+                ]
+                
+            else:
+                variable_def_body += [
                     ast.AnnAssign(
                         target=ast.Name(
                             id=registry.generate_parameter_name(v.variable.name.value),
@@ -217,25 +261,20 @@ def generate_operation(
                     )
                 ]
 
-            if not isinstance(v.type, NonNullTypeNode) or v.default_value:
-                arguments_body += [
-                    ast.AnnAssign(
-                        target=ast.Name(
-                            id=registry.generate_parameter_name(v.variable.name.value),
-                            ctx=ast.Store(),
-                        ),
-                        annotation=recurse_type_annotation(
-                            v.type,
-                            registry,
-                        ),
-                        value=ast.Constant(
-                            value=parse_value_node(v.default_value)
-                            if v.default_value
-                            else None
-                        ),
-                        simple=1,
+            for directive in v.directives:
+                directive_name = directive.name.value
+                directive_def = registry.get_directive(directive_name)
+                if directive_def:
+                    variable_def_body = directive_def.type(
+                        v,
+                        variable_def_body,
+                        registry,
+                        **{arg.name.value: arg.value.value for arg in directive.arguments}
                     )
-                ]
+                    
+            arguments_body += variable_def_body
+
+        arguments_body += validators_body
 
         class_body_fields += [
             ast.ClassDef(

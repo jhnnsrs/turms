@@ -1,6 +1,6 @@
 import ast
-from typing import Dict, List
-from turms.config import GeneratorConfig, LogFunction
+from typing import Dict, List, Optional
+from turms.config import GeneratorConfig, LogFunction, TurmsDirective
 from keyword import iskeyword
 from turms.errors import (
     NoEnumFound,
@@ -84,6 +84,9 @@ class ClassRegistry(object):
         self.config = config
 
         self.scalar_map = {**SCALAR_DEFAULTS, **config.scalar_definitions}
+        self.factory_map = config.default_factories
+        self.validator_map = config.argument_validators
+        self.directive_map = config.turms_directives
 
         self.fragment_document_map = {}
 
@@ -103,6 +106,25 @@ class ClassRegistry(object):
 
         self.interfacefragments_class_map = {}
         self.log = log
+
+    def get_default_factory(self, typename: str) -> Optional[str]:
+        if typename in self.factory_map:
+            factory = self.factory_map[typename]
+            self.register_import(factory)
+            return factory.split(".")[-1]
+        
+    def get_validator(self, typename: str) -> Optional[str]:
+        if typename in self.validator_map:
+            factory = self.validator_map[typename]
+            self.register_import(factory)
+            return factory.split(".")[-1]
+        
+    def get_directive(self, directive_name: str) -> Optional[TurmsDirective]:
+        if directive_name in self.directive_map:
+            return self.directive_map[directive_name]
+    
+
+
 
     def style_inputtype_class(self, typename: str):
         for styler in self.stylers:
