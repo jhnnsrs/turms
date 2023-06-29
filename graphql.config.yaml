@@ -1,4 +1,3 @@
-
 projects:
   default:
     schema: https://countries.trevorblades.com/
@@ -12,6 +11,36 @@ projects:
           - type: turms.plugins.fragments.FragmentsPlugin
           - type: turms.plugins.operations.OperationsPlugin
           - type: turms.plugins.funcs.FuncsPlugin
+        processors:
+          - type: turms.processors.black.BlackProcessor
+        scalar_definitions:
+          uuid: str
+  beast:
+    schema: tests/schemas/beasts.graphql
+    documents: tests/documents/beasts/**.graphql
+    extensions:
+      turms:
+        out_dir: gg
+        plugins:
+          - type: turms.plugins.enums.EnumsPlugin
+          - type: turms.plugins.inputs.InputsPlugin
+          - type: turms.plugins.fragments.FragmentsPlugin
+          - type: turms.plugins.operations.OperationsPlugin
+          - type: turms.plugins.funcs.FuncsPlugin
+          - type: turms.plugins.funcs.FuncsPlugin
+            global_args:
+              - type: gql.client.AsyncClientSession
+                key: client
+            definitions:
+              - type: query
+                use: api.proxies.execute
+                is_async: True
+              - type: mutation
+                use: api.proxies.execute
+                is_async: True
+        stylers:
+          - type: turms.stylers.capitalize.CapitalizeStyler
+          - type: turms.stylers.snake_case.SnakeCaseStyler
         processors:
           - type: turms.processors.black.BlackProcessor
         scalar_definitions:

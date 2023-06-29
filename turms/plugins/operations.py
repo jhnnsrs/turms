@@ -52,7 +52,6 @@ def get_query_bases(
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
 ):
-
     if plugin_config.query_bases:
         for base in plugin_config.query_bases:
             registry.register_import(base)
@@ -76,7 +75,6 @@ def get_mutation_bases(
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
 ):
-
     if plugin_config.mutation_bases:
         for base in plugin_config.mutation_bases:
             registry.register_import(base)
@@ -100,7 +98,6 @@ def get_arguments_bases(
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
 ):
-
     if plugin_config.arguments_bases:
         for base in plugin_config.arguments_bases:
             registry.register_import(base)
@@ -124,7 +121,6 @@ def get_subscription_bases(
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
 ):
-
     if plugin_config.subscription_bases:
         for base in plugin_config.subscription_bases:
             registry.register_import(base)
@@ -150,7 +146,6 @@ def generate_operation(
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
 ):
-
     tree = []
     assert o.name.value, "Operation names are required"
 
@@ -201,41 +196,83 @@ def generate_operation(
     merged_document = replace_iteratively(query_document, registry)
 
     if plugin_config.create_arguments:
-
         arguments_body = []
 
         for v in o.variable_definitions:
-            if isinstance(v.type, NonNullTypeNode) and not v.default_value:
-                arguments_body += [
-                    ast.AnnAssign(
-                        target=ast.Name(
-                            id=registry.generate_parameter_name(v.variable.name.value),
-                            ctx=ast.Store(),
-                        ),
-                        annotation=recurse_type_annotation(v.type, registry),
-                        simple=1,
-                    )
-                ]
+            is_optional = not isinstance(v.type, NonNullTypeNode) or v.default_value
+            annotation = recurse_type_annotation(v.type, registry)
+            field_name = registry.generate_parameter_name(v.variable.name.value)
+            target = v.variable.name.value
 
-            if not isinstance(v.type, NonNullTypeNode) or v.default_value:
-                arguments_body += [
-                    ast.AnnAssign(
-                        target=ast.Name(
-                            id=registry.generate_parameter_name(v.variable.name.value),
-                            ctx=ast.Store(),
-                        ),
-                        annotation=recurse_type_annotation(
-                            v.type,
-                            registry,
-                        ),
-                        value=ast.Constant(
-                            value=parse_value_node(v.default_value)
-                            if v.default_value
-                            else None
+            if target != field_name:
+                registry.register_import("pydantic.Field")
+                if is_optional:
+                    assign = ast.AnnAssign(
+                        target=ast.Name(field_name, ctx=ast.Store()),
+                        annotation=annotation,
+                        value=ast.Call(
+                            func=ast.Name(id="Field", ctx=ast.Load()),
+                            args=[],
+                            keywords=[
+                                ast.keyword(
+                                    arg="alias", value=ast.Constant(value=target)
+                                ),
+                                ast.keyword(
+                                    arg="default",
+                                    value=ast.Constant(
+                                        value=parse_value_node(v.default_value)
+                                        if v.default_value
+                                        else None
+                                    ),
+                                ),
+                            ],
                         ),
                         simple=1,
                     )
-                ]
+                else:
+                    assign = ast.AnnAssign(
+                        target=ast.Name(field_name, ctx=ast.Store()),
+                        annotation=annotation,
+                        value=ast.Call(
+                            func=ast.Name(id="Field", ctx=ast.Load()),
+                            args=[],
+                            keywords=[
+                                ast.keyword(
+                                    arg="alias", value=ast.Constant(value=target)
+                                )
+                            ],
+                        ),
+                        simple=1,
+                    )
+            else:
+                if is_optional:
+                    assign = ast.AnnAssign(
+                        target=ast.Name(field_name, ctx=ast.Store()),
+                        annotation=annotation,
+                        value=ast.Call(
+                            func=ast.Name(id="Field", ctx=ast.Load()),
+                            args=[],
+                            keywords=[
+                                ast.keyword(
+                                    arg="default",
+                                    value=ast.Constant(
+                                        value=parse_value_node(v.default_value)
+                                        if v.default_value
+                                        else None
+                                    ),
+                                ),
+                            ],
+                        ),
+                        simple=1,
+                    )
+                else:
+                    assign = ast.AnnAssign(
+                        target=ast.Name(field_name, ctx=ast.Store()),
+                        annotation=annotation,
+                        simple=1,
+                    )
+
+            arguments_body += [assign]
 
         class_body_fields += [
             ast.ClassDef(
@@ -299,7 +336,6 @@ class OperationsPlugin(Plugin):
         config: GeneratorConfig,
         registry: ClassRegistry,
     ) -> List[ast.AST]:
-
         plugin_tree = []
 
         documents = parse_documents(
