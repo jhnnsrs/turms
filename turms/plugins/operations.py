@@ -42,6 +42,7 @@ class OperationsPluginConfig(PluginConfig):
     operations_glob: Optional[str]
     create_arguments: bool = True
     extract_documentation: bool = True
+    arguments_allow_population_by_field_name: bool = False
 
     class Config:
         env_prefix = "TURMS_PLUGINS_OPERATIONS_"
@@ -91,6 +92,38 @@ def get_mutation_bases(
                 ast.Name(id=base.split(".")[-1], ctx=ast.Load())
                 for base in config.object_bases
             ]
+
+
+def generate_arguments_config(
+    operation: OperationDefinitionNode,
+    config: GeneratorConfig,
+    plugin_config: OperationsPluginConfig,
+    registry: ClassRegistry,
+):
+    config_fields = []
+
+    if plugin_config.arguments_allow_population_by_field_name:
+        config_fields.append(
+            ast.Assign(
+                targets=[
+                    ast.Name(id="allow_population_by_field_name", ctx=ast.Store())
+                ],
+                value=ast.Constant(value=True),
+            )
+        )
+
+    if len(config_fields) > 0:
+        return [
+            ast.ClassDef(
+                name="Config",
+                bases=[],
+                keywords=[],
+                body=config_fields,
+                decorator_list=[],
+            )
+        ]
+    else:
+        return []
 
 
 def get_arguments_bases(
@@ -273,6 +306,10 @@ def generate_operation(
                     )
 
             arguments_body += [assign]
+
+        arguments_body + generate_arguments_config(
+            o.operation, config, plugin_config, registry
+        )
 
         class_body_fields += [
             ast.ClassDef(

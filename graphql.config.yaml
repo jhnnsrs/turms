@@ -26,8 +26,9 @@ projects:
           - type: turms.plugins.inputs.InputsPlugin
           - type: turms.plugins.fragments.FragmentsPlugin
           - type: turms.plugins.operations.OperationsPlugin
+            arguments_allow_population_by_field_name: True
           - type: turms.plugins.funcs.FuncsPlugin
-          - type: turms.plugins.funcs.FuncsPlugin
+            argument_key_is_styled: True
             global_args:
               - type: gql.client.AsyncClientSession
                 key: client

@@ -69,6 +69,7 @@ class FuncsPluginConfig(PluginConfig):
     global_kwargs: List[Kwarg] = []
     definitions: List[FunctionDefinition] = []
     extract_documentation: bool = True
+    argument_key_is_styled: bool = False
 
     class Config:
         env_prefix = "TURMS_PLUGINS_FUNCS_"
@@ -85,7 +86,6 @@ def generate_async_func_name(
     config: GeneratorConfig,
     registry: ClassRegistry,
 ):
-
     return f"{plugin_config.prepend_async}{camel_to_snake(o.name.value)}"
 
 
@@ -95,7 +95,6 @@ def generate_sync_func_name(
     config: GeneratorConfig,
     registry: ClassRegistry,
 ):
-
     return f"{plugin_config.prepend_sync}{camel_to_snake(o.name.value)}"
 
 
@@ -103,7 +102,6 @@ def get_extra_args_for_onode(
     definition: FunctionDefinition,
     plugin_config: FuncsPluginConfig,
 ) -> List[Arg]:
-
     args = plugin_config.global_args
     return args + definition.extra_args
 
@@ -111,7 +109,6 @@ def get_extra_args_for_onode(
 def generate_passing_extra_args_for_onode(
     definition: FunctionDefinition, plugin_config: FuncsPluginConfig
 ):
-
     return [
         ast.Name(id=arg.key, ctx=ast.Load())
         for arg in get_extra_args_for_onode(definition, plugin_config)
@@ -121,7 +118,6 @@ def generate_passing_extra_args_for_onode(
 def generate_passing_extra_kwargs_for_onode(
     definition: FunctionDefinition, plugin_config: FuncsPluginConfig
 ):
-
     return [
         ast.keyword(arg=kwarg.key, value=ast.Name(id=kwarg.key, ctx=ast.Load()))
         for kwarg in get_extra_kwargs_for_onode(definition, plugin_config)
@@ -132,7 +128,6 @@ def get_extra_kwargs_for_onode(
     definition: FunctionDefinition,
     plugin_config: FuncsPluginConfig,
 ) -> List[Kwarg]:
-
     kwargs = plugin_config.global_kwargs
 
     return kwargs + definition.extra_kwargs
@@ -169,7 +164,6 @@ def generate_parameters(
     plugin_config: FuncsPluginConfig,
     registry: ClassRegistry,
 ):
-
     extra_args = get_extra_args_for_onode(definition, plugin_config)
     pos_args = []
 
@@ -244,13 +238,23 @@ def generate_parameters(
     )
 
 
-def generate_variable_dict(o: OperationDefinitionNode, registry: ClassRegistry):
-
+def generate_variable_dict(
+    o: OperationDefinitionNode,
+    plugin_config: FuncsPluginConfig,
+    registry: ClassRegistry,
+):
     keys = []
     values = []
 
     for v in o.variable_definitions:
-        keys.append(ast.Constant(value=v.variable.name.value))
+        if plugin_config.argument_key_is_styled:
+            keys.append(
+                ast.Constant(
+                    value=registry.generate_parameter_name(v.variable.name.value)
+                )
+            )
+        else:
+            keys.append(ast.Constant(value=v.variable.name.value))
         values.append(
             ast.Name(
                 id=registry.generate_parameter_name(v.variable.name.value),
@@ -262,7 +266,6 @@ def generate_variable_dict(o: OperationDefinitionNode, registry: ClassRegistry):
 
 
 def generate_document_arg(o: OperationDefinitionNode, registry: ClassRegistry):
-
     return ast.Name(id=get_operation_class_name(o, registry), ctx=ast.Load())
 
 
@@ -356,7 +359,6 @@ def get_return_type_string(
     registry: ClassRegistry,
     collapse=True,
 ) -> Tuple[str, bool]:
-
     o_name = get_operation_class_name(o, registry)
 
     root = get_operation_root_type(client_schema, o)
@@ -407,7 +409,6 @@ def generate_query_doc(
     registry: ClassRegistry,
     collapse=False,
 ):
-
     x = get_operation_root_type(client_schema, o)
     o.__annotations__
 
@@ -496,13 +497,12 @@ def genereate_async_call(
                     )
                     + [
                         generate_document_arg(o, registry),
-                        generate_variable_dict(o, registry),
+                        generate_variable_dict(o, plugin_config, registry),
                     ],
                 )
             )
         )
     else:
-
         return ast.Return(
             value=ast.Attribute(
                 value=ast.Await(
@@ -519,7 +519,7 @@ def genereate_async_call(
                         )
                         + [
                             generate_document_arg(o, registry),
-                            generate_variable_dict(o, registry),
+                            generate_variable_dict(o, plugin_config, registry),
                         ],
                     )
                 ),
@@ -554,7 +554,7 @@ def genereate_sync_call(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o, registry),
-                    generate_variable_dict(o, registry),
+                    generate_variable_dict(o, plugin_config, registry),
                 ],
             )
         )
@@ -574,7 +574,7 @@ def genereate_sync_call(
                     )
                     + [
                         generate_document_arg(o, registry),
-                        generate_variable_dict(o, registry),
+                        generate_variable_dict(o, plugin_config, registry),
                     ],
                 ),
                 attr=registry.generate_node_name(
@@ -609,7 +609,7 @@ def genereate_async_iterator(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o, registry),
-                    generate_variable_dict(o, registry),
+                    generate_variable_dict(o, plugin_config, registry),
                 ],
             ),
             body=[
@@ -631,7 +631,7 @@ def genereate_async_iterator(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o, registry),
-                    generate_variable_dict(o, registry),
+                    generate_variable_dict(o, plugin_config, registry),
                 ],
             ),
             body=[
@@ -675,7 +675,7 @@ def genereate_sync_iterator(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o, registry),
-                    generate_variable_dict(o, registry),
+                    generate_variable_dict(o, plugin_config, registry),
                 ],
             ),
             body=[
@@ -697,7 +697,7 @@ def genereate_sync_iterator(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o, registry),
-                    generate_variable_dict(o, registry),
+                    generate_variable_dict(o, plugin_config, registry),
                 ],
             ),
             body=[
@@ -875,13 +875,11 @@ class FuncsPlugin(Plugin):
         config: GeneratorConfig,
         registry: ClassRegistry,
     ) -> List[ast.AST]:
-
         plugin_tree = []
 
         documents = parse_documents(
-                client_schema, self.config.funcs_glob or config.documents
+            client_schema, self.config.funcs_glob or config.documents
         )
-       
 
         operations = [
             node

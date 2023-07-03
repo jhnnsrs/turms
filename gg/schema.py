@@ -1,8 +1,8 @@
-from pydantic import BaseModel, Field
-from typing import Optional, Literal, List
+from typing import List, Optional, Literal
 from api.proxies import execute
-from gql.client import AsyncClientSession
 from enum import Enum
+from pydantic import Field, BaseModel
+from gql.client import AsyncClientSession
 
 
 class Beast(BaseModel):
@@ -80,8 +80,8 @@ async def acreate_beast(
                 "id": id,
                 "legs": legs,
                 "binomial": binomial,
-                "commonName": common_name,
-                "taxClass": tax_class,
+                "common_name": common_name,
+                "tax_class": tax_class,
                 "eats": eats,
             },
         )

@@ -1,4 +1,3 @@
-
 from .utils import build_relative_glob, unit_test_with
 from turms.config import GeneratorConfig
 from turms.run import generate_ast
@@ -147,95 +146,6 @@ def test_beasts_schema(beast_schema):
         generated_ast,
         "",
     )
-
-
-def test_extra_args(beast_schema):
-    config = GeneratorConfig(
-        documents=build_relative_glob("/documents/beasts/**/*.graphql"),
-    )
-
-    extra_args = [
-        Arg(
-            key="client",
-            type="mocks.ExtraArg",
-            description="An Extra Arg",
-        )
-    ]
-
-    extra_kwargs = [
-        Kwarg(
-            key="extra",
-            type="int",
-            description="An Extra Arg",
-            default=5,
-        )
-    ]
-
-    generated_ast = generate_ast(
-        config,
-        beast_schema,
-        stylers=[DefaultStyler()],
-        plugins=[
-            EnumsPlugin(),
-            InputsPlugin(),
-            FragmentsPlugin(),
-            OperationsPlugin(),
-            FuncsPlugin(
-                config=FuncsPluginConfig(
-                    definitions=[
-                        FunctionDefinition(
-                            type="query",
-                            use="mocks.query",
-                            is_async=False,
-                            extra_args=extra_args,
-                            extra_kwargs=extra_kwargs,
-                        ),
-                        FunctionDefinition(
-                            type="query",
-                            use="mocks.query",
-                            is_async=True,
-                            extra_args=extra_args,
-                            extra_kwargs=extra_kwargs,
-                        ),
-                        FunctionDefinition(
-                            type="mutation",
-                            use="mocks.aquery",
-                            is_async=False,
-                            extra_args=extra_args,
-                            extra_kwargs=extra_kwargs,
-                        ),
-                        FunctionDefinition(
-                            type="mutation",
-                            use="mocks.aquery",
-                            is_async=True,
-                            extra_args=extra_args,
-                            extra_kwargs=extra_kwargs,
-                        ),
-                        FunctionDefinition(
-                            type="subscription",
-                            use="mocks.subscribe",
-                            is_async=False,
-                            extra_args=extra_args,
-                            extra_kwargs=extra_kwargs,
-                        ),
-                        FunctionDefinition(
-                            type="subscription",
-                            use="mocks.asubscribe",
-                            is_async=True,
-                            extra_args=extra_args,
-                            extra_kwargs=extra_kwargs,
-                        ),
-                    ]
-                ),
-            ),
-        ],
-    )
-
-    unit_test_with(
-        generated_ast,
-        "",
-    )
-
 
 
 def test_extra_args(beast_schema):
