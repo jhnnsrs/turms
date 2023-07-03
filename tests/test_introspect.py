@@ -25,7 +25,6 @@ def test_introspect_wrong():
 
 
 def test_do_not_allow_schema_introspection():
-
     s = Schema(schema_url="https://countries.trevorblades.com/")
 
     with pytest.raises(GenerationError):
@@ -33,7 +32,6 @@ def test_do_not_allow_schema_introspection():
 
 
 def test_with_schema_intrsopection():
-
     s = Schema(schema_url="https://countries.trevorblades.com/")
 
     build_schema_from_schema_type(s.schema_url, allow_introspection=True)

@@ -3,6 +3,7 @@ from turms.cli.main import cli
 import shutil
 from .utils import build_relative_glob
 import os
+import pytest
 
 
 def test_run_gen(tmp_path):
@@ -14,7 +15,6 @@ def test_run_gen(tmp_path):
     # Move config file to temp dir
 
     with runner.isolated_filesystem(temp_dir=tmp_path) as td:
-
         shutil.copyfile(c, os.path.join(td, "graphql.config.yaml"))
         shutil.copytree(d, os.path.join(td, "graphql"))
 
@@ -33,7 +33,6 @@ def test_run_gen_multiple(tmp_path):
     # Move config file to temp dir
 
     with runner.isolated_filesystem(temp_dir=tmp_path) as td:
-
         schema_dir = os.path.join(td, "schema")
         graphql_dir = os.path.join(td, "graphql")
         os.mkdir(schema_dir)
@@ -64,7 +63,6 @@ def test_run_gen_display_errors(tmp_path):
     # Move config file to temp dir
 
     with runner.isolated_filesystem(temp_dir=tmp_path) as td:
-
         schema_dir = os.path.join(td, "schema")
         graphql_dir = os.path.join(td, "graphql")
         os.mkdir(schema_dir)
@@ -90,7 +88,6 @@ def test_run_gen_multiple_but_one(tmp_path):
     # Move config file to temp dir
 
     with runner.isolated_filesystem(temp_dir=tmp_path) as td:
-
         schema_dir = os.path.join(td, "schema")
         graphql_dir = os.path.join(td, "graphql")
         os.mkdir(schema_dir)
@@ -111,7 +108,6 @@ def test_run_download(tmp_path):
     # Move config file to temp dir
 
     with runner.isolated_filesystem(temp_dir=tmp_path) as td:
-
         shutil.copyfile(c, os.path.join(td, "graphql.config.yaml"))
         result = runner.invoke(cli, ["download"])
 
@@ -128,7 +124,6 @@ def test_run_download_multiple(tmp_path):
     # Move config file to temp dir
 
     with runner.isolated_filesystem(temp_dir=tmp_path) as td:
-
         schema_dir = os.path.join(td, "schema")
         shutil.copyfile(c, os.path.join(td, "graphql.config.yaml"))
         os.mkdir(schema_dir)
@@ -153,7 +148,6 @@ def test_run_init(tmp_path):
     # Move config file to temp dir
 
     with runner.isolated_filesystem(temp_dir=tmp_path) as td:
-
         result = runner.invoke(cli, ["init"])
 
         assert os.path.exists(os.path.join(td, "graphql.config.yaml"))
@@ -169,7 +163,6 @@ def test_run_error_code(tmp_path):
     # Move config file to temp dir
 
     with runner.isolated_filesystem(temp_dir=tmp_path) as td:
-
         shutil.copyfile(c, os.path.join(td, "graphql.config.yaml"))
         shutil.copytree(d, os.path.join(td, "graphql"))
 
@@ -186,7 +179,6 @@ def test_run_no_error_code(tmp_path):
     # Move config file to temp dir
 
     with runner.isolated_filesystem(temp_dir=tmp_path) as td:
-
         shutil.copyfile(c, os.path.join(td, "graphql.config.yaml"))
         shutil.copytree(d, os.path.join(td, "graphql"))
 
