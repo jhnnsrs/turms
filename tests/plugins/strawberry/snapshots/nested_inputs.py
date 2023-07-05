@@ -9,6 +9,7 @@ class RemoveItemFromPlaylistTrackInput:
 class RemoveItemFromPlaylistInput:
     playlistId: str
     snapshotId: Optional[str]
+    tracks: RemoveItemFromPlaylistTrackInput
 
 @strawberry.type
 class Query:

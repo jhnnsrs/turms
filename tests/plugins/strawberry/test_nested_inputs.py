@@ -19,7 +19,7 @@ input RemoveItemFromPlaylistTrackInput {
 input RemoveItemFromPlaylistInput {
     playlistId: ID!
     snapshotId: ID
-    #tracks: [RemoveItemFromPlaylistTrackInput!]!
+    tracks: [RemoveItemFromPlaylistTrackInput!]!
 }
 """
 
