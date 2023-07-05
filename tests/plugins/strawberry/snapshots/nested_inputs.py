@@ -1,6 +1,6 @@
 import strawberry
-from enum import Enum
 from typing import Optional
+from enum import Enum
 
 @strawberry.input
 class RemoveItemFromPlaylistTrackInput:
