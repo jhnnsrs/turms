@@ -1,10 +1,14 @@
 import strawberry
 from typing import Optional
-from enum import Enum
 
 @strawberry.input
 class RemoveItemFromPlaylistTrackInput:
     uri: str
+
+@strawberry.input
+class RemoveItemFromPlaylistInput:
+    playlistId: str
+    snapshotId: Optional[str]
 
 @strawberry.type
 class Query:

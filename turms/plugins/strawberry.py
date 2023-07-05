@@ -149,7 +149,6 @@ def default_generate_enums(
     plugin_config: "StrawberryPluginConfig",
     registry: ClassRegistry,
 ):
-
     tree = []
 
     enum_types = {
@@ -157,8 +156,6 @@ def default_generate_enums(
         for key, value in client_schema.type_map.items()
         if isinstance(value, GraphQLEnumType)
     }
-
-    registry.register_import("enum.Enum")
 
     for key, type in enum_types.items():
 
@@ -212,6 +209,8 @@ def default_generate_enums(
 
             else:
                 fields += [assign]
+
+        registry.register_import("enum.Enum")
 
         tree.append(
             ast.ClassDef(

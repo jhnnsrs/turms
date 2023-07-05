@@ -13,14 +13,14 @@ type Query {
 }
 
 input RemoveItemFromPlaylistTrackInput {
-  uri: String!
+    uri: String!
 }
 
-# input RemoveItemFromPlaylistInput {
-#   playlistId: ID!
-#   snapshotId: ID
-#   tracks: [RemoveItemFromPlaylistTrackInput!]!
-# }
+input RemoveItemFromPlaylistInput {
+    playlistId: ID!
+    snapshotId: ID
+    #tracks: [RemoveItemFromPlaylistTrackInput!]!
+}
 """
 
 
