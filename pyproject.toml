@@ -55,6 +55,7 @@ turms = "turms.cli.main:cli"
 [tool.poetry.group.dev.dependencies]
 libcst = "^0.4.9"
 ruff = "^0.0.257"
+pytest-snapshot = "^0.9.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
