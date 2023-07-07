@@ -1,5 +1,5 @@
 import strawberry
-from typing import Optional
+from typing import Optional, List
 
 @strawberry.input
 class RemoveItemFromPlaylistTrackInput:
@@ -9,7 +9,7 @@ class RemoveItemFromPlaylistTrackInput:
 class RemoveItemFromPlaylistInput:
     playlistId: str
     snapshotId: Optional[str]
-    tracks: RemoveItemFromPlaylistTrackInput
+    tracks: List[RemoveItemFromPlaylistTrackInput]
 
 @strawberry.type
 class Query:
