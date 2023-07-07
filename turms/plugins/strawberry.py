@@ -396,7 +396,7 @@ def generate_object_field_annotation(
             )
         )
 
-    raise NotImplementedError(f"Unknown input type {repr(graphql_type)}") # pragma: no cover
+    raise NotImplementedError(f"Unknown object type {repr(graphql_type)}") # pragma: no cover
 
 
 def recurse_argument_annotation(
@@ -525,7 +525,7 @@ def recurse_argument_annotation(
 
         registry.register_import("typing.List")
         return list_builder(
-            generate_object_field_annotation(
+            recurse_argument_annotation(
                 graphql_type.of_type,
                 parent,
                 config,
