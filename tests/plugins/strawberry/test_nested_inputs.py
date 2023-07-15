@@ -1,6 +1,7 @@
 from turms.config import GeneratorConfig
 from turms.plugins.strawberry import StrawberryPlugin
-from turms.run import build_ast_schema, generate_ast, parse_asts_to_string
+from turms.processors.isort import IsortProcessor
+from turms.run import build_ast_schema, generate_code, parse_asts_to_string
 from graphql import parse
 import pathlib
 
@@ -25,16 +26,18 @@ input RemoveItemFromPlaylistInput {
 
 
 def _generate_schema(schema: str):
-    config = GeneratorConfig(scalar_definitions={"_Any": "typing.Any"})
+    config = GeneratorConfig(
+        scalar_definitions={"_Any": "typing.Any"}, skip_forwards=True
+    )
 
-    generated_ast = generate_ast(
+    code = generate_code(
         config,
         schema=build_ast_schema(parse(schema)),
         plugins=[StrawberryPlugin()],
-        skip_forwards=True,
+        processors=[IsortProcessor()],
     )
 
-    return parse_asts_to_string(generated_ast)
+    return code
 
 
 def test_generates_schema(snapshot):

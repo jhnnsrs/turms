@@ -1,5 +1,7 @@
-import strawberry
 from typing import List, Optional
+
+import strawberry
+
 
 @strawberry.input
 class RemoveItemFromPlaylistTrackInput:
