@@ -21,8 +21,13 @@ type Query {
   calledBy(commonName: String!): [Beast]
 }
 
+input NestedInput {
+  nested: [[String!]!]
+  something: NestedInput
+}
+
 type Mutation {
-  "Genrates a best which is nice"
+  "Generates a best which is nice"
   createBeast(
     nested: [[String!]!]
     optional_parameter: String
@@ -34,6 +39,8 @@ type Mutation {
     optional_parameter: String
     nonOptionalParameter: Int!
   ): Beast
+
+  somethingWithNestedInput(input: NestedInput!): Beast
 }
 
 type Subscription {

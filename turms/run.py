@@ -23,6 +23,8 @@ from turms.helpers import (
     import_string,
 )
 from turms.plugins.base import Plugin
+from turms.parsers.base import Parser
+from turms.processors.base import Processor
 from turms.registry import ClassRegistry
 from turms.stylers.base import Styler
 from pydantic.error_wrappers import ValidationError
@@ -155,7 +157,6 @@ def scan_folder_for_single_config(folder_path: str = None) -> str:
 
 
 def write_code_to_file(code: str, outdir: str, filepath: str):
-
     if not os.path.isdir(outdir):  # pragma: no cover
         os.makedirs(outdir)
 
@@ -242,7 +243,6 @@ def build_schema_from_schema_type(
         GraphQLSchema: The schema
     """
     if isinstance(schema, dict):
-
         if len(schema.values()) == 1:
             key, value = list(schema.items())[0]
             try:
@@ -377,15 +377,15 @@ def generate(project: GraphQLProject, log: Optional[LogFunction] = None) -> str:
         log=log,
     )
 
-    for styler in parsers:
-        generated_ast = styler.parse_ast(generated_ast)
-
-    generated = parse_asts_to_string(generated_ast)
-
-    for processor in processors:
-        generated = processor.run(generated, gen_config)
-
-    return generated
+    return generate_code(
+        gen_config,
+        schema,
+        plugins=plugins,
+        stylers=stylers,
+        parsers=parsers,
+        processors=processors,
+        log=log,
+    )
 
 
 def parse_asts_to_string(generated_ast: List[ast.AST]) -> str:
@@ -437,3 +437,95 @@ def generate_ast(
         global_tree += registry.generate_forward_refs()
 
     return global_tree
+
+
+def parse_ast(
+    config: GeneratorConfig,
+    ast: List[ast.AST],
+    parsers: Optional[List[Parser]] = None,
+    log: LogFunction = lambda *args, **kwargs: print,
+) -> List[ast.AST]:
+    """Parses the ast with the plugins
+
+    Args:
+        ast (List[ast.AST]): The ast to parse
+        plugins (Optional[List[Plugin]], optional): The plugins to use. Defaults to [].
+        stylers (Optional[List[Styler]], optional): The plugins to use. Defaults to [].
+
+    Raises:
+        GenerationError: Errors involving the generation of the ast
+
+    Returns:
+        List[ast.AST]: The parsed ast (as list, not as module)
+    """
+
+    parsers = parsers or []
+
+    for parser in parsers:
+        try:
+            ast = parser.parse_ast(ast)
+        except Exception as e:
+            raise GenerationError(
+                f"{parser.__class__.__name__} failed!\n {str(e)}"
+            ) from e
+
+    return ast
+
+
+def process_code(
+    config: GeneratorConfig,
+    code: List[ast.AST],
+    processors: Optional[List[Processor]] = None,
+    log: LogFunction = lambda *args, **kwargs: print,
+) -> List[ast.AST]:
+    """Parses the ast with the plugins
+
+    Args:
+        ast (List[ast.AST]): The ast to parse
+        plugins (Optional[List[Plugin]], optional): The plugins to use. Defaults to [].
+        stylers (Optional[List[Styler]], optional): The plugins to use. Defaults to [].
+
+    Raises:
+        GenerationError: Errors involving the generation of the ast
+
+    Returns:
+        List[ast.AST]: The parsed ast (as list, not as module)
+    """
+
+    processors = processors or []
+
+    for processor in processors:
+        try:
+            code = processor.run(code, config)
+        except Exception as e:
+            raise GenerationError(
+                f"{processor.__class__.__name__} failed!\n {str(e)}"
+            ) from e
+
+    return code
+
+
+def generate_code(
+    config: GeneratorConfig,
+    schema: GraphQLSchema,
+    plugins: Optional[List[Plugin]] = None,
+    stylers: Optional[List[Styler]] = None,
+    parsers: Optional[List[Parser]] = None,
+    processors: Optional[List[Processor]] = None,
+    log: LogFunction = lambda *args, **kwargs: print,
+) -> str:
+    generated_ast = generate_ast(
+        config,
+        schema,
+        plugins=plugins,
+        stylers=stylers,
+        skip_forwards=config.skip_forwards,
+        log=log,
+    )
+
+    parsed_ast = parse_ast(config, generated_ast, parsers=parsers, log=log)
+    code = parse_asts_to_string(parsed_ast)
+
+    processed_code = process_code(config, code, processors=processors, log=log)
+
+    return processed_code

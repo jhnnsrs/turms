@@ -149,7 +149,6 @@ def default_generate_enums(
     plugin_config: "StrawberryPluginConfig",
     registry: ClassRegistry,
 ):
-
     tree = []
 
     enum_types = {
@@ -157,8 +156,6 @@ def default_generate_enums(
         for key, value in client_schema.type_map.items()
         if isinstance(value, GraphQLEnumType)
     }
-
-    registry.register_import("enum.Enum")
 
     for key, type in enum_types.items():
 
@@ -212,6 +209,8 @@ def default_generate_enums(
 
             else:
                 fields += [assign]
+
+        registry.register_import("enum.Enum")
 
         tree.append(
             ast.ClassDef(
@@ -397,7 +396,7 @@ def generate_object_field_annotation(
             )
         )
 
-    raise NotImplementedError(f"Unknown input type {repr(graphql_type)}") # pragma: no cover
+    raise NotImplementedError(f"Unknown object type {repr(graphql_type)}") # pragma: no cover
 
 
 def recurse_argument_annotation(
@@ -526,7 +525,7 @@ def recurse_argument_annotation(
 
         registry.register_import("typing.List")
         return list_builder(
-            generate_object_field_annotation(
+            recurse_argument_annotation(
                 graphql_type.of_type,
                 parent,
                 config,
