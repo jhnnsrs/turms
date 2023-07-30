@@ -10,9 +10,12 @@ class GraphQLFilter(BaseFilter):  # pragma: no cover
             return False
 
         x = os.path.basename(path)
-        fileending = x.split(".")[1]
+        try:
+            fileending = x.split(".")[1]
 
-        return fileending == "graphql"
+            return fileending == "graphql"
+        except Exception:
+            return False
 
 
 def stream_changes(folder: str):  # pragma: no cover

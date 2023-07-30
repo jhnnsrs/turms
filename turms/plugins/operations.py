@@ -55,7 +55,6 @@ def get_query_bases(
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
 ):
-
     if plugin_config.query_bases:
         for base in plugin_config.query_bases:
             registry.register_import(base)
@@ -79,7 +78,6 @@ def get_mutation_bases(
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
 ):
-
     if plugin_config.mutation_bases:
         for base in plugin_config.mutation_bases:
             registry.register_import(base)
@@ -103,7 +101,6 @@ def get_arguments_bases(
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
 ):
-
     if plugin_config.arguments_bases:
         for base in plugin_config.arguments_bases:
             registry.register_import(base)
@@ -127,7 +124,6 @@ def get_subscription_bases(
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
 ):
-
     if plugin_config.subscription_bases:
         for base in plugin_config.subscription_bases:
             registry.register_import(base)
@@ -146,7 +142,7 @@ def get_subscription_bases(
             ]
 
 
-def represent_variable_definition(x: VariableDefinitionNode)-> str:
+def represent_variable_definition(x: VariableDefinitionNode) -> str:
     if isinstance(x, NamedTypeNode):
         return x.name.value
     if isinstance(x, NonNullTypeNode):
@@ -155,6 +151,7 @@ def represent_variable_definition(x: VariableDefinitionNode)-> str:
         return f"[{represent_variable_definition(x.type)}]"
     raise Exception(f"Unknown type {type(x)}")
 
+
 def generate_operation(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
@@ -162,7 +159,6 @@ def generate_operation(
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
 ):
-
     tree = []
     assert o.name.value, "Operation names are required"
 
@@ -212,12 +208,10 @@ def generate_operation(
     merged_document = print_operation(o, config, registry)
 
     if plugin_config.create_arguments:
-
         arguments_body = []
         validators_body = []
 
         for v in o.variable_definitions:
-
             variable_def_body = []
 
             type = v.type
@@ -225,8 +219,12 @@ def generate_operation(
             keywords = []
 
             if v.default_value:
-                keywords.append(ast.keyword(arg="default", value=ast.Constant(v.default_value.value, ctx=ast.Load())))
-                
+                keywords.append(
+                    ast.keyword(
+                        arg="default",
+                        value=ast.Constant(v.default_value.value, ctx=ast.Load()),
+                    )
+                )
 
             if keywords:
                 registry.register_import("pydantic.Field")
@@ -248,7 +246,7 @@ def generate_operation(
                         simple=1,
                     )
                 ]
-                
+
             else:
                 variable_def_body += [
                     ast.AnnAssign(
@@ -269,9 +267,12 @@ def generate_operation(
                         v,
                         variable_def_body,
                         registry,
-                        **{arg.name.value: arg.value.value for arg in directive.arguments}
+                        **{
+                            arg.name.value: arg.value.value
+                            for arg in directive.arguments
+                        },
                     )
-                    
+
             arguments_body += variable_def_body
 
         arguments_body += validators_body
@@ -338,7 +339,6 @@ class OperationsPlugin(Plugin):
         config: GeneratorConfig,
         registry: ClassRegistry,
     ) -> List[ast.AST]:
-
         plugin_tree = []
 
         documents = parse_documents(

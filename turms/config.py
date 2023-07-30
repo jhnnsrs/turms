@@ -175,6 +175,9 @@ class TurmsDirective(BaseModel):
     args: Optional[Dict[str, ArgType]] = Field(
         default_factory=dict, description="The arguments of the directive"
     )
+    trim: bool = Field(
+        True, description="This directive will be exluded and not send to the server"
+    )
 
     
 

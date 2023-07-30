@@ -60,15 +60,12 @@ def recurse_find_references(
     if isinstance(
         graphql_type, (GraphQLUnionType, GraphQLObjectType, GraphQLInterfaceType)
     ):
-
         for sub_node in node.selection_set.selections:
-
             if isinstance(sub_node, FragmentSpreadNode):
                 registry.register_fragment(sub_node.name.value)
 
-            if isinstance(sub_node, InlineFragmentNode):
+            elif isinstance(sub_node, InlineFragmentNode):
                 for sub_sub_node in sub_node.selection_set.selections:
-
                     if isinstance(sub_sub_node, FieldNode):
                         sub_sub_node_type = client_schema.get_type(
                             sub_node.type_condition.name.value
@@ -78,19 +75,26 @@ def recurse_find_references(
                             continue
 
                         field_type = sub_sub_node_type.fields[sub_sub_node.name.value]
-                        return recurse_find_references(
+                        recurse_find_references(
                             sub_sub_node,
                             field_type.type,
                             client_schema,
                             registry,
                         )
 
-    elif isinstance(graphql_type, GraphQLScalarType):
+            else:
+                field_type = graphql_type.fields[sub_node.name.value]
+                recurse_find_references(
+                    sub_node,
+                    field_type.type,
+                    client_schema,
+                    registry,
+                )
 
+    elif isinstance(graphql_type, GraphQLScalarType):
         registry.register_scalar(graphql_type.name)
 
     elif isinstance(graphql_type, GraphQLEnumType):
-
         registry.register_enum(graphql_type.name)
 
     elif isinstance(graphql_type, GraphQLNonNull):
@@ -103,7 +107,6 @@ def recurse_find_references(
         )
 
     elif isinstance(graphql_type, GraphQLList):
-
         recurse_find_references(
             node,
             graphql_type.of_type,
@@ -121,7 +124,6 @@ def recurse_type_annotation(
     registry: ReferenceRegistry,
     optional=True,
 ):
-
     if isinstance(graphql_type, NonNullTypeNode):
         return recurse_type_annotation(
             graphql_type.type, schema, registry, optional=False
@@ -131,7 +133,6 @@ def recurse_type_annotation(
         recurse_type_annotation(graphql_type.type, schema, registry)
 
     elif isinstance(graphql_type, NamedTypeNode):
-
         z = schema.get_type(graphql_type.name.value)
         if isinstance(z, GraphQLScalarType):
             registry.register_scalar(z.name)
@@ -166,10 +167,8 @@ def create_reference_registry_from_documents(
             operations[definition.name.value] = definition
 
     for fragment in fragments.values():
-
         type = schema.get_type(fragment.type_condition.name.value)
         for selection in fragment.selection_set.selections:
-
             if isinstance(selection, FieldNode):
                 # definition
                 if selection.name.value == "__typename":
@@ -184,14 +183,12 @@ def create_reference_registry_from_documents(
                 )
 
     for operation in operations.values():
-
         type = schema.get_root_type(operation.operation)
 
         for argument in operation.variable_definitions:
             recurse_type_annotation(argument.type, schema, registry)
 
         for selection in operation.selection_set.selections:
-
             if isinstance(selection, FieldNode):
                 # definition
                 if selection.name.value == "__typename":
