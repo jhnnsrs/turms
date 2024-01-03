@@ -218,13 +218,24 @@ def generate_parameters(
 
     for kwarg in extra_kwargs:
         registry.register_import(kwarg.type)
+
+        annotation = ast.Name(
+            id=kwarg.type.split(".")[-1],
+            ctx=ast.Load(),
+        )
+
+        if kwarg.default is None:
+            # if we set the default to None, we need to make the annotation optional
+            # complies with PEP 484
+            annotation = ast.Subscript(
+                value=ast.Name(id="Optional", ctx=ast.Load()),
+                slice=annotation,
+            )
+
         kw_args.append(
             ast.arg(
                 arg=kwarg.key,
-                annotation=ast.Name(
-                    id=kwarg.type.split(".")[-1],
-                    ctx=ast.Load(),
-                ),
+                annotation=annotation,
             )
         )
         kw_values.append(ast.Constant(value=kwarg.default))
