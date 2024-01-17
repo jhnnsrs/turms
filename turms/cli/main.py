@@ -38,7 +38,7 @@ logo = """
 
 welcome = """
 Welcome to Turms! Turms is a GraphQL code generator that generates code from your GraphQL schema and documents. For more information, visit
-https://gihub.com/jhnnsrs/turms
+https://github.com/jhnnsrs/turms
 """
 
 
@@ -81,7 +81,6 @@ def generate_projects(projects, title="Turms"):
 
     with Live(panel, screen=False) as live:
         for key, project in projects.items():
-
             project_tree = Tree(f"{key}", style="not bold white")
             tree.add(project_tree)
             live.update(panel)
@@ -172,7 +171,6 @@ def watch_projects(projects, title="Turms"):  # pragma: no cover
     )
 
     with Live(panel, screen=False) as live:
-
         tree.renderable = f"Watching {project.documents}..."
         live.update(panel)
 
@@ -201,7 +199,6 @@ def watch_projects(projects, title="Turms"):  # pragma: no cover
                 live.update(panel)
 
             except Exception as e:
-
                 tree.renderable = f"[red] {str(e)} [/],"
                 tree.border_style = "not bold red"
                 tree.style = "not bold red"
@@ -216,7 +213,8 @@ def cli(ctx):
 
     Welcome to Turms! Turms is a GraphQL code generator that generates code from your GraphQL schema and documents.
 
-    For more information, visit [link=https://gihub.com/jhnnsrs/turms] https://gihub.com/jhnnsrs/turms [/link]"""
+    For more information, visit [link=https://github.com/jhnnsrs/turms] https://github.com/jhnnsrs/turms [/link]
+    """
 
 
 @cli.command()
