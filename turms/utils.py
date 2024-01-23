@@ -49,8 +49,10 @@ class FragmentNotFoundError(GenerationError):
 class NoDocumentsFoundError(GenerationError):
     pass
 
+
 class InvalidDocuments(GenerationError):
     pass
+
 
 class NoScalarEquivalentDefined(GenerationError):
     pass
@@ -222,6 +224,13 @@ def generate_config_class(
                 )
 
     if len(config_fields) > 0:
+        config_fields.insert(
+            0,
+            ast.Expr(
+                value=ast.Str(s="A config class"),
+            ),
+        )
+    if len(config_fields) > 0:
         return [
             ast.ClassDef(
                 name="Config",
@@ -259,7 +268,9 @@ def parse_documents(client_schema: GraphQLSchema, scan_glob) -> DocumentNode:
 
     errors = validate(client_schema, nodes)
     if len(errors) > 0:
-        raise InvalidDocuments("Invalid Documents \n" + "\n".join(str(e) for e in errors))
+        raise InvalidDocuments(
+            "Invalid Documents \n" + "\n".join(str(e) for e in errors)
+        )
 
     return nodes
 
@@ -294,7 +305,6 @@ def replace_iteratively(
 def get_additional_bases_for_type(
     typename, config: GeneratorConfig, registry: ClassRegistry
 ):
-
     if typename in config.additional_bases:
         for base in config.additional_bases[typename]:
             registry.register_import(base)
@@ -307,7 +317,6 @@ def get_additional_bases_for_type(
 
 
 def get_interface_bases(config: GeneratorConfig, registry: ClassRegistry):
-
     if config.interface_bases:
         for base in config.interface_bases:
             registry.register_import(base)
@@ -343,7 +352,6 @@ def recurse_type_annotation(
     optional=True,
     overwrite_final: Optional[str] = None,
 ):
-
     if isinstance(type, NonNullTypeNode):
         return recurse_type_annotation(
             type.type, registry, optional=False, overwrite_final=overwrite_final
@@ -450,7 +458,6 @@ def recurse_outputtype_annotation(
         return registry.reference_enum(type.name, "", allow_forward=False)
 
     if isinstance(type, GraphQLScalarType):
-
         if optional:
             registry.register_import("typing.Optional")
             return ast.Subscript(
@@ -462,7 +469,6 @@ def recurse_outputtype_annotation(
             return registry.reference_scalar(type.name)
 
     if isinstance(type, GraphQLObjectType) or isinstance(type, GraphQLInterfaceType):
-
         assert overwrite_final, "Needs to be set"
         if optional:
             registry.register_import("typing.Optional")
@@ -517,7 +523,6 @@ def recurse_outputtype_label(
         return registry.reference_enum(type.name, "", allow_forward=False).id
 
     if isinstance(type, GraphQLScalarType):
-
         if optional:
             return "Optional[" + registry.reference_scalar(type.name).id + "]"
 
@@ -525,7 +530,6 @@ def recurse_outputtype_label(
             return registry.reference_scalar(type.name).id
 
     if isinstance(type, GraphQLObjectType) or isinstance(type, GraphQLInterfaceType):
-
         assert overwrite_final, "Needs to be set"
         if optional:
             return "Optional[" + overwrite_final + "]"
@@ -542,7 +546,6 @@ def recurse_type_label(
     optional=True,
     overwrite_final: Optional[str] = None,
 ):
-
     if isinstance(type, NonNullTypeNode):
         return recurse_type_label(
             type.type, registry, optional=False, overwrite_final=overwrite_final

@@ -49,7 +49,6 @@ def default_generate_directives(
     plugin_config: "StrawberryPluginConfig",
     registry: ClassRegistry,
 ):
-
     tree = []
 
     directives = client_schema.directives
@@ -66,7 +65,6 @@ def default_generate_directives(
     registry.register_import("strawberry.schema_directive.Location")
 
     for directive in generatable_directives:
-
         if plugin_config.skip_underscore and directive.name.startswith("_"):
             continue
 
@@ -158,7 +156,6 @@ def default_generate_enums(
     }
 
     for key, type in enum_types.items():
-
         directive_keywords = generate_directive_keywords(type.ast_node, plugin_config)
         if directive_keywords:
             decorator = ast.Call(
@@ -184,7 +181,6 @@ def default_generate_enums(
         )
 
         for value_key, value in type.values.items():
-
             if isinstance(value.value, str):
                 servalue = value.value
             else:
@@ -362,10 +358,12 @@ def generate_object_field_annotation(
         )
 
     if isinstance(graphql_type, GraphQLList):
-
         registry.register_import("typing.List")
+
         def list_builder(x):
-            return ast.Subscript(value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load())
+            return ast.Subscript(
+                value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
+            )
 
         if is_optional:
             registry.register_import("typing.Optional")
@@ -396,7 +394,9 @@ def generate_object_field_annotation(
             )
         )
 
-    raise NotImplementedError(f"Unknown object type {repr(graphql_type)}") # pragma: no cover
+    raise NotImplementedError(
+        f"Unknown object type {repr(graphql_type)}"
+    )  # pragma: no cover
 
 
 def recurse_argument_annotation(
@@ -501,10 +501,12 @@ def recurse_argument_annotation(
         )
 
     if isinstance(graphql_type, GraphQLList):
-
         registry.register_import("typing.List")
+
         def list_builder(x):
-            return ast.Subscript(value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load())
+            return ast.Subscript(
+                value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
+            )
 
         if is_optional:
             registry.register_import("typing.Optional")
@@ -582,7 +584,6 @@ def generate_inputs(
     plugin_config: StrawberryPluginConfig,
     registry: ClassRegistry,
 ):
-
     tree = []
 
     inputobjects_type = {
@@ -592,7 +593,6 @@ def generate_inputs(
     }
 
     for key, type in inputobjects_type.items():
-
         if plugin_config.skip_underscore and key.startswith("_"):  # pragma: no cover
             continue
 
@@ -688,7 +688,6 @@ def generate_types(
     plugin_config: StrawberryPluginConfig,
     registry: ClassRegistry,
 ):
-
     tree = []
 
     objects = {
@@ -717,7 +716,6 @@ def generate_types(
     ] = {}  # A list of interfaces with its respective base
 
     for key, object_type in sorted_objects.items():
-
         additional_bases = get_additional_bases_for_type(
             object_type.name, config, registry
         )
@@ -794,7 +792,6 @@ def generate_types(
             additional_args = []
             kwdefaults = []
             if value.args:
-
                 sorted_args = {
                     key: value
                     for key, value in sorted(
@@ -805,7 +802,6 @@ def generate_types(
                 }
 
                 for argkey, arg in sorted_args.items():
-
                     additional_args.append(
                         ast.arg(
                             arg=registry.generate_parameter_name(argkey),
@@ -842,7 +838,6 @@ def generate_types(
             keywords += generate_directive_keywords(value.ast_node, plugin_config)
 
             if not additional_args and key not in ["Mutation", "Subscription", "Query"]:
-
                 if not keywords:
                     assign_value = None
                 else:
@@ -930,7 +925,6 @@ def generate_scalars(
     plugin_config: StrawberryPluginConfig,
     registry: ClassRegistry,
 ):
-
     objects = {
         key: value
         for key, value in client_schema.type_map.items()
@@ -944,7 +938,6 @@ def generate_scalars(
         registry.register_import("typing.NewType")
 
     for key, scalar in objects.items():
-
         keywords = []
         keywords += generate_directive_keywords(scalar.ast_node, plugin_config)
         if scalar.description:
@@ -1030,7 +1023,6 @@ class StrawberryPlugin(Plugin):
         config: GeneratorConfig,
         registry: ClassRegistry,
     ) -> List[ast.AST]:
-
         registry.register_import("strawberry")
 
         directives = (

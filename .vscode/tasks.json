@@ -7,12 +7,12 @@
     {
       "label": "Patch",
       "type": "shell",
-      "command": "source venv/bin/activate && poetry version patch && poetry build "
+      "command": " poetry version patch && poetry build "
     },
     {
       "label": "Publish",
       "type": "shell",
-      "command": "source venv/bin/activate && poetry publish"
+      "command": " poetry publish"
     },
     {
       "type": "shell",

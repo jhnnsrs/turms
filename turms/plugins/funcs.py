@@ -514,6 +514,12 @@ def genereate_async_call(
             )
         )
     else:
+        correct_attr = (
+            o.selection_set.selections[0].alias.value
+            if o.selection_set.selections[0].alias
+            else o.selection_set.selections[0].name.value
+        )
+
         return ast.Return(
             value=ast.Attribute(
                 value=ast.Await(
@@ -534,9 +540,7 @@ def genereate_async_call(
                         ],
                     )
                 ),
-                attr=registry.generate_node_name(
-                    o.selection_set.selections[0].name.value
-                ),
+                attr=registry.generate_node_name(correct_attr),
                 ctx=ast.Load(),
             )
         )
@@ -570,6 +574,12 @@ def genereate_sync_call(
             )
         )
     else:
+        correct_attr = (
+            o.selection_set.selections[0].alias.value
+            if o.selection_set.selections[0].alias
+            else o.selection_set.selections[0].name.value
+        )
+
         return ast.Return(
             value=ast.Attribute(
                 value=ast.Call(
@@ -588,9 +598,7 @@ def genereate_sync_call(
                         generate_variable_dict(o, plugin_config, registry),
                     ],
                 ),
-                attr=registry.generate_node_name(
-                    o.selection_set.selections[0].name.value
-                ),
+                attr=registry.generate_node_name(correct_attr),
                 ctx=ast.Load(),
             )
         )
@@ -629,6 +637,12 @@ def genereate_async_iterator(
             orelse=[],
         )
     else:
+        correct_attr = (
+            o.selection_set.selections[0].alias.value
+            if o.selection_set.selections[0].alias
+            else o.selection_set.selections[0].name.value
+        )
+
         return ast.AsyncFor(
             target=ast.Name(id="event", ctx=ast.Store()),
             iter=ast.Call(
@@ -651,9 +665,7 @@ def genereate_async_iterator(
                         value=ast.Attribute(
                             value=ast.Name(id="event", ctx=ast.Load()),
                             ctx=ast.Load(),
-                            attr=registry.generate_node_name(
-                                o.selection_set.selections[0].name.value
-                            ),
+                            attr=registry.generate_node_name(correct_attr),
                         )
                     )
                 ),
@@ -695,6 +707,12 @@ def genereate_sync_iterator(
             orelse=[],
         )
     else:
+        correct_attr = (
+            o.selection_set.selections[0].alias.value
+            if o.selection_set.selections[0].alias
+            else o.selection_set.selections[0].name.value
+        )
+
         return ast.For(
             target=ast.Name(id="event", ctx=ast.Store()),
             iter=ast.Call(
@@ -717,9 +735,7 @@ def genereate_sync_iterator(
                         value=ast.Attribute(
                             value=ast.Name(id="event", ctx=ast.Load()),
                             ctx=ast.Load(),
-                            attr=registry.generate_node_name(
-                                o.selection_set.selections[0].name.value
-                            ),
+                            attr=registry.generate_node_name(correct_attr),
                         )
                     )
                 ),
