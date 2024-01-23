@@ -182,7 +182,6 @@ def recurse_type_annotation(
             # We need to get all input objects that this graphql input object type references
 
             for key, node in graphql_type.fields.items():
-                print("key", key, node)
                 recurse_type_annotation(node, node.type, schema, registry)
 
     else:
