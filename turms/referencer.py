@@ -14,6 +14,7 @@ from graphql import (
     OperationDefinitionNode,
     FragmentDefinitionNode,
     GraphQLInterfaceType,
+    GraphQLInputField,
 )
 from graphql.type.definition import (
     GraphQLType,
@@ -49,6 +50,11 @@ class ReferenceRegistry:
     def register_scalar(self, type_name: str):
         self.scalars.add(type_name)
 
+    def is_input_registered(self, type_name: str):
+        return type_name in self.inputs
+
+
+
 
 def recurse_find_references(
     node: FieldNode,
@@ -60,15 +66,12 @@ def recurse_find_references(
     if isinstance(
         graphql_type, (GraphQLUnionType, GraphQLObjectType, GraphQLInterfaceType)
     ):
-
         for sub_node in node.selection_set.selections:
-
             if isinstance(sub_node, FragmentSpreadNode):
                 registry.register_fragment(sub_node.name.value)
 
-            if isinstance(sub_node, InlineFragmentNode):
+            elif isinstance(sub_node, InlineFragmentNode):
                 for sub_sub_node in sub_node.selection_set.selections:
-
                     if isinstance(sub_sub_node, FieldNode):
                         sub_sub_node_type = client_schema.get_type(
                             sub_node.type_condition.name.value
@@ -84,13 +87,24 @@ def recurse_find_references(
                             client_schema,
                             registry,
                         )
+            elif isinstance(sub_node, FieldNode):
+                if sub_node.name.value == "__typename":
+                    continue
+                this_type = graphql_type.fields[sub_node.name.value]
+
+                recurse_find_references(
+                    sub_node,
+                    this_type.type,
+                    client_schema,
+                    registry,
+                )
+            else:
+                raise Exception("Unexpected Type")
 
     elif isinstance(graphql_type, GraphQLScalarType):
-
         registry.register_scalar(graphql_type.name)
 
     elif isinstance(graphql_type, GraphQLEnumType):
-
         registry.register_enum(graphql_type.name)
 
     elif isinstance(graphql_type, GraphQLNonNull):
@@ -103,7 +117,6 @@ def recurse_find_references(
         )
 
     elif isinstance(graphql_type, GraphQLList):
-
         recurse_find_references(
             node,
             graphql_type.of_type,
@@ -115,38 +128,65 @@ def recurse_find_references(
         raise Exception("Unknown Type", type(graphql_type), graphql_type)
 
 
+
+def break_recursion_loop(*args, **kwargs):
+    return recurse_type_annotation(*args, **kwargs)
+
+
+
 def recurse_type_annotation(
+    field: GraphQLInputField,
     graphql_type: NamedTypeNode,
     schema: GraphQLSchema,
     registry: ReferenceRegistry,
     optional=True,
 ):
-
+    
     if isinstance(graphql_type, NonNullTypeNode):
         return recurse_type_annotation(
-            graphql_type.type, schema, registry, optional=False
+            field, graphql_type.type, schema, registry, optional=False
         )
 
     elif isinstance(graphql_type, ListTypeNode):
-        recurse_type_annotation(graphql_type.type, schema, registry)
+        return recurse_type_annotation(field, graphql_type.type, schema, registry)
 
     elif isinstance(graphql_type, NamedTypeNode):
+        type = schema.get_type(graphql_type.name.value)
+        assert type, graphql_type
+        return recurse_type_annotation(field, type, schema, registry, optional=False)
+    
+    elif isinstance(graphql_type, GraphQLNonNull):
+        return recurse_type_annotation(
+            field, graphql_type.of_type, schema, registry, optional=False
+        )
+    
+    elif isinstance(graphql_type, GraphQLList):
+        return recurse_type_annotation(
+            field, graphql_type.of_type, schema, registry, optional=False
+        )
+    
 
-        z = schema.get_type(graphql_type.name.value)
-        if isinstance(z, GraphQLScalarType):
-            registry.register_scalar(z.name)
+    elif isinstance(graphql_type, GraphQLScalarType):
+        registry.register_scalar(graphql_type.name)
 
-        elif isinstance(z, GraphQLInputObjectType):
-            registry.register_input(z.name)
+    elif isinstance(graphql_type, GraphQLEnumType):
+        registry.register_enum(graphql_type.name)
 
-        elif isinstance(z, GraphQLEnumType):
-            registry.register_enum(z.name)
+    elif isinstance(graphql_type, GraphQLInputObjectType):
+        # Only and only is we have not registered this input object type yet
+        # we need to register it (otherwise we might get into a recursion loop)
+        if not registry.is_input_registered(graphql_type.name):
+        
+            registry.register_input(graphql_type.name)
 
-        else:
-            raise Exception("Unknown Subtype", type(graphql_type), graphql_type)
+            # We need to get all input objects that this graphql input object type references
+
+            for key, node in graphql_type.fields.items():
+                print("key", key, node)
+                recurse_type_annotation(node, node.type, schema, registry)
 
     else:
-        raise Exception("Unknown Type", type(graphql_type), graphql_type)
+        raise Exception("Unknown Type", field, graphql_type)
 
 
 def create_reference_registry_from_documents(
@@ -166,10 +206,8 @@ def create_reference_registry_from_documents(
             operations[definition.name.value] = definition
 
     for fragment in fragments.values():
-
         type = schema.get_type(fragment.type_condition.name.value)
         for selection in fragment.selection_set.selections:
-
             if isinstance(selection, FieldNode):
                 # definition
                 if selection.name.value == "__typename":
@@ -184,14 +222,12 @@ def create_reference_registry_from_documents(
                 )
 
     for operation in operations.values():
-
         type = schema.get_root_type(operation.operation)
 
         for argument in operation.variable_definitions:
-            recurse_type_annotation(argument.type, schema, registry)
+            recurse_type_annotation(argument, argument.type, schema, registry)
 
         for selection in operation.selection_set.selections:
-
             if isinstance(selection, FieldNode):
                 # definition
                 if selection.name.value == "__typename":

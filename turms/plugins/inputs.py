@@ -29,7 +29,7 @@ class InputsPluginConfig(PluginConfig):
     type = "turms.plugins.inputs.InputsPlugin"
     inputtype_bases: List[str] = ["pydantic.BaseModel"]
     skip_underscore: bool = True
-    skip_unreferenced: bool = False
+    skip_unreferenced: bool = True
 
     class Config:
         env_prefix = "TURMS_PLUGINS_INPUTS_"
@@ -106,7 +106,6 @@ def generate_input_annotation(
                 )
 
         if is_optional:
-
             registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
@@ -138,7 +137,6 @@ def generate_inputs(
     plugin_config: InputsPluginConfig,
     registry: ClassRegistry,
 ):
-
     tree = []
 
     inputobjects_type = {
@@ -147,7 +145,7 @@ def generate_inputs(
         if isinstance(value, GraphQLInputObjectType)
     }
 
-    if plugin_config.skip_unreferenced:
+    if plugin_config.skip_unreferenced and config.documents:
         ref_registry = create_reference_registry_from_documents(
             client_schema, parse_documents(client_schema, config.documents)
         )
@@ -158,7 +156,6 @@ def generate_inputs(
         registry.register_import(base)
 
     for key, type in inputobjects_type.items():
-
         if ref_registry and key not in ref_registry.inputs:
             continue
 
@@ -174,7 +171,6 @@ def generate_inputs(
         )
 
         for value_key, value in type.fields.items():
-
             field_name = registry.generate_node_name(value_key)
 
             if field_name != value_key:
@@ -263,7 +259,6 @@ class InputsPlugin(Plugin):
         config: GeneratorConfig,
         registry: ClassRegistry,
     ) -> List[ast.AST]:
-
         for base in self.config.inputtype_bases:
             registry.register_import(base)
 
