@@ -30,9 +30,143 @@ class InputsPluginConfig(PluginConfig):
     inputtype_bases: List[str] = ["pydantic.BaseModel"]
     skip_underscore: bool = True
     skip_unreferenced: bool = True
+    arguments_allow_population_by_field_name: bool = True
 
     class Config:
         env_prefix = "TURMS_PLUGINS_INPUTS_"
+
+
+def generate_input_config_class(
+    graphQLType: GraphQLTypes,
+    config: GeneratorConfig,
+    plugin_config: InputsPluginConfig,
+    typename: str = None,
+):
+    """Generates the config class for a specific type
+
+    It will append the config class to the registry, and set the frozen
+    attribute for the class to True, if the freeze config is enabled and
+    the type appears in the freeze list.
+
+    It will also add config attributes to the class, if the type appears in
+    'additional_config' in the config file.
+
+    """
+
+    config_fields = []
+
+    if config.freeze.enabled:
+        if graphQLType in config.freeze.types:
+            if config.freeze.exclude and typename in config.freeze.exclude:
+                pass
+            elif config.freeze.include and typename not in config.freeze.include:
+                pass
+            else:
+                config_fields.append(
+                    ast.Assign(
+                        targets=[ast.Name(id="frozen", ctx=ast.Store())],
+                        value=ast.Constant(value=True),
+                    )
+                )
+
+    if config.options.enabled:
+        if graphQLType in config.options.types:
+            if config.options.exclude and typename in config.options.exclude:
+                pass
+            elif config.options.include and typename not in config.options.include:
+                pass
+            else:
+                if config.options.allow_mutation is not None:
+                    config_fields.append(
+                        ast.Assign(
+                            targets=[ast.Name(id="allow_mutation", ctx=ast.Store())],
+                            value=ast.Constant(value=config.options.allow_mutation),
+                        )
+                    )
+
+                if config.options.extra is not None:
+                    config_fields.append(
+                        ast.Assign(
+                            targets=[ast.Name(id="extra", ctx=ast.Store())],
+                            value=ast.Constant(value=config.options.extra),
+                        )
+                    )
+
+                if config.options.validate_assignment is not None:
+                    config_fields.append(
+                        ast.Assign(
+                            targets=[
+                                ast.Name(id="validate_assignment", ctx=ast.Store())
+                            ],
+                            value=ast.Constant(
+                                value=config.options.validate_assignment
+                            ),
+                        )
+                    )
+
+                if (
+                    config.options.allow_population_by_field_name is not None
+                    or plugin_config.arguments_allow_population_by_field_name
+                ):
+                    config_fields.append(
+                        ast.Assign(
+                            targets=[
+                                ast.Name(
+                                    id="allow_population_by_field_name", ctx=ast.Store()
+                                )
+                            ],
+                            value=ast.Constant(
+                                value=config.options.allow_population_by_field_name
+                                or plugin_config.arguments_allow_population_by_field_name
+                            ),
+                        )
+                    )
+
+                if config.options.orm_mode is not None:
+                    config_fields.append(
+                        ast.Assign(
+                            targets=[ast.Name(id="orm_mode", ctx=ast.Store())],
+                            value=ast.Constant(value=config.options.orm_mode),
+                        )
+                    )
+
+                if config.options.use_enum_values is not None:
+                    config_fields.append(
+                        ast.Assign(
+                            targets=[ast.Name(id="use_enum_values", ctx=ast.Store())],
+                            value=ast.Constant(value=config.options.use_enum_values),
+                        )
+                    )
+
+    if typename:
+        if typename in config.additional_config:
+            for key, value in config.additional_config[typename].items():
+                config_fields.append(
+                    ast.Assign(
+                        targets=[ast.Name(id=key, ctx=ast.Store())],
+                        value=ast.Constant(value=value),
+                    )
+                )
+
+    if len(config_fields) > 0:
+        config_fields.insert(
+            0,
+            ast.Expr(
+                value=ast.Str(s="A config class"),
+            ),
+        )
+    if len(config_fields) > 0:
+        return [
+            ast.ClassDef(
+                name="Config",
+                bases=[],
+                keywords=[],
+                body=config_fields,
+                decorator_list=[],
+            )
+        ]
+    else:
+        return []
 
 
 def generate_input_annotation(
@@ -236,7 +370,9 @@ def generate_inputs(
                 decorator_list=[],
                 keywords=[],
                 body=fields
-                + generate_config_class(GraphQLTypes.INPUT, config, typename=key),
+                + generate_input_config_class(
+                    GraphQLTypes.INPUT, config, plugin_config, typename=key
+                ),
             )
         )
 

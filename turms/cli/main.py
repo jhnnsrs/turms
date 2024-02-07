@@ -11,11 +11,12 @@ from turms.run import (
     scan_folder_for_single_config,
     load_projects_from_configpath,
     build_schema_from_schema_type,
+    build_introspection_from_schema_type
 )
 from .watch import stream_changes
 from graphql import print_schema
 from functools import wraps
-
+import json
 click.rich_click.USE_RICH_MARKUP = True
 
 directory = os.getcwd()
@@ -259,7 +260,7 @@ def watch(projects):  # pragma: no cover
 @with_projects
 @click.option(
     "--out",
-    default=".schema.graphql",
+    default=None,
     help="The output file extension (will be appended to the project name)",
 )
 @click.option(
@@ -267,8 +268,23 @@ def watch(projects):  # pragma: no cover
     default=None,
     help="The output directory for the schema files (will default to the current working directory)",
 )
-def download(projects, out, dir):
+@click.option(
+    "--format",
+    default="sdl",
+    help="The output format for the schema files (sdl or json)",
+    type=click.Choice(["sdl", "introspection"]),
+)
+def download(projects, out, dir, format):
     """Download the graphql projects schema as a sdl file"""
+
+
+
+    default_extensions = {
+        "sdl": ".schema.graphql",
+        "introspection": ".introspection.json",
+    }
+
+    out = out or default_extensions.get(format, ".schema.graphql")
 
     try:
         app_directory = dir or os.getcwd()
@@ -277,14 +293,24 @@ def download(projects, out, dir):
             get_console().print(
                 f"Downloading schema for project {key} to {app_directory}/{filename}"
             )
-            schema = build_schema_from_schema_type(
-                project.schema_url, allow_introspection=True
-            )
+            if format == "sdl":
+                schema =  build_schema_from_schema_type(
+                    project.schema_url, allow_introspection=True
+                )
+                output = print_schema(schema)
+
+            else:
+                introspection = build_introspection_from_schema_type(
+                    project.schema_url
+                )
+                output = json.dumps(introspection, indent=2)
+
+            
             with open(os.path.join(app_directory, filename), "w") as f:
-                f.write(print_schema(schema))
+                f.write(output)
+
     except Exception as e:
         raise click.ClickException(str(e)) from e
-
 
 if __name__ == "__main__":
     cli()

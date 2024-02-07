@@ -230,6 +230,45 @@ def instantiate(module_path: str, **kwargs):
     """
     return import_string(module_path)(**kwargs)
 
+def build_introspection_from_schema_type(
+    schema: SchemaType
+) -> GraphQLSchema:
+    """Builds a schema from a project
+
+    Args:
+        project (GraphQLProject): The project
+
+    Returns:
+        GraphQLSchema: The schema
+    """
+    if isinstance(schema, dict):
+        if len(schema.values()) == 1:
+            key, value = list(schema.items())[0]
+            return load_introspection_from_url(key, value.headers)
+        
+        else:
+            # Multiple schemas, now we only support dsl
+            raise GenerationError("Multiple schemas not supported for introspection")
+
+    if isinstance(schema, list):
+        if len(schema) == 1:
+            # Only one schema, probably because of aesthetic reasons
+            return build_introspection_from_schema_type(
+                schema[0]
+            )
+
+        else:
+            raise GenerationError("Multiple schemas not supported for introspection")
+
+    if isinstance(schema, AnyHttpUrl):
+        return load_introspection_from_url(schema)
+
+    if isinstance(schema, str):
+        return load_introspection_from_url(schema)
+    
+    
+    raise GenerationError("Could not build introspection with type " + str(type(schema)))
+
 
 def build_schema_from_schema_type(
     schema: SchemaType, allow_introspection: bool = False
