@@ -175,6 +175,16 @@ def generate_inputs(
 
             if field_name != value_key:
                 registry.register_import("pydantic.Field")
+                keywords = [
+                    ast.keyword(
+                        arg="alias", value=ast.Constant(value=value_key)
+                    )
+                ]
+                if not isinstance(value.type, GraphQLNonNull):
+                    keywords.append(
+                        ast.keyword(arg="default", value=ast.Constant(None))
+                    )
+
                 assign = ast.AnnAssign(
                     target=ast.Name(field_name, ctx=ast.Store()),
                     annotation=generate_input_annotation(
@@ -188,14 +198,11 @@ def generate_inputs(
                     value=ast.Call(
                         func=ast.Name(id="Field", ctx=ast.Load()),
                         args=[],
-                        keywords=[
-                            ast.keyword(
-                                arg="alias", value=ast.Constant(value=value_key)
-                            )
-                        ],
+                        keywords=keywords,
                     ),
                     simple=1,
                 )
+
             else:
                 assign = ast.AnnAssign(
                     target=ast.Name(value_key, ctx=ast.Store()),
@@ -208,6 +215,7 @@ def generate_inputs(
                         is_optional=True,
                     ),
                     simple=1,
+                    value=ast.Constant(None) if not isinstance(value.type, GraphQLNonNull) else None,
                 )
 
             potential_comment = (
