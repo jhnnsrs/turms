@@ -42,7 +42,7 @@ class OperationsPluginConfig(PluginConfig):
     operations_glob: Optional[str]
     create_arguments: bool = True
     extract_documentation: bool = True
-    arguments_allow_population_by_field_name: bool = False
+    arguments_allow_population_by_field_name: bool = True
 
     class Config:
         env_prefix = "TURMS_PLUGINS_OPERATIONS_"
