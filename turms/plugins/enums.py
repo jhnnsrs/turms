@@ -21,7 +21,7 @@ class EnumsPluginConfig(PluginConfig):
     type = "turms.plugins.enums.EnumsPlugin"
     skip_underscore: bool = False
     skip_double_underscore: bool = True
-    skip_unreferenced: bool = False
+    skip_unreferenced: bool = True
     prepend: str = ""
     append: str = ""
 
@@ -35,7 +35,6 @@ def generate_enums(
     plugin_config: EnumsPluginConfig,
     registry: ClassRegistry,
 ):
-
     tree = []
 
     enum_types = {
@@ -44,7 +43,7 @@ def generate_enums(
         if isinstance(value, GraphQLEnumType)
     }
 
-    if plugin_config.skip_unreferenced:
+    if plugin_config.skip_unreferenced and config.documents:
         ref_registry = create_reference_registry_from_documents(
             client_schema, parse_documents(client_schema, config.documents)
         )
@@ -52,7 +51,6 @@ def generate_enums(
         ref_registry = None
 
     for key, type in enum_types.items():
-
         if ref_registry and key not in ref_registry.enums:
             continue
 
@@ -71,7 +69,6 @@ def generate_enums(
         )
 
         for value_key, value in type.values.items():
-
             if isinstance(value.value, str):
                 servalue = value.value
             else:
@@ -129,7 +126,6 @@ class EnumsPlugin(Plugin):
         config: GeneratorConfig,
         registry: ClassRegistry,
     ) -> List[ast.AST]:
-
         registry.register_import("enum.Enum")
 
         return generate_enums(client_schema, config, self.config, registry)

@@ -77,7 +77,9 @@ class ClassRegistry(object):
     yet been defined). Class Registry provides a facade to the rest of the code to abstract
     the logic behind the stylers."""
 
-    def __init__(self, config: GeneratorConfig, stylers: List[Styler], log: LogFunction):
+    def __init__(
+        self, config: GeneratorConfig, stylers: List[Styler], log: LogFunction
+    ):
         self.stylers = stylers
         self._imports = set()
         self._builtins = set()
@@ -238,7 +240,7 @@ class ClassRegistry(object):
     def inherit_interface(self, typename: str, allow_forward=True) -> ast.AST:
         if typename not in self.interface_baseclass_map:
             raise RegistryError(
-                f"Interface type {typename} is not yet defined but referenced by. And we dont allow forward references"
+                f"Interface type {typename} is not yet defined but referenced. Please define it first."
             )
         return self.interface_baseclass_map[typename]
 
@@ -281,7 +283,7 @@ class ClassRegistry(object):
     def inherit_fragment(self, typename: str, allow_forward=True) -> ast.AST:
         if typename not in self.fragment_class_map:
             raise RegistryError(
-                f"Interface type {typename} is not yet defined but referenced by. And we dont allow forward references"
+                f"Fragment {typename} is not yet defined but referenced by. Please change the order in your fragments."
             )
         return self.fragment_class_map[typename]
 

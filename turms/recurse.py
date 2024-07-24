@@ -415,7 +415,7 @@ def recurse_annotation(
                 )
 
             if isinstance(sub_node, InlineFragmentNode):
-                raise NotImplementedError()
+                raise NotImplementedError("Inline Fragments are not yet implemented")
 
         body = pick_fields if pick_fields else [ast.Pass()]
 

@@ -107,6 +107,12 @@ def load_introspection_from_url(
         raise GenerationError(
             f"Failed to fetch schema from {url} Graphql error: {x['errors']}"
         )
+    
+    if "data" not in x:
+        raise GenerationError(f"Failed to fetch schema from {url}. Did not receive data attripute: {x}")
+    
+
+
     return x["data"]
 
 

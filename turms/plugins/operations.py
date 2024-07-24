@@ -254,7 +254,7 @@ def generate_operation(
                                     arg="default",
                                     value=ast.Constant(
                                         value=parse_value_node(v.default_value)
-                                        if v.default_value
+                                        if v.default_value is not None
                                         else None
                                     ),
                                 ),
@@ -290,7 +290,7 @@ def generate_operation(
                                     arg="default",
                                     value=ast.Constant(
                                         value=parse_value_node(v.default_value)
-                                        if v.default_value
+                                        if v.default_value is not None
                                         else None
                                     ),
                                 ),

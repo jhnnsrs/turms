@@ -218,13 +218,24 @@ def generate_parameters(
 
     for kwarg in extra_kwargs:
         registry.register_import(kwarg.type)
+
+        annotation = ast.Name(
+            id=kwarg.type.split(".")[-1],
+            ctx=ast.Load(),
+        )
+
+        if kwarg.default is None:
+            # if we set the default to None, we need to make the annotation optional
+            # complies with PEP 484
+            annotation = ast.Subscript(
+                value=ast.Name(id="Optional", ctx=ast.Load()),
+                slice=annotation,
+            )
+
         kw_args.append(
             ast.arg(
                 arg=kwarg.key,
-                annotation=ast.Name(
-                    id=kwarg.type.split(".")[-1],
-                    ctx=ast.Load(),
-                ),
+                annotation=annotation,
             )
         )
         kw_values.append(ast.Constant(value=kwarg.default))
@@ -503,6 +514,12 @@ def genereate_async_call(
             )
         )
     else:
+        correct_attr = (
+            o.selection_set.selections[0].alias.value
+            if o.selection_set.selections[0].alias
+            else o.selection_set.selections[0].name.value
+        )
+
         return ast.Return(
             value=ast.Attribute(
                 value=ast.Await(
@@ -523,9 +540,7 @@ def genereate_async_call(
                         ],
                     )
                 ),
-                attr=registry.generate_node_name(
-                    o.selection_set.selections[0].name.value
-                ),
+                attr=registry.generate_node_name(correct_attr),
                 ctx=ast.Load(),
             )
         )
@@ -559,6 +574,12 @@ def genereate_sync_call(
             )
         )
     else:
+        correct_attr = (
+            o.selection_set.selections[0].alias.value
+            if o.selection_set.selections[0].alias
+            else o.selection_set.selections[0].name.value
+        )
+
         return ast.Return(
             value=ast.Attribute(
                 value=ast.Call(
@@ -577,9 +598,7 @@ def genereate_sync_call(
                         generate_variable_dict(o, plugin_config, registry),
                     ],
                 ),
-                attr=registry.generate_node_name(
-                    o.selection_set.selections[0].name.value
-                ),
+                attr=registry.generate_node_name(correct_attr),
                 ctx=ast.Load(),
             )
         )
@@ -618,6 +637,12 @@ def genereate_async_iterator(
             orelse=[],
         )
     else:
+        correct_attr = (
+            o.selection_set.selections[0].alias.value
+            if o.selection_set.selections[0].alias
+            else o.selection_set.selections[0].name.value
+        )
+
         return ast.AsyncFor(
             target=ast.Name(id="event", ctx=ast.Store()),
             iter=ast.Call(
@@ -640,9 +665,7 @@ def genereate_async_iterator(
                         value=ast.Attribute(
                             value=ast.Name(id="event", ctx=ast.Load()),
                             ctx=ast.Load(),
-                            attr=registry.generate_node_name(
-                                o.selection_set.selections[0].name.value
-                            ),
+                            attr=registry.generate_node_name(correct_attr),
                         )
                     )
                 ),
@@ -684,6 +707,12 @@ def genereate_sync_iterator(
             orelse=[],
         )
     else:
+        correct_attr = (
+            o.selection_set.selections[0].alias.value
+            if o.selection_set.selections[0].alias
+            else o.selection_set.selections[0].name.value
+        )
+
         return ast.For(
             target=ast.Name(id="event", ctx=ast.Store()),
             iter=ast.Call(
@@ -706,9 +735,7 @@ def genereate_sync_iterator(
                         value=ast.Attribute(
                             value=ast.Name(id="event", ctx=ast.Load()),
                             ctx=ast.Load(),
-                            attr=registry.generate_node_name(
-                                o.selection_set.selections[0].name.value
-                            ),
+                            attr=registry.generate_node_name(correct_attr),
                         )
                     )
                 ),

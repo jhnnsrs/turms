@@ -1,9 +1,9 @@
 [tool.poetry]
 name = "turms"
-version = "0.4.2"
+version = "0.5.0"
 description = "graphql-codegen powered by pydantic"
 authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
-license = "CC BY-NC 3.0"
+license = "MIT"
 readme = "README.md"
 packages = [{ include = "turms" }]
 homepage = "https://jhnnsrs.github.io/turms"

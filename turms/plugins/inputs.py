@@ -29,7 +29,7 @@ class InputsPluginConfig(PluginConfig):
     type = "turms.plugins.inputs.InputsPlugin"
     inputtype_bases: List[str] = ["pydantic.BaseModel"]
     skip_underscore: bool = True
-    skip_unreferenced: bool = False
+    skip_unreferenced: bool = True
 
     class Config:
         env_prefix = "TURMS_PLUGINS_INPUTS_"
@@ -106,7 +106,6 @@ def generate_input_annotation(
                 )
 
         if is_optional:
-
             registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
@@ -138,7 +137,6 @@ def generate_inputs(
     plugin_config: InputsPluginConfig,
     registry: ClassRegistry,
 ):
-
     tree = []
 
     inputobjects_type = {
@@ -147,7 +145,7 @@ def generate_inputs(
         if isinstance(value, GraphQLInputObjectType)
     }
 
-    if plugin_config.skip_unreferenced:
+    if plugin_config.skip_unreferenced and config.documents:
         ref_registry = create_reference_registry_from_documents(
             client_schema, parse_documents(client_schema, config.documents)
         )
@@ -158,7 +156,6 @@ def generate_inputs(
         registry.register_import(base)
 
     for key, type in inputobjects_type.items():
-
         if ref_registry and key not in ref_registry.inputs:
             continue
 
@@ -174,11 +171,20 @@ def generate_inputs(
         )
 
         for value_key, value in type.fields.items():
-
             field_name = registry.generate_node_name(value_key)
 
             if field_name != value_key:
                 registry.register_import("pydantic.Field")
+                keywords = [
+                    ast.keyword(
+                        arg="alias", value=ast.Constant(value=value_key)
+                    )
+                ]
+                if not isinstance(value.type, GraphQLNonNull):
+                    keywords.append(
+                        ast.keyword(arg="default", value=ast.Constant(None))
+                    )
+
                 assign = ast.AnnAssign(
                     target=ast.Name(field_name, ctx=ast.Store()),
                     annotation=generate_input_annotation(
@@ -192,14 +198,11 @@ def generate_inputs(
                     value=ast.Call(
                         func=ast.Name(id="Field", ctx=ast.Load()),
                         args=[],
-                        keywords=[
-                            ast.keyword(
-                                arg="alias", value=ast.Constant(value=value_key)
-                            )
-                        ],
+                        keywords=keywords,
                     ),
                     simple=1,
                 )
+
             else:
                 assign = ast.AnnAssign(
                     target=ast.Name(value_key, ctx=ast.Store()),
@@ -212,6 +215,7 @@ def generate_inputs(
                         is_optional=True,
                     ),
                     simple=1,
+                    value=ast.Constant(None) if not isinstance(value.type, GraphQLNonNull) else None,
                 )
 
             potential_comment = (
@@ -263,7 +267,6 @@ class InputsPlugin(Plugin):
         config: GeneratorConfig,
         registry: ClassRegistry,
     ) -> List[ast.AST]:
-
         for base in self.config.inputtype_bases:
             registry.register_import(base)
 
