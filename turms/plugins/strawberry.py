@@ -39,8 +39,7 @@ class StrawberryGenerateFunc(ImportableFunctionMixin, Protocol):
         config: GeneratorConfig,
         plugin_config: "StrawberryPluginConfig",
         registry: ClassRegistry,
-    ) -> List[ast.AST]:
-        ...  # pragma: no cover
+    ) -> List[ast.AST]: ...  # pragma: no cover
 
 
 def default_generate_directives(
@@ -708,12 +707,12 @@ def generate_types(
     }
     registry.register_import("strawberry")
 
-    interface_map: Dict[
-        str, List[str]
-    ] = {}  # A list of interfaces with the union classes attached
-    interface_base_map: Dict[
-        str, str
-    ] = {}  # A list of interfaces with its respective base
+    interface_map: Dict[str, List[str]] = (
+        {}
+    )  # A list of interfaces with the union classes attached
+    interface_base_map: Dict[str, str] = (
+        {}
+    )  # A list of interfaces with its respective base
 
     for key, object_type in sorted_objects.items():
         additional_bases = get_additional_bases_for_type(

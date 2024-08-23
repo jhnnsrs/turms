@@ -176,9 +176,7 @@ def generate_inputs(
             if field_name != value_key:
                 registry.register_import("pydantic.Field")
                 keywords = [
-                    ast.keyword(
-                        arg="alias", value=ast.Constant(value=value_key)
-                    )
+                    ast.keyword(arg="alias", value=ast.Constant(value=value_key))
                 ]
                 if not isinstance(value.type, GraphQLNonNull):
                     keywords.append(
@@ -215,7 +213,11 @@ def generate_inputs(
                         is_optional=True,
                     ),
                     simple=1,
-                    value=ast.Constant(None) if not isinstance(value.type, GraphQLNonNull) else None,
+                    value=(
+                        ast.Constant(None)
+                        if not isinstance(value.type, GraphQLNonNull)
+                        else None
+                    ),
                 )
 
             potential_comment = (

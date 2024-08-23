@@ -22,5 +22,4 @@ class Processor(BaseModel):
     config: ProcessorConfig
 
     @abstractmethod
-    def run(gen_file: str, config: GeneratorConfig):
-        ...  # pragma: no cover
+    def run(gen_file: str, config: GeneratorConfig): ...  # pragma: no cover

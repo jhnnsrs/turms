@@ -21,5 +21,4 @@ class Parser(BaseModel):
     def parse_ast(
         self,
         asts: List[ast.AST],
-    ) -> List[ast.AST]:
-        ...  # pragma: no cover
+    ) -> List[ast.AST]: ...  # pragma: no cover

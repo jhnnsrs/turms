@@ -785,32 +785,36 @@ def generate_operation_func(
                 ),
                 body=[
                     doc,
-                    genereate_async_call(
-                        definition,
-                        o,
-                        client_schema,
-                        config,
-                        plugin_config,
-                        registry,
-                        collapse,
-                    )
-                    if definition.type != OperationType.SUBSCRIPTION
-                    else genereate_async_iterator(
-                        definition,
-                        o,
-                        client_schema,
-                        config,
-                        plugin_config,
-                        registry,
-                        collapse,
+                    (
+                        genereate_async_call(
+                            definition,
+                            o,
+                            client_schema,
+                            config,
+                            plugin_config,
+                            registry,
+                            collapse,
+                        )
+                        if definition.type != OperationType.SUBSCRIPTION
+                        else genereate_async_iterator(
+                            definition,
+                            o,
+                            client_schema,
+                            config,
+                            plugin_config,
+                            registry,
+                            collapse,
+                        )
                     ),
                 ],
                 decorator_list=[],
-                returns=return_type
-                if definition.type != OperationType.SUBSCRIPTION
-                else ast.Subscript(
-                    value=ast.Name(id="AsyncIterator", ctx=ast.Load()),
-                    slice=return_type,
+                returns=(
+                    return_type
+                    if definition.type != OperationType.SUBSCRIPTION
+                    else ast.Subscript(
+                        value=ast.Name(id="AsyncIterator", ctx=ast.Load()),
+                        slice=return_type,
+                    )
                 ),
             )
         )
@@ -831,31 +835,35 @@ def generate_operation_func(
                 ),
                 body=[
                     doc,
-                    genereate_sync_call(
-                        definition,
-                        o,
-                        client_schema,
-                        config,
-                        plugin_config,
-                        registry,
-                        collapse,
-                    )
-                    if definition.type != OperationType.SUBSCRIPTION
-                    else genereate_sync_iterator(
-                        definition,
-                        o,
-                        client_schema,
-                        config,
-                        plugin_config,
-                        registry,
-                        collapse,
+                    (
+                        genereate_sync_call(
+                            definition,
+                            o,
+                            client_schema,
+                            config,
+                            plugin_config,
+                            registry,
+                            collapse,
+                        )
+                        if definition.type != OperationType.SUBSCRIPTION
+                        else genereate_sync_iterator(
+                            definition,
+                            o,
+                            client_schema,
+                            config,
+                            plugin_config,
+                            registry,
+                            collapse,
+                        )
                     ),
                 ],
                 decorator_list=[],
-                returns=return_type
-                if definition.type != OperationType.SUBSCRIPTION
-                else ast.Subscript(
-                    value=ast.Name(id="Iterator", ctx=ast.Load()), slice=return_type
+                returns=(
+                    return_type
+                    if definition.type != OperationType.SUBSCRIPTION
+                    else ast.Subscript(
+                        value=ast.Name(id="Iterator", ctx=ast.Load()), slice=return_type
+                    )
                 ),
             )
         )

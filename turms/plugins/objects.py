@@ -157,13 +157,22 @@ def generate_object_field_annotation(
             and config.freeze.convert_list_to_tuple
         ):
             registry.register_import("typing.Tuple")
+
             def list_builder(x):
-                return ast.Subscript(value=ast.Name("Tuple", ctx=ast.Load()), slice=ast.Tuple(elts=[x, ast.Ellipsis()], ctx=ast.Load()), ctx=ast.Load())
+                return ast.Subscript(
+                    value=ast.Name("Tuple", ctx=ast.Load()),
+                    slice=ast.Tuple(elts=[x, ast.Ellipsis()], ctx=ast.Load()),
+                    ctx=ast.Load(),
+                )
+
         else:
 
             registry.register_import("typing.List")
+
             def list_builder(x):
-                return ast.Subscript(value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load())
+                return ast.Subscript(
+                    value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
+                )
 
         if is_optional:
             registry.register_import("typing.Optional")
@@ -223,12 +232,12 @@ def generate_types(
         )
     }
 
-    interface_map: Dict[
-        str, List[str]
-    ] = {}  # A list of interfaces with the union classes attached
-    interface_base_map: Dict[
-        str, str
-    ] = {}  # A list of interfaces with its respective base
+    interface_map: Dict[str, List[str]] = (
+        {}
+    )  # A list of interfaces with the union classes attached
+    interface_base_map: Dict[str, str] = (
+        {}
+    )  # A list of interfaces with its respective base
 
     for base in plugin_config.types_bases:
         registry.register_import(base)

@@ -6,6 +6,7 @@ from pydantic import BaseModel, BaseSettings, Field
 from graphql.utilities.build_client_schema import GraphQLSchema
 from turms.config import LogFunction
 
+
 class PluginConfig(BaseSettings):
     type: str
 
@@ -30,9 +31,7 @@ class Plugin(BaseModel):
         config,
         client_schema: GraphQLSchema,
         registry,
-    ) -> List[ast.AST]:
-        ...  # pragma: no cover
-
+    ) -> List[ast.AST]: ...  # pragma: no cover
 
     class Config:
         extra = "forbid"

@@ -54,8 +54,6 @@ class ReferenceRegistry:
         return type_name in self.inputs
 
 
-
-
 def recurse_find_references(
     node: FieldNode,
     graphql_type: GraphQLType,
@@ -128,10 +126,8 @@ def recurse_find_references(
         raise Exception("Unknown Type", type(graphql_type), graphql_type)
 
 
-
 def break_recursion_loop(*args, **kwargs):
     return recurse_type_annotation(*args, **kwargs)
-
 
 
 def recurse_type_annotation(
@@ -141,7 +137,7 @@ def recurse_type_annotation(
     registry: ReferenceRegistry,
     optional=True,
 ):
-    
+
     if isinstance(graphql_type, NonNullTypeNode):
         return recurse_type_annotation(
             field, graphql_type.type, schema, registry, optional=False
@@ -154,17 +150,16 @@ def recurse_type_annotation(
         type = schema.get_type(graphql_type.name.value)
         assert type, graphql_type
         return recurse_type_annotation(field, type, schema, registry, optional=False)
-    
+
     elif isinstance(graphql_type, GraphQLNonNull):
         return recurse_type_annotation(
             field, graphql_type.of_type, schema, registry, optional=False
         )
-    
+
     elif isinstance(graphql_type, GraphQLList):
         return recurse_type_annotation(
             field, graphql_type.of_type, schema, registry, optional=False
         )
-    
 
     elif isinstance(graphql_type, GraphQLScalarType):
         registry.register_scalar(graphql_type.name)
@@ -176,7 +171,7 @@ def recurse_type_annotation(
         # Only and only is we have not registered this input object type yet
         # we need to register it (otherwise we might get into a recursion loop)
         if not registry.is_input_registered(graphql_type.name):
-        
+
             registry.register_input(graphql_type.name)
 
             # We need to get all input objects that this graphql input object type references

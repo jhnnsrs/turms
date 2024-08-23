@@ -118,10 +118,11 @@ def recurse_annotation(
                 )
                 cls = ast.ClassDef(
                     inline_fragment_name,
-                    bases=additional_bases + [
-                ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                for base in config.object_bases
-            ],
+                    bases=additional_bases
+                    + [
+                        ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+                        for base in config.object_bases
+                    ],
                     decorator_list=[],
                     keywords=[],
                     body=inline_fragment_fields
@@ -165,9 +166,6 @@ def recurse_annotation(
                 )
         else:
             return ast.Name(id=union_class_names[0], ctx=ast.Load())
-
-
-
 
     if isinstance(type, GraphQLInterfaceType):
         # Lets Create Base Class to Inherit from for this
@@ -294,9 +292,9 @@ def recurse_annotation(
                         )
 
                     elif isinstance(sub_sub_node, FragmentSpreadNode):
-                        additional_bases.append(registry.reference_fragment(
-                            sub_sub_node.name.value, parent
-                        ))
+                        additional_bases.append(
+                            registry.reference_fragment(sub_sub_node.name.value, parent)
+                        )
 
                 cls = ast.ClassDef(
                     inline_fragment_name,
@@ -490,14 +488,22 @@ def recurse_annotation(
 
         if config.freeze.enabled:
             registry.register_import("typing.Tuple")
+
             def list_builder(x):
-                return ast.Subscript(value=ast.Name("Tuple", ctx=ast.Load()), slice=ast.Tuple(elts=[x, ast.Ellipsis()], ctx=ast.Load()), ctx=ast.Load())
+                return ast.Subscript(
+                    value=ast.Name("Tuple", ctx=ast.Load()),
+                    slice=ast.Tuple(elts=[x, ast.Ellipsis()], ctx=ast.Load()),
+                    ctx=ast.Load(),
+                )
 
         else:
 
             registry.register_import("typing.List")
+
             def list_builder(x):
-                return ast.Subscript(value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load())
+                return ast.Subscript(
+                    value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
+                )
 
         if is_optional:
             registry.register_import("typing.Optional")

@@ -397,7 +397,9 @@ def recurse_type_annotation(
                             type.name.value, "", allow_forward=False
                         )
                     except NoEnumFound:
-                        raise NotImplementedError(f"Could not find corresponding type for type '{type.name.value}'. Did you register this scalar?")
+                        raise NotImplementedError(
+                            f"Could not find corresponding type for type '{type.name.value}'. Did you register this scalar?"
+                        )
 
         if not x:
             raise Exception(f"Could not set value for {type}")
@@ -584,7 +586,9 @@ def recurse_type_label(
                             type.name.value, "", allow_forward=False
                         )
                     except NoEnumFound:
-                        raise NotImplementedError(f"Could not find correspoinding type labler for {type.name.value}")
+                        raise NotImplementedError(
+                            f"Could not find correspoinding type labler for {type.name.value}"
+                        )
 
         if optional:
             return "Optional[" + x.id + "]"
