@@ -119,7 +119,9 @@ def generate_typename_field(
 
 
 def generate_config_class(
-    graphQLType: GraphQLTypes, config: GeneratorConfig, typename: str = None
+    graphQLType: GraphQLTypes,
+    config: GeneratorConfig,
+    typename: str = None,
 ):
     """Generates the config class for a specific type
 
