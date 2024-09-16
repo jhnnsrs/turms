@@ -110,6 +110,13 @@ def generate_projects(projects, title="Turms"):
                 live.update(panel)
 
     if raised_exceptions:
+        # print traceback of first exception
+        for e in raised_exceptions:
+            try:
+                raise e
+            except Exception:
+                get_console().print_exception()
+
         raise click.ClickException(
             "One or more projects failed to generate. First error"
         ) from raised_exceptions[0]

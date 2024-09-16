@@ -1,5 +1,7 @@
 import builtins
-from pydantic import AnyHttpUrl, BaseModel, BaseSettings, Field, validator
+from pydantic import AnyHttpUrl, BaseModel, Field, GetCoreSchemaHandler, field_validator, validator, ConfigDict
+from pydantic_core import core_schema
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import (
     Any,
     Dict,
@@ -15,22 +17,24 @@ from enum import Enum
 
 
 class ConfigProxy(BaseModel):
+    model_config = ConfigDict(extra="allow")
     type: str
 
-    class Config:
-        extra = "allow"
 
 
 class ImportableFunctionMixin(Protocol):
-    @classmethod
-    def __get_validators__(cls):
-        # one or more validators may be yielded which will be called in the
-        # order to validate the input, each validator will receive as an input
-        # the value returned from the previous validator
-        yield cls.validate
 
     @classmethod
-    def validate(cls, v):
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        return core_schema.with_info_after_validator_function(
+            cls.validate, handler(callable), field_name=handler.field_name
+        )
+
+
+    @classmethod
+    def validate(cls, v, *info):
         if not callable(v):
             if not isinstance(v, str):
                 raise TypeError("string required")
@@ -45,11 +49,16 @@ class PythonType(str):
     """A string that represents a python type. Either a builtin type or a type from a module."""
 
     @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        return core_schema.with_info_after_validator_function(
+            cls.validate, handler(str), field_name=handler.field_name
+        )
+
 
     @classmethod
-    def validate(cls, v):
+    def validate(cls, v, *info):
         if not isinstance(v, str):
             raise TypeError("string required")
         if v not in dir(builtins):
@@ -102,11 +111,11 @@ class FreezeConfig(BaseSettings):
     """The core types (Input, Fragment, Object, Operation) to freeze"""
 
     exclude: Optional[List[str]] = Field(
-        description="List of types to exclude from freezing"
+        None, description="List of types to exclude from freezing"
     )
     """List of types to exclude from freezing"""
     include: Optional[List[str]] = Field(
-        description="List of types to include in freezing"
+        None, description="List of types to include in freezing"
     )
     """The types to freeze"""
     exclude_fields: Optional[List[str]] = Field(
@@ -137,18 +146,18 @@ class OptionsConfig(BaseSettings):
 
     enabled: bool = Field(False, description="Enabling this, will freeze the schema")
     """Enabling this, will freeze the schema"""
-    extra: ExtraOptions
+    extra: ExtraOptions  = None
     """Extra options for pydantic"""
-    allow_mutation: Optional[bool]
+    allow_mutation: Optional[bool] = None
     """Allow mutation"""
-    allow_population_by_field_name: Optional[bool]
+    allow_population_by_field_name: Optional[bool] = None
     """Allow population by field name"""
-    orm_mode: Optional[bool]
+    orm_mode: Optional[bool] = None
     """ORM mode"""
-    use_enum_values: Optional[bool]
+    use_enum_values: Optional[bool] = None
     """Use enum values"""
 
-    validate_assignment: Optional[bool]
+    validate_assignment: Optional[bool] = None
     """Validate assignment"""
 
     types: List[GraphQLTypes] = Field(
@@ -158,14 +167,16 @@ class OptionsConfig(BaseSettings):
     """The core types (Input, Fragment, Object, Operation) to enable this option"""
 
     exclude: Optional[List[str]] = Field(
-        description="List of types to exclude from setting this option"
+        None, description="List of types to exclude from setting this option"
     )
     """List of types to exclude from setting this option"""
     include: Optional[List[str]] = Field(
-        description="List of types to include in setting these options"
+        None, description="List of types to include in setting these options"
     )
     """The types to freeze"""
 
+
+PydanticVersion = Literal["v1", "v2"]
 
 class GeneratorConfig(BaseSettings):
     """Configuration for the generator
@@ -177,6 +188,13 @@ class GeneratorConfig(BaseSettings):
     and the scalars that should be used.
 
     """
+    model_config: SettingsConfigDict = SettingsConfigDict(
+        env_prefix="TURMS_",
+        extra="forbid",
+        
+
+    )
+    pydantic_version: PydanticVersion = "v2"
 
     domain: Optional[str] = None
     """The domain of the GraphQL API ( will be set as a config variable)"""
@@ -184,7 +202,7 @@ class GeneratorConfig(BaseSettings):
     """The output directory for the generated models"""
     generated_name: str = "schema.py"
     """ The name of the generated file within the output directory"""
-    documents: Optional[str]
+    documents: Optional[str] = None
     """The documents to parse. Setting this will overwrite the documents in the graphql config"""
     verbose: bool = False
     """Enable verbose logging"""
@@ -261,7 +279,7 @@ class GeneratorConfig(BaseSettings):
     )
     "List of stylers to use. Style are used to enforce specific styles on the generaded class or fieldnames. "
 
-    @validator("parsers", "plugins", "processors", "stylers")
+    @field_validator("parsers", "plugins", "processors", "stylers")
     def validate_importable(cls, v):
         try:
             for parser in v:
@@ -271,9 +289,6 @@ class GeneratorConfig(BaseSettings):
 
         return v
 
-    class Config:
-        env_prefix = "TURMS_"
-        extra = "forbid"
 
 
 class Extensions(BaseModel):
@@ -301,17 +316,17 @@ class GraphQLProject(BaseSettings):
     Turm will use the schema and documents to generate the python models, according
     to the generator configuration under extensions.turms
     """
+    model_config: SettingsConfigDict = SettingsConfigDict(
+        env_prefix="TURMS_GRAPHQL_",
+        extra="allow",
+    )
 
-    schema_url: SchemaType = Field(alias="schema", env="TURMS_GRAPHQL_SCHEMA")
+    schema_url: SchemaType = Field(alias="schema")
     """The schema url or path to the schema file"""
-    documents: Optional[str]
+    documents: Optional[str] = None
     """The documents (operations,fragments) to parse"""
     extensions: Extensions
     """The extensions configuration for the project (here resides the turms configuration)"""
-
-    class Config:
-        env_prefix = "TURMS_GRAPHQL_"
-        extra = "allow"
 
 
 class GraphQLConfigMultiple(BaseSettings):
@@ -319,12 +334,13 @@ class GraphQLConfigMultiple(BaseSettings):
 
     This is the main configuration for multiple GraphQL projects. It is compliant with
     the graphql-config specification for multiple projec."""
+    model_config: SettingsConfigDict = SettingsConfigDict(
+        extra="allow",
+    )
 
     projects: Dict[str, GraphQLProject]
     """ The projects that should be parsed. The key is the name of the project and the value is the graphql project"""
 
-    class Config:
-        extra = "allow"
 
 
 class GraphQLConfigSingle(GraphQLProject):
@@ -333,6 +349,6 @@ class GraphQLConfigSingle(GraphQLProject):
     This is the main configuration for a single GraphQL project. It is compliant with
     the graphql-config specification for a single project.
     """
-
-    class Config:
-        extra = "allow"
+    model_config: SettingsConfigDict = SettingsConfigDict(
+        extra="allow",
+    )

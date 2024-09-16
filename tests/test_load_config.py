@@ -38,9 +38,9 @@ def test_load_single_config():
 
 
 def test_failure_on_wrong_scalars():
-    with pytest.raises(pydantic.error_wrappers.ValidationError):
+    with pytest.raises(pydantic.ValidationError):
         GeneratorConfig(scalar_definitions={"X": "zzzzz"})
-    with pytest.raises(pydantic.error_wrappers.ValidationError):
+    with pytest.raises(pydantic.ValidationError):
         GeneratorConfig(scalar_definitions={"X": 15})
 
 

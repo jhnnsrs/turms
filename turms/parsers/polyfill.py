@@ -1,16 +1,26 @@
 from turms.parsers.base import Parser, ParserConfig
 from typing import List
 import ast
-from pydantic import Field
+from pydantic_settings import SettingsConfigDict
+from pydantic import Field, field_validator, ConfigDict
 
 
 class PolyfillPluginConfig(ParserConfig):
-    type = "turms.parsers.polyfill.PolyfillPlugin"
+    model_config = SettingsConfigDict(env_prefix="TURMS_PARSERS_POLYFILL_")
+    type: str = "turms.parsers.polyfill.PolyfillPlugin"
     skip_underscore: bool = True
     python_version: str = "3.9"
 
-    class Config:
-        env_prefix = "TURMS_PARSERS_POLYFILL_"
+    @field_validator("python_version", mode="before")
+    def validate_python_version(cls, value):
+        if isinstance(value, (int, float)):
+            value = str(value)
+
+        if value not in ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]:
+            raise ValueError("Invalid python version")
+
+        return value
+
 
 
 def polyfill_python_seven(

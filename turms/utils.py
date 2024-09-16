@@ -94,7 +94,10 @@ def generate_typename_field(
     registry.register_import("typing.Optional")
     registry.register_import("typing.Literal")
 
-    keywords = [ast.keyword(arg="alias", value=ast.Constant(value="__typename"))]
+    keywords = [
+        ast.keyword(arg="alias", value=ast.Constant(value="__typename")),
+        ast.keyword(arg="default", value=ast.Constant(value=typename)),
+    ]
     if config.exclude_typenames:
         keywords.append(ast.keyword(arg="exclude", value=ast.Constant(value=True)))
 
@@ -117,8 +120,94 @@ def generate_typename_field(
         simple=1,
     )
 
+def generate_config_dict(
+    graphQLType: GraphQLTypes, config: GeneratorConfig, registy: ClassRegistry, typename: str = None
+):
+    """Generates the config class for a specific type version 2
 
-def generate_config_class(
+    It will append the config class to the registry, and set the frozen
+    attribute for the class to True, if the freeze config is enabled and
+    the type appears in the freeze list.
+
+    It will also add config attributes to the class, if the type appears in
+    'additional_config' in the config file.
+
+    """
+
+    config_keywords = []
+
+    if config.freeze.enabled:
+        if graphQLType in config.freeze.types:
+            if config.freeze.exclude and typename in config.freeze.exclude:
+                pass
+            elif config.freeze.include and typename not in config.freeze.include:
+                pass
+            else:
+                config_keywords.append(
+                    ast.keyword(arg="frozen", value=ast.Constant(value=True))
+                )
+
+    if config.options.enabled:
+        if graphQLType in config.options.types:
+            if config.options.exclude and typename in config.options.exclude:
+                pass
+            elif config.options.include and typename not in config.options.include:
+                pass
+            else:
+                if config.options.allow_mutation is not None:
+                    config_keywords.append(
+                        ast.keyword(arg="allow_mutation", value=ast.Constant(value=config.options.allow_mutation))
+                    )
+
+                if config.options.extra is not None:
+                    config_keywords.append(
+                        ast.keyword(arg="extra", value=ast.Constant(value=config.options.extra))
+                    )
+
+                if config.options.validate_assignment is not None:
+                    config_keywords.append(
+                        ast.keyword(arg="validate_assignment", value=ast.Constant(value=config.options.validate_assignment))
+                    )
+
+                if config.options.allow_population_by_field_name is not None:
+                    config_keywords.append(
+                        ast.keyword(arg="populate_by_name", value=ast.Constant(value=config.options.allow_population_by_field_name))
+                    )
+
+                if config.options.orm_mode is not None:
+                    config_keywords.append(
+                        ast.keyword(arg="orm_mode", value=ast.Constant(value=config.options.orm_mode))
+                    )
+
+                if config.options.use_enum_values is not None:
+                    config_keywords.append(
+                        ast.keyword(arg="use_enum_values", value=ast.Constant(value=config.options.use_enum_values))
+                    )
+
+
+    if typename:
+        if typename in config.additional_config:
+            for key, value in config.additional_config[typename].items():
+                config_keywords.append(
+                    ast.keyword(arg=key, value=ast.Constant(value=value))
+                )
+
+    
+    if len(config_keywords) > 0:
+        registy.register_import("pydantic.ConfigDict")
+        return [
+            ast.Assign(
+                targets=[ast.Name(id="model_config", ctx=ast.Store())],
+                value=ast.Call(func=ast.Name(id="ConfigDict", ctx=ast.Load()),
+                args=[], keywords=config_keywords)
+            )
+                
+        ]
+    else:
+        return []
+
+
+def generate_config_class_pydantic(
     graphQLType: GraphQLTypes, config: GeneratorConfig, typename: str = None
 ):
     """Generates the config class for a specific type
@@ -242,6 +331,13 @@ def generate_config_class(
         ]
     else:
         return []
+    
+
+def generate_pydantic_config(graphQLType: GraphQLTypes, config: GeneratorConfig, registry: ClassRegistry, typename: str = None):
+    if config.pydantic_version == "v2": 
+        return generate_config_dict(graphQLType, config, registry, typename)
+    else:
+        return generate_config_class_pydantic(graphQLType, config, typename)
 
 
 def parse_documents(client_schema: GraphQLSchema, scan_glob) -> DocumentNode:

@@ -12,6 +12,7 @@ from graphql import (
     GraphQLArgument,
     ObjectTypeDefinitionNode,
 )
+from pydantic_settings import SettingsConfigDict
 
 from turms.plugins.base import Plugin, PluginConfig
 import ast
@@ -24,7 +25,7 @@ from graphql.type.definition import (
 )
 from turms.registry import ClassRegistry
 from turms.utils import (
-    generate_config_class,
+    generate_pydantic_config,
     get_additional_bases_for_type,
     interface_is_extended_by_other_interfaces,
 )
@@ -133,7 +134,7 @@ def default_generate_directives(
                 decorator_list=[decorator],
                 keywords=[],
                 body=(fields or [ast.Pass()])
-                + generate_config_class(GraphQLTypes.DIRECTIVE, config, directive.name),
+                + generate_pydantic_config(GraphQLTypes.DIRECTIVE, config, registry, directive.name),
             )
         )
 
@@ -223,7 +224,8 @@ def default_generate_enums(
 
 
 class StrawberryPluginConfig(PluginConfig):
-    type = "turms.plugins.strawberry.Strawberry"
+    model_config = SettingsConfigDict(env_prefix = "TURMS_PLUGINS_STRAWBERRY_")
+    type: str = "turms.plugins.strawberry.Strawberry"
     generate_directives: bool = True
     generate_scalars: bool = True
     builtin_directives: List[str] = ["include", "skip", "deprecated", "specifiedBy"]
@@ -240,8 +242,6 @@ class StrawberryPluginConfig(PluginConfig):
     generate_directives_func: StrawberryGenerateFunc = default_generate_directives
     generate_enums_func: StrawberryGenerateFunc = default_generate_enums
 
-    class Config:
-        env_prefix = "TURMS_PLUGINS_STRAWBERRY_"
 
 
 def generate_object_field_annotation(
@@ -674,7 +674,7 @@ def generate_inputs(
                 decorator_list=[decorator],
                 keywords=[],
                 body=fields
-                + generate_config_class(GraphQLTypes.INPUT, config, typename=key),
+                + generate_pydantic_config(GraphQLTypes.INPUT, config, registry, typename=key),
             )
         )
 
@@ -911,7 +911,7 @@ def generate_types(
                 bases=additional_bases,
                 decorator_list=[decorator],
                 keywords=[],
-                body=fields + generate_config_class(GraphQLTypes.OBJECT, config, key),
+                body=fields + generate_pydantic_config(GraphQLTypes.OBJECT, config, registry, key),
             )
         )
 

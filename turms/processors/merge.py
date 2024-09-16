@@ -129,7 +129,7 @@ def merge_class(generated: cst.ClassDef, existing: cst.ClassDef):
 
 
 class MergeProcessorConfig(ProcessorConfig):
-    type = "turms.processors.merge.MergeProcessor"
+    type: str = "turms.processors.merge.MergeProcessor"
 
 
 def merge_code(old_code: str, new_code: str, config: MergeProcessorConfig):

@@ -1,13 +1,13 @@
 from abc import abstractmethod
 
-from pydantic import BaseModel, BaseSettings
+from pydantic import BaseModel, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class StylerConfig(BaseSettings):
+    model_config = SettingsConfigDict(extra="forbid")
     type: str
 
-    class Config:
-        extra = "forbid"
 
 
 class Styler(BaseModel):

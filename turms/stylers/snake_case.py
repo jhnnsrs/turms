@@ -9,7 +9,7 @@ def camel_to_snake(name):
 
 
 class SnakeCaseStylerConfig(StylerConfig):
-    type = "turms.stylers.snake_case.SnakeCaseStyler"
+    type: str = "turms.stylers.snake_case.SnakeCaseStyler"
 
 
 class SnakeCaseStyler(BaseStyler):

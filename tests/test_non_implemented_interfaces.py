@@ -24,7 +24,7 @@ def test_generation_ok(unimplemented_interface_schema):
         ],
     )
 
-    unit_test_with(generated_ast, "Foo(forward=Ref(id=3))")
+    unit_test_with(generated_ast, "Foo(forward=Ref(id='3'))")
 
 
 def test_generation_raises(unimplemented_interface_schema):

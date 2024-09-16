@@ -1,5 +1,7 @@
 import ast
 from typing import List, Optional
+
+from pydantic_settings import SettingsConfigDict
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.language.ast import OperationDefinitionNode, OperationType
@@ -19,7 +21,7 @@ import re
 from graphql import NonNullTypeNode, language
 from turms.registry import ClassRegistry
 from turms.utils import (
-    generate_config_class,
+    generate_pydantic_config,
     inspect_operation_for_documentation,
     parse_documents,
     recurse_type_annotation,
@@ -34,18 +36,17 @@ fragment_searcher = re.compile(r"\.\.\.(?P<fragment>[a-zA-Z]*)")
 
 
 class OperationsPluginConfig(PluginConfig):
-    type = "turms.plugins.operations.OperationsPlugin"
-    query_bases: List[str] = None
-    arguments_bases: List[str] = None
-    mutation_bases: List[str] = None
-    subscription_bases: List[str] = None
-    operations_glob: Optional[str]
+    model_config = SettingsConfigDict(env_prefix = "TURMS_PLUGINS_OPERATIONS_")
+    type: str = "turms.plugins.operations.OperationsPlugin"
+    query_bases: List[str] = []
+    arguments_bases: List[str] = []
+    mutation_bases: List[str] = []
+    subscription_bases: List[str] = []
+    operations_glob: Optional[str] = None
     create_arguments: bool = True
     extract_documentation: bool = True
     arguments_allow_population_by_field_name: bool = False
 
-    class Config:
-        env_prefix = "TURMS_PLUGINS_OPERATIONS_"
 
 
 def get_query_bases(
@@ -349,7 +350,7 @@ def generate_operation(
             bases=extra_bases,
             decorator_list=[],
             keywords=[],
-            body=class_body_fields + generate_config_class(o.operation, config),
+            body=class_body_fields + generate_pydantic_config(o.operation, config, registry),
         )
     )
 

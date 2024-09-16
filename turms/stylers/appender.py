@@ -3,7 +3,7 @@ from turms.stylers.base import BaseStyler, StylerConfig
 
 
 class AppenderStylerConfig(StylerConfig):
-    type = "turms.stylers.appender.AppenderStyler"
+    type: str = "turms.stylers.appender.AppenderStyler"
     append_fragment: str = "Fragment"
     append_query: str = "Query"
     append_mutation: str = "Mutation"
