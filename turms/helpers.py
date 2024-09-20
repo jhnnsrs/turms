@@ -1,3 +1,4 @@
+import os
 import json
 from importlib import import_module
 from typing import Any, Dict, Optional, Tuple
@@ -39,6 +40,38 @@ def import_string(dotted_path):
         ) from err
 
 
+def generate_headers(
+    default_headers: Dict[str, str], headers: Optional[Dict[str, str]]
+) -> Dict[str, str]:
+    """
+    Generate headers for requests. It will combine the default_headers
+    and headers dicts, and then also look for environment variables to
+    create a final set of headers.
+
+    For example:
+
+    default_headers = {"Content-Type": "application/json"}
+    headers = {"X-Hasura-Role": "admin"}
+    # from the environment...
+    os.environ["TURMS_HTTP_HEADERS"] = '{"Authorization": "Bearer 1234"}'
+
+    will return...
+
+    {
+        "Content-Type": "application/json",
+        "X-Hasura-Role": "admin",
+        "Authorization": "Bearer 1234",
+    }
+    """
+
+    final_headers = {**default_headers, **(headers or {})}
+
+    if env_headers := os.environ.get("TURMS_HTTP_HEADERS"):
+        final_headers.update(json.loads(env_headers))
+
+    return final_headers
+
+
 def load_introspection_from_url(
     url: AnyHttpUrl, headers: Optional[Dict[str, str]] = None
 ) -> IntrospectionResult:
@@ -62,11 +95,11 @@ def load_introspection_from_url(
         )  # pragma: no cover
 
     jdata = json.dumps({"query": get_introspection_query()}).encode("utf-8")
-    default_headers = {"Content-Type": "application/json", "Accept": "application/json"}
-    if headers:
-        default_headers.update(headers)
+    headers = generate_headers(
+        {"Content-Type": "application/json", "Accept": "application/json"}, headers
+    )
     try:
-        req = requests.post(url, data=jdata, headers=default_headers)
+        req = requests.post(url, data=jdata, headers=headers)
         x = req.json()
     except Exception:
         raise GenerationError(f"Failed to fetch schema from {url}")
@@ -91,11 +124,9 @@ def load_dsl_from_url(url: AnyHttpUrl, headers: Dict[str, str] = None) -> DSLStr
             "The requests library is required to introspect a schema from a url"
         )  # pragma: no cover
 
-    default_headers = {}
-    if headers:
-        default_headers.update(headers)
+    headers = generate_headers({}, headers)
     try:
-        req = requests.get(url, headers=default_headers)
+        req = requests.get(url, headers=headers)
         x = req.text()
     except Exception:
         raise GenerationError(f"Failed to fetch schema from {url}")
