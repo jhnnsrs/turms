@@ -27,7 +27,7 @@ from turms.parsers.base import Parser
 from turms.processors.base import Processor
 from turms.registry import ClassRegistry
 from turms.stylers.base import Styler
-from pydantic.error_wrappers import ValidationError
+from pydantic import ValidationError
 
 from .errors import GenerationError
 import json
