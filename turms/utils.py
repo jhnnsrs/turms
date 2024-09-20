@@ -316,7 +316,7 @@ def generate_config_class_pydantic(
         config_fields.insert(
             0,
             ast.Expr(
-                value=ast.Str(s="A config class"),
+                value=ast.Constant(value="A config class"),
             ),
         )
     if len(config_fields) > 0:

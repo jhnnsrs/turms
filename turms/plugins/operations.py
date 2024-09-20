@@ -205,7 +205,7 @@ def generate_operation(
     if operation_documentation:
         class_body_fields.append(
             ast.Expr(
-                value=ast.Str(s=operation_documentation),
+                value=ast.Constant(value=operation_documentation),
             )
         )
 

@@ -161,7 +161,7 @@ def generate_object_field_annotation(
             def list_builder(x):
                 return ast.Subscript(
                     value=ast.Name("Tuple", ctx=ast.Load()),
-                    slice=ast.Tuple(elts=[x, ast.Ellipsis()], ctx=ast.Load()),
+                    slice=ast.Tuple(elts=[x,  ast.Constant(value="...")], ctx=ast.Load()),
                     ctx=ast.Load(),
                 )
 

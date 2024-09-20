@@ -4,6 +4,7 @@ from pydantic_core import core_schema
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import (
     Any,
+    Callable,
     Dict,
     List,
     Optional,
