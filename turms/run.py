@@ -27,7 +27,7 @@ from turms.parsers.base import Parser
 from turms.processors.base import Processor
 from turms.registry import ClassRegistry
 from turms.stylers.base import Styler
-from pydantic.error_wrappers import ValidationError
+from pydantic import ValidationError
 
 from .errors import GenerationError
 import json
@@ -231,6 +231,10 @@ def instantiate(module_path: str, **kwargs):
     return import_string(module_path)(**kwargs)
 
 
+def is_url(url: str) -> bool:
+    return url.startswith("http") or url.startswith("https")
+
+
 def build_schema_from_schema_type(
     schema: SchemaType, allow_introspection: bool = False
 ) -> GraphQLSchema:
@@ -273,7 +277,7 @@ def build_schema_from_schema_type(
             dsl_subschemas = []
 
             for item in schema:
-                if isinstance(item, AnyHttpUrl):
+                if is_url(item):
                     dsl_subschemas.append(load_dsl_from_url(item))
                 if isinstance(item, dict):
                     for key, value in item.items():
@@ -283,7 +287,7 @@ def build_schema_from_schema_type(
 
             return build_ast_schema(parse(" ".join(dsl_subschemas)))
 
-    if isinstance(schema, AnyHttpUrl):
+    if is_url(schema):
         try:
             dsl_string = load_dsl_from_url(schema)
             return build_ast_schema(parse(dsl_string))
@@ -345,25 +349,25 @@ def generate(project: GraphQLProject, log: Optional[LogFunction] = None) -> str:
     processors = []
 
     for parser_config in gen_config.parsers:
-        styler = instantiate(parser_config.type, config=parser_config.dict(), log=log)
+        styler = instantiate(parser_config.type, config=parser_config.model_dump(), log=log)
         if verbose:
             get_console().print(f"Using Parser {styler}")
         parsers.append(styler)
 
     for plugins_config in gen_config.plugins:
-        styler = instantiate(plugins_config.type, config=plugins_config.dict(), log=log)
+        styler = instantiate(plugins_config.type, config=plugins_config.model_dump(), log=log)
         if verbose:
             get_console().print(f"Using Plugin {styler}")
         plugins.append(styler)
 
     for styler_config in gen_config.stylers:
-        styler = instantiate(styler_config.type, config=styler_config.dict(), log=log)
+        styler = instantiate(styler_config.type, config=styler_config.model_dump(), log=log)
         if verbose:
             get_console().print(f"Using Styler {styler}")
         stylers.append(styler)
 
     for proc_config in gen_config.processors:
-        styler = instantiate(proc_config.type, config=proc_config.dict(), log=log)
+        styler = instantiate(proc_config.type, config=proc_config.model_dump(), log=log)
         if verbose:
             get_console().print(f"Using Processor {styler}")
         processors.append(styler)

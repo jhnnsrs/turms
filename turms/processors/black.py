@@ -4,7 +4,7 @@ from turms.config import GeneratorConfig
 
 
 class BlackProcessorConfig(ProcessorConfig):
-    type = "turms.processors.black.BlackProcessor"
+    type: str = "turms.processors.black.BlackProcessor"
 
 
 class BlackProcessor(Processor):

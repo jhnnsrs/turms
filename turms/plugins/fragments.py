@@ -1,5 +1,7 @@
 import ast
 from typing import List, Optional
+
+from pydantic_settings import SettingsConfigDict
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
 from turms.recurse import type_field_node
@@ -8,7 +10,7 @@ from pydantic import Field
 from graphql.language.ast import FragmentDefinitionNode
 from turms.registry import ClassRegistry
 from turms.utils import (
-    generate_config_class,
+    generate_pydantic_config,
     generate_typename_field,
     get_additional_bases_for_type,
     get_interface_bases,
@@ -32,12 +34,11 @@ logger = logging.getLogger(__name__)
 
 
 class FragmentsPluginConfig(PluginConfig):
-    type = "turms.plugins.fragments.FragmentsPlugin"
-    fragment_bases: List[str] = None
-    fragments_glob: Optional[str]
+    model_config = SettingsConfigDict(env_prefix = "TURMS_PLUGINS_FRAGMENTS_")
+    type: str = "turms.plugins.fragments.FragmentsPlugin"
+    fragment_bases: List[str] = []
+    fragments_glob: Optional[str] = None
 
-    class Config:
-        env_prefix = "TURMS_PLUGINS_FRAGMENTS_"
 
 
 def get_fragment_bases(
@@ -191,9 +192,10 @@ def generate_fragment(
                     decorator_list=[],
                     keywords=[],
                     body=inline_fragment_fields
-                    + generate_config_class(
+                    + generate_pydantic_config(
                         GraphQLTypes.FRAGMENT,
                         config,
+                        registry,
                         sub_node.type_condition.name.value,
                     ),
                 )
@@ -275,7 +277,7 @@ def generate_fragment(
                 + get_fragment_bases(config, plugin_config, registry),
                 decorator_list=[],
                 keywords=[],
-                body=fields + generate_config_class(GraphQLTypes.FRAGMENT, config),
+                body=fields + generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry),
             )
         )
         return tree

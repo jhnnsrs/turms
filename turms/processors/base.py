@@ -1,14 +1,14 @@
 from abc import abstractmethod
 
-from pydantic import BaseModel, BaseSettings
+from pydantic import BaseModel, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from turms.config import GeneratorConfig
 
 
 class ProcessorConfig(BaseSettings):
+    model_config = SettingsConfigDict(extra="forbid")
     type: str
 
-    class Config:
-        extra = "forbid"
 
 
 class Processor(BaseModel):

@@ -7,7 +7,7 @@ from graphql.language.ast import (
 )
 from turms.registry import ClassRegistry
 from turms.utils import (
-    generate_config_class,
+    generate_pydantic_config,
     generate_typename_field,
     get_additional_bases_for_type,
     get_interface_bases,
@@ -126,7 +126,7 @@ def recurse_annotation(
                     decorator_list=[],
                     keywords=[],
                     body=inline_fragment_fields
-                    + generate_config_class(GraphQLTypes.FRAGMENT, config),
+                    + generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry),
                 )
 
                 subtree.append(cls)
@@ -224,7 +224,7 @@ def recurse_annotation(
             bases=get_interface_bases(config, registry) + additional_bases,
             decorator_list=[],
             keywords=[],
-            body=body + generate_config_class(GraphQLTypes.FRAGMENT, config),
+            body=body + generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry),
         )
         subtree.append(mother_class)
 
@@ -248,7 +248,7 @@ def recurse_annotation(
                     decorator_list=[],
                     keywords=[],
                     body=[ast.Pass()]
-                    + generate_config_class(GraphQLTypes.FRAGMENT, config),
+                    + generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry),
                 )
 
                 subtree.append(cls)
@@ -305,7 +305,7 @@ def recurse_annotation(
                     decorator_list=[],
                     keywords=[],
                     body=inline_fragment_fields
-                    + generate_config_class(GraphQLTypes.FRAGMENT, config),
+                    + generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry),
                 )
 
                 subtree.append(cls)
@@ -426,7 +426,7 @@ def recurse_annotation(
             ],
             decorator_list=[],
             keywords=[],
-            body=body + generate_config_class(GraphQLTypes.OBJECT, config),
+            body=body + generate_pydantic_config(GraphQLTypes.OBJECT, config, registry),
         )
 
         subtree.append(cls)
@@ -492,7 +492,7 @@ def recurse_annotation(
             def list_builder(x):
                 return ast.Subscript(
                     value=ast.Name("Tuple", ctx=ast.Load()),
-                    slice=ast.Tuple(elts=[x, ast.Ellipsis()], ctx=ast.Load()),
+                    slice=ast.Tuple(elts=[x, ast.Constant(value=...)], ctx=ast.Load()),
                     ctx=ast.Load(),
                 )
 
@@ -569,6 +569,10 @@ def type_field_node(
     target = target_from_node(node)
     field_name = registry.generate_node_name(target)
 
+    keywords = []
+    if not isinstance(field.type, GraphQLNonNull):
+        keywords.append(ast.keyword(arg="default", value=ast.Constant(value=None)))
+
     if target != field_name:
         registry.register_import("pydantic.Field")
         assign = ast.AnnAssign(
@@ -586,11 +590,13 @@ def type_field_node(
             value=ast.Call(
                 func=ast.Name(id="Field", ctx=ast.Load()),
                 args=[],
-                keywords=[ast.keyword(arg="alias", value=ast.Constant(value=target))],
+                keywords=keywords + [ast.keyword(arg="alias", value=ast.Constant(value=target))],
             ),
             simple=1,
         )
     else:
+        if keywords:
+            registry.register_import("pydantic.Field")
         assign = ast.AnnAssign(
             target=ast.Name(target, ctx=ast.Store()),
             annotation=recurse_annotation(
@@ -603,6 +609,11 @@ def type_field_node(
                 registry,
                 is_optional=is_optional,
             ),
+            value=ast.Call(
+                func=ast.Name(id="Field", ctx=ast.Load()),
+                args=[],
+                keywords=keywords,
+            ) if keywords else None,
             simple=1,
         )
 

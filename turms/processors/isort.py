@@ -4,7 +4,7 @@ from turms.config import GeneratorConfig
 
 
 class IsortProcessorConfig(ProcessorConfig):
-    type = "turms.processors.isort.IsortProcessor"
+    type: str = "turms.processors.isort.IsortProcessor"
 
 
 class IsortProcessor(Processor):

@@ -48,7 +48,7 @@ def test_run_gen_multiple(tmp_path):
         )
 
         result = runner.invoke(cli, ["gen"])
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.output
 
 
 def test_run_gen_display_errors(tmp_path):
@@ -75,7 +75,7 @@ def test_run_gen_display_errors(tmp_path):
         shutil.copytree(country_documents, os.path.join(graphql_dir, "countries"))
 
         result = runner.invoke(cli, ["gen"])
-        assert result.exit_code == 1
+        assert result.exit_code == 1, result.output
         assert "*.graphql" in result.output
 
 
@@ -97,7 +97,7 @@ def test_run_gen_multiple_but_one(tmp_path):
         shutil.copytree(country_documents, os.path.join(graphql_dir, "countries"))
 
         result = runner.invoke(cli, ["gen", "countries"])
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.output
 
 
 def test_run_download(tmp_path):
@@ -112,7 +112,7 @@ def test_run_download(tmp_path):
         result = runner.invoke(cli, ["download"])
 
         assert os.path.exists(os.path.join(td, "default.schema.graphql"))
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.output
 
 
 def test_run_download_multiple(tmp_path):
@@ -133,7 +133,7 @@ def test_run_download_multiple(tmp_path):
         )
 
         result = runner.invoke(cli, ["download"])
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.output
         assert os.path.exists(
             os.path.join(td, "countries.schema.graphql")
         ), "countries schema not found"
@@ -151,7 +151,7 @@ def test_run_init(tmp_path):
         result = runner.invoke(cli, ["init"])
 
         assert os.path.exists(os.path.join(td, "graphql.config.yaml"))
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.output
 
 
 def test_run_error_code(tmp_path):
@@ -167,7 +167,7 @@ def test_run_error_code(tmp_path):
         shutil.copytree(d, os.path.join(td, "graphql"))
 
         result = runner.invoke(cli, ["gen"])
-        assert result.exit_code == 1
+        assert result.exit_code == 1, result.output
 
 
 def test_run_no_error_code(tmp_path):
@@ -183,4 +183,4 @@ def test_run_no_error_code(tmp_path):
         shutil.copytree(d, os.path.join(td, "graphql"))
 
         result = runner.invoke(cli, ["gen"])
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.output

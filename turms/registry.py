@@ -439,7 +439,7 @@ class ClassRegistry(object):
                                 id=reference,
                                 ctx=ast.Load(),
                             ),
-                            attr="update_forward_refs",
+                            attr="model_rebuild" if self.config.pydantic_version == "v2" else "update_forward_refs",
                             ctx=ast.Load(),
                         ),
                         keywords=[],
