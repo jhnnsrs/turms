@@ -120,8 +120,12 @@ def generate_typename_field(
         simple=1,
     )
 
+
 def generate_config_dict(
-    graphQLType: GraphQLTypes, config: GeneratorConfig, registy: ClassRegistry, typename: str = None
+    graphQLType: GraphQLTypes,
+    config: GeneratorConfig,
+    registy: ClassRegistry,
+    typename: str = None,
 ):
     """Generates the config class for a specific type version 2
 
@@ -156,34 +160,54 @@ def generate_config_dict(
             else:
                 if config.options.allow_mutation is not None:
                     config_keywords.append(
-                        ast.keyword(arg="allow_mutation", value=ast.Constant(value=config.options.allow_mutation))
+                        ast.keyword(
+                            arg="allow_mutation",
+                            value=ast.Constant(value=config.options.allow_mutation),
+                        )
                     )
 
                 if config.options.extra is not None:
                     config_keywords.append(
-                        ast.keyword(arg="extra", value=ast.Constant(value=config.options.extra))
+                        ast.keyword(
+                            arg="extra", value=ast.Constant(value=config.options.extra)
+                        )
                     )
 
                 if config.options.validate_assignment is not None:
                     config_keywords.append(
-                        ast.keyword(arg="validate_assignment", value=ast.Constant(value=config.options.validate_assignment))
+                        ast.keyword(
+                            arg="validate_assignment",
+                            value=ast.Constant(
+                                value=config.options.validate_assignment
+                            ),
+                        )
                     )
 
                 if config.options.allow_population_by_field_name is not None:
                     config_keywords.append(
-                        ast.keyword(arg="populate_by_name", value=ast.Constant(value=config.options.allow_population_by_field_name))
+                        ast.keyword(
+                            arg="populate_by_name",
+                            value=ast.Constant(
+                                value=config.options.allow_population_by_field_name
+                            ),
+                        )
                     )
 
                 if config.options.orm_mode is not None:
                     config_keywords.append(
-                        ast.keyword(arg="orm_mode", value=ast.Constant(value=config.options.orm_mode))
+                        ast.keyword(
+                            arg="orm_mode",
+                            value=ast.Constant(value=config.options.orm_mode),
+                        )
                     )
 
                 if config.options.use_enum_values is not None:
                     config_keywords.append(
-                        ast.keyword(arg="use_enum_values", value=ast.Constant(value=config.options.use_enum_values))
+                        ast.keyword(
+                            arg="use_enum_values",
+                            value=ast.Constant(value=config.options.use_enum_values),
+                        )
                     )
-
 
     if typename:
         if typename in config.additional_config:
@@ -192,16 +216,17 @@ def generate_config_dict(
                     ast.keyword(arg=key, value=ast.Constant(value=value))
                 )
 
-    
     if len(config_keywords) > 0:
         registy.register_import("pydantic.ConfigDict")
         return [
             ast.Assign(
                 targets=[ast.Name(id="model_config", ctx=ast.Store())],
-                value=ast.Call(func=ast.Name(id="ConfigDict", ctx=ast.Load()),
-                args=[], keywords=config_keywords)
+                value=ast.Call(
+                    func=ast.Name(id="ConfigDict", ctx=ast.Load()),
+                    args=[],
+                    keywords=config_keywords,
+                ),
             )
-                
         ]
     else:
         return []
@@ -331,10 +356,15 @@ def generate_config_class_pydantic(
         ]
     else:
         return []
-    
 
-def generate_pydantic_config(graphQLType: GraphQLTypes, config: GeneratorConfig, registry: ClassRegistry, typename: str = None):
-    if config.pydantic_version == "v2": 
+
+def generate_pydantic_config(
+    graphQLType: GraphQLTypes,
+    config: GeneratorConfig,
+    registry: ClassRegistry,
+    typename: str = None,
+):
+    if config.pydantic_version == "v2":
         return generate_config_dict(graphQLType, config, registry, typename)
     else:
         return generate_config_class_pydantic(graphQLType, config, typename)

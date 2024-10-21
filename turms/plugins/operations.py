@@ -36,7 +36,7 @@ fragment_searcher = re.compile(r"\.\.\.(?P<fragment>[a-zA-Z]*)")
 
 
 class OperationsPluginConfig(PluginConfig):
-    model_config = SettingsConfigDict(env_prefix = "TURMS_PLUGINS_OPERATIONS_")
+    model_config = SettingsConfigDict(env_prefix="TURMS_PLUGINS_OPERATIONS_")
     type: str = "turms.plugins.operations.OperationsPlugin"
     query_bases: List[str] = []
     arguments_bases: List[str] = []
@@ -46,7 +46,6 @@ class OperationsPluginConfig(PluginConfig):
     create_arguments: bool = True
     extract_documentation: bool = True
     arguments_allow_population_by_field_name: bool = False
-
 
 
 def get_query_bases(
@@ -101,10 +100,9 @@ def generate_arguments_config(
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
 ):
-    
+
     if config.pydantic_version == "1":
         config_fields = []
-
 
         if plugin_config.arguments_allow_population_by_field_name:
             config_fields.append(
@@ -128,14 +126,19 @@ def generate_arguments_config(
             ]
         else:
             return []
-    
+
     else:
 
         config_keywords = []
 
         if plugin_config.arguments_allow_population_by_field_name is not None:
             config_keywords.append(
-                    ast.keyword(arg="populate_by_name", value=ast.Constant(value=config.options.allow_population_by_field_name))
+                ast.keyword(
+                    arg="populate_by_name",
+                    value=ast.Constant(
+                        value=config.options.allow_population_by_field_name
+                    ),
+                )
             )
 
         if len(config_keywords) > 0:
@@ -143,10 +146,12 @@ def generate_arguments_config(
             return [
                 ast.Assign(
                     targets=[ast.Name(id="model_config", ctx=ast.Store())],
-                    value=ast.Call(func=ast.Name(id="ConfigDict", ctx=ast.Load()),
-                    args=[], keywords=config_keywords)
+                    value=ast.Call(
+                        func=ast.Name(id="ConfigDict", ctx=ast.Load()),
+                        args=[],
+                        keywords=config_keywords,
+                    ),
                 )
-                    
             ]
         else:
             return []
@@ -198,8 +203,6 @@ def get_subscription_bases(
             ]
 
 
-
-
 def generate_expanded_types(
     v: VariableDefinitionNode,
     client_schema: GraphQLSchema,
@@ -207,7 +210,6 @@ def generate_expanded_types(
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
 ):
-    
 
     if isinstance(v.type, NonNullTypeNode):
         type_node = v.type.type
@@ -260,17 +262,6 @@ def generate_expanded_types(
             )
 
         fields_body += [assign]
-
-
-
-
-
-
-
-
-
-
-
 
 
 def generate_operation(
@@ -450,7 +441,8 @@ def generate_operation(
             bases=extra_bases,
             decorator_list=[],
             keywords=[],
-            body=class_body_fields + generate_pydantic_config(o.operation, config, registry),
+            body=class_body_fields
+            + generate_pydantic_config(o.operation, config, registry),
         )
     )
 

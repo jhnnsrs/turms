@@ -9,7 +9,6 @@ class StylerConfig(BaseSettings):
     type: str
 
 
-
 class Styler(BaseModel):
     """Base class for all stylers
 

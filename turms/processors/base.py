@@ -10,7 +10,6 @@ class ProcessorConfig(BaseSettings):
     type: str
 
 
-
 class Processor(BaseModel):
     """Base class for all processors
 

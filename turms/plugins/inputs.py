@@ -27,7 +27,9 @@ from turms.config import GraphQLTypes
 
 
 class InputsPluginConfig(PluginConfig):
-    model_config = SettingsConfigDict(extra="forbid", env_prefix="TURMS_PLUGINS_INPUTS_")
+    model_config = SettingsConfigDict(
+        extra="forbid", env_prefix="TURMS_PLUGINS_INPUTS_"
+    )
     type: str = "turms.plugins.inputs.InputsPlugin"
     inputtype_bases: List[str] = ["pydantic.BaseModel"]
     skip_underscore: bool = True
@@ -92,7 +94,7 @@ def generate_input_annotation(
             def list_builder(x):
                 return ast.Subscript(
                     value=ast.Name("Tuple", ctx=ast.Load()),
-                    slice=ast.Tuple(elts=[x,  ast.Constant(value=...)], ctx=ast.Load()),
+                    slice=ast.Tuple(elts=[x, ast.Constant(value=...)], ctx=ast.Load()),
                     ctx=ast.Load(),
                 )
 
@@ -245,7 +247,9 @@ def generate_inputs(
                 decorator_list=[],
                 keywords=[],
                 body=fields
-                + generate_pydantic_config(GraphQLTypes.INPUT, config, registry, typename=key),
+                + generate_pydantic_config(
+                    GraphQLTypes.INPUT, config, registry, typename=key
+                ),
             )
         )
 

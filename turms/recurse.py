@@ -224,7 +224,8 @@ def recurse_annotation(
             bases=get_interface_bases(config, registry) + additional_bases,
             decorator_list=[],
             keywords=[],
-            body=body + generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry),
+            body=body
+            + generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry),
         )
         subtree.append(mother_class)
 
@@ -590,7 +591,8 @@ def type_field_node(
             value=ast.Call(
                 func=ast.Name(id="Field", ctx=ast.Load()),
                 args=[],
-                keywords=keywords + [ast.keyword(arg="alias", value=ast.Constant(value=target))],
+                keywords=keywords
+                + [ast.keyword(arg="alias", value=ast.Constant(value=target))],
             ),
             simple=1,
         )
@@ -609,11 +611,15 @@ def type_field_node(
                 registry,
                 is_optional=is_optional,
             ),
-            value=ast.Call(
-                func=ast.Name(id="Field", ctx=ast.Load()),
-                args=[],
-                keywords=keywords,
-            ) if keywords else None,
+            value=(
+                ast.Call(
+                    func=ast.Name(id="Field", ctx=ast.Load()),
+                    args=[],
+                    keywords=keywords,
+                )
+                if keywords
+                else None
+            ),
             simple=1,
         )
 

@@ -1,5 +1,13 @@
 import builtins
-from pydantic import AnyHttpUrl, BaseModel, Field, GetCoreSchemaHandler, field_validator, validator, ConfigDict
+from pydantic import (
+    AnyHttpUrl,
+    BaseModel,
+    Field,
+    GetCoreSchemaHandler,
+    field_validator,
+    validator,
+    ConfigDict,
+)
 from pydantic_core import core_schema
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import (
@@ -22,7 +30,6 @@ class ConfigProxy(BaseModel):
     type: str
 
 
-
 class ImportableFunctionMixin(Protocol):
 
     @classmethod
@@ -32,7 +39,6 @@ class ImportableFunctionMixin(Protocol):
         return core_schema.with_info_after_validator_function(
             cls.validate, handler(callable), field_name=handler.field_name
         )
-
 
     @classmethod
     def validate(cls, v, *info):
@@ -56,7 +62,6 @@ class PythonType(str):
         return core_schema.with_info_after_validator_function(
             cls.validate, handler(str), field_name=handler.field_name
         )
-
 
     @classmethod
     def validate(cls, v, *info):
@@ -147,7 +152,7 @@ class OptionsConfig(BaseSettings):
 
     enabled: bool = Field(False, description="Enabling this, will freeze the schema")
     """Enabling this, will freeze the schema"""
-    extra: ExtraOptions  = None
+    extra: ExtraOptions = None
     """Extra options for pydantic"""
     allow_mutation: Optional[bool] = None
     """Allow mutation"""
@@ -179,6 +184,7 @@ class OptionsConfig(BaseSettings):
 
 PydanticVersion = Literal["v1", "v2"]
 
+
 class GeneratorConfig(BaseSettings):
     """Configuration for the generator
 
@@ -189,11 +195,10 @@ class GeneratorConfig(BaseSettings):
     and the scalars that should be used.
 
     """
+
     model_config: SettingsConfigDict = SettingsConfigDict(
         env_prefix="TURMS_",
         extra="forbid",
-        
-
     )
     pydantic_version: PydanticVersion = "v2"
 
@@ -291,7 +296,6 @@ class GeneratorConfig(BaseSettings):
         return v
 
 
-
 class Extensions(BaseModel):
     """Wrapping class to be able to extract the tums configuraiton"""
 
@@ -317,6 +321,7 @@ class GraphQLProject(BaseSettings):
     Turm will use the schema and documents to generate the python models, according
     to the generator configuration under extensions.turms
     """
+
     model_config: SettingsConfigDict = SettingsConfigDict(
         env_prefix="TURMS_GRAPHQL_",
         extra="allow",
@@ -335,6 +340,7 @@ class GraphQLConfigMultiple(BaseSettings):
 
     This is the main configuration for multiple GraphQL projects. It is compliant with
     the graphql-config specification for multiple projec."""
+
     model_config: SettingsConfigDict = SettingsConfigDict(
         extra="allow",
     )
@@ -343,13 +349,13 @@ class GraphQLConfigMultiple(BaseSettings):
     """ The projects that should be parsed. The key is the name of the project and the value is the graphql project"""
 
 
-
 class GraphQLConfigSingle(GraphQLProject):
     """Configuration for a single GraphQL project
 
     This is the main configuration for a single GraphQL project. It is compliant with
     the graphql-config specification for a single project.
     """
+
     model_config: SettingsConfigDict = SettingsConfigDict(
         extra="allow",
     )

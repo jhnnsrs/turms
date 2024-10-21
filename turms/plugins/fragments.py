@@ -34,11 +34,10 @@ logger = logging.getLogger(__name__)
 
 
 class FragmentsPluginConfig(PluginConfig):
-    model_config = SettingsConfigDict(env_prefix = "TURMS_PLUGINS_FRAGMENTS_")
+    model_config = SettingsConfigDict(env_prefix="TURMS_PLUGINS_FRAGMENTS_")
     type: str = "turms.plugins.fragments.FragmentsPlugin"
     fragment_bases: List[str] = []
     fragments_glob: Optional[str] = None
-
 
 
 def get_fragment_bases(
@@ -277,7 +276,8 @@ def generate_fragment(
                 + get_fragment_bases(config, plugin_config, registry),
                 decorator_list=[],
                 keywords=[],
-                body=fields + generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry),
+                body=fields
+                + generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry),
             )
         )
         return tree

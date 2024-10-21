@@ -22,7 +22,6 @@ class PolyfillPluginConfig(ParserConfig):
         return value
 
 
-
 def polyfill_python_seven(
     asts: List[ast.AST], config: PolyfillPluginConfig
 ) -> List[ast.AST]:

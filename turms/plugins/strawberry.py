@@ -134,7 +134,9 @@ def default_generate_directives(
                 decorator_list=[decorator],
                 keywords=[],
                 body=(fields or [ast.Pass()])
-                + generate_pydantic_config(GraphQLTypes.DIRECTIVE, config, registry, directive.name),
+                + generate_pydantic_config(
+                    GraphQLTypes.DIRECTIVE, config, registry, directive.name
+                ),
             )
         )
 
@@ -224,7 +226,7 @@ def default_generate_enums(
 
 
 class StrawberryPluginConfig(PluginConfig):
-    model_config = SettingsConfigDict(env_prefix = "TURMS_PLUGINS_STRAWBERRY_")
+    model_config = SettingsConfigDict(env_prefix="TURMS_PLUGINS_STRAWBERRY_")
     type: str = "turms.plugins.strawberry.Strawberry"
     generate_directives: bool = True
     generate_scalars: bool = True
@@ -241,7 +243,6 @@ class StrawberryPluginConfig(PluginConfig):
     # Functional configuration:
     generate_directives_func: StrawberryGenerateFunc = default_generate_directives
     generate_enums_func: StrawberryGenerateFunc = default_generate_enums
-
 
 
 def generate_object_field_annotation(
@@ -674,7 +675,9 @@ def generate_inputs(
                 decorator_list=[decorator],
                 keywords=[],
                 body=fields
-                + generate_pydantic_config(GraphQLTypes.INPUT, config, registry, typename=key),
+                + generate_pydantic_config(
+                    GraphQLTypes.INPUT, config, registry, typename=key
+                ),
             )
         )
 
@@ -911,7 +914,8 @@ def generate_types(
                 bases=additional_bases,
                 decorator_list=[decorator],
                 keywords=[],
-                body=fields + generate_pydantic_config(GraphQLTypes.OBJECT, config, registry, key),
+                body=fields
+                + generate_pydantic_config(GraphQLTypes.OBJECT, config, registry, key),
             )
         )
 

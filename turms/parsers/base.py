@@ -9,7 +9,6 @@ class ParserConfig(BaseSettings):
     type: str
 
 
-
 class Parser(BaseModel):
     """Base class for all parsers
 

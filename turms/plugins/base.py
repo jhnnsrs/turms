@@ -13,7 +13,6 @@ class PluginConfig(BaseSettings):
     type: str
 
 
-
 class Plugin(BaseModel):
     """
     Base class for all plugins
@@ -21,6 +20,7 @@ class Plugin(BaseModel):
     Plugins are the workhorse of turms. They are used to generate python code, according
     to the GraphQL schema. You can use plugins to generate python code for your GraphQL
     schema. THe all received the graphql schema and the config of the plugin."""
+
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
     config: PluginConfig
     log: LogFunction = Field(default=lambda *args, **kwargs: print(*args))
