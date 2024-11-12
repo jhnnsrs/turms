@@ -92,7 +92,6 @@ def load_dsl_from_url(url: AnyHttpUrl, headers: Dict[str, str] = None) -> DSLStr
         )  # pragma: no cover
 
     default_headers = {}
-    print("LAODING")
     if headers:
         default_headers.update(headers)
     try:

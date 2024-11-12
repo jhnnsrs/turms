@@ -7,10 +7,12 @@ from graphql.language.ast import (
 )
 from turms.registry import ClassRegistry
 from turms.utils import (
+    generate_generic_typename_field,
     generate_pydantic_config,
     generate_typename_field,
     get_additional_bases_for_type,
     get_interface_bases,
+    non_typename_fields,
     target_from_node,
 )
 import ast
@@ -73,10 +75,11 @@ def recurse_annotation(
 
         union_class_names = []
 
-        for sub_node in node.selection_set.selections:
+        sub_nodes = non_typename_fields(node)
+
+        for sub_node in sub_nodes:
 
             if isinstance(sub_node, FragmentSpreadNode):
-
                 fragment_name = registry.inherit_fragment(sub_node.name.value)
                 union_class_names.append(fragment_name)
 
@@ -172,22 +175,7 @@ def recurse_annotation(
         mother_class_fields = []
         target = target_from_node(node)
 
-        # SINGLE SPREAD, AUTO COLLAPSING
-        if len(node.selection_set.selections) == 1:
-            # If there is only one field and its a fragment, we can just use the fragment
-
-            subnode = node.selection_set.selections[0]
-            if isinstance(subnode, FragmentSpreadNode):
-                if is_optional:
-                    registry.register_import("typing.Optional")
-                    return ast.Subscript(
-                        value=ast.Name("Optional", ctx=ast.Load()),
-                        slice=registry.reference_fragment(subnode.name.value, parent),
-                        ctx=ast.Load(),
-                    )
-
-                else:
-                    return registry.reference_fragment(subnode.name.value, parent)
+        sub_nodes = non_typename_fields(node)
 
         base_name = f"{parent}{target.capitalize()}"
 
@@ -196,11 +184,34 @@ def recurse_annotation(
                 ast.Expr(value=ast.Constant(value=type.description))
             )
 
-        for sub_node in node.selection_set.selections:
+        implementing_types = client_schema.get_implementations(type)
+
+
+        implementing_class_base_classes = {
+
+        }
+
+        inline_fragment_fields = {}
+
+
+        
+
+        for sub_node in sub_nodes:
+
+            if isinstance(sub_node, FragmentSpreadNode):
+                # Spread nodes are like inheritance?
+                try:
+                    # We are dealing with a fragment that is an interface
+                    implementation_map = registry.get_interface_fragment_implementations(sub_node.name.value)
+                    for k, v in implementation_map.items():
+                        implementing_class_base_classes.setdefault(k, []).append(v)
+
+                except KeyError:
+                    x = registry.get_fragment_type(sub_node.name.value)
+                    implementing_class_base_classes.setdefault(x.name, []).append(registry.inherit_fragment(sub_node.name.value))
+
 
             if isinstance(sub_node, FieldNode):
-                if sub_node.name.value == "__typename":
-                    continue
 
                 field_type = type.fields[sub_node.name.value]
                 mother_class_fields += type_field_node(
@@ -213,15 +224,33 @@ def recurse_annotation(
                     registry,
                 )
 
+            if isinstance(sub_node, InlineFragmentNode):
+
+
+                on_type_name = sub_node.type_condition.name.value
+
+                inline_fragment_fields.setdefault(on_type_name, []).append(
+                    generate_typename_field(
+                        sub_node.type_condition.name.value, registry, config
+                    )
+                )
+
+
+
+
+
         # We first genrate the mother class that will provide common fields of this fragment. This will never be reference
         # though
         mother_class_name = f"{base_name}Base"
         additional_bases = get_additional_bases_for_type(type.name, config, registry)
+
         body = mother_class_fields if mother_class_fields else [ast.Pass()]
+
+
 
         mother_class = ast.ClassDef(
             mother_class_name,
-            bases=get_interface_bases(config, registry) + additional_bases,
+            bases=additional_bases + get_interface_bases(config, registry),
             decorator_list=[],
             keywords=[],
             body=body
@@ -229,138 +258,84 @@ def recurse_annotation(
         )
         subtree.append(mother_class)
 
+        implementaionMap = {}
         union_class_names = []
 
-        for sub_node in node.selection_set.selections:
+        for i in implementing_types.objects:
 
-            if isinstance(sub_node, FragmentSpreadNode):
+            class_name = f"{mother_class_name}{i.name}"
 
-                spreaded_fragment_classname = f"{base_name}{sub_node.name.value}"
+            ast_base_nodes = [ast.Name(id=x, ctx=ast.Load()) for x in implementing_class_base_classes.get(i.name, [])]
+            implementaionMap[i.name] = class_name
 
-                cls = ast.ClassDef(
-                    spreaded_fragment_classname,
-                    bases=[
-                        ast.Name(id=mother_class_name, ctx=ast.Load()),
-                        ast.Name(
-                            id=registry.inherit_fragment(sub_node.name.value),
-                            ctx=ast.Load(),
-                        ),
-                    ],
+            inline_fields = inline_fragment_fields.get(i, [])
+        
+
+            implementing_class = ast.ClassDef(
+                    class_name,
+                    bases=ast_base_nodes + [ast.Name(id=mother_class_name, ctx=ast.Load())] + get_interface_bases(config, registry),  # Todo: fill with base
                     decorator_list=[],
                     keywords=[],
-                    body=[ast.Pass()]
-                    + generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry),
-                )
-
-                subtree.append(cls)
-                union_class_names.append(spreaded_fragment_classname)
-
-            if isinstance(sub_node, InlineFragmentNode):
-                inline_fragment_name = (
-                    f"{base_name}{sub_node.type_condition.name.value}InlineFragment"
-                )
-                inline_fragment_fields = []
-
-                inline_fragment_fields += [
-                    generate_typename_field(
-                        sub_node.type_condition.name.value, registry, config
-                    )
-                ]
-
-                additional_bases = get_additional_bases_for_type(
-                    sub_node.type_condition.name.value, config, registry
-                )
-
-                for sub_sub_node in sub_node.selection_set.selections:
-
-                    if isinstance(sub_sub_node, FieldNode):
-                        sub_sub_node_type = client_schema.get_type(
-                            sub_node.type_condition.name.value
-                        )
-
-                        if sub_sub_node.name.value == "__typename":
-                            continue
-
-                        field_type = sub_sub_node_type.fields[sub_sub_node.name.value]
-                        inline_fragment_fields += type_field_node(
-                            sub_sub_node,
-                            inline_fragment_name,
-                            field_type,
-                            client_schema,
-                            config,
-                            subtree,
-                            registry,
-                        )
-
-                    elif isinstance(sub_sub_node, FragmentSpreadNode):
-                        additional_bases.append(
-                            registry.reference_fragment(sub_sub_node.name.value, parent)
-                        )
-
-                cls = ast.ClassDef(
-                    inline_fragment_name,
-                    bases=additional_bases
-                    + [
-                        ast.Name(id=mother_class_name, ctx=ast.Load()),
-                    ],
-                    decorator_list=[],
-                    keywords=[],
-                    body=inline_fragment_fields
-                    + generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry),
-                )
-
-                subtree.append(cls)
-                union_class_names.append(inline_fragment_name)
-
-        if not config.always_resolve_interfaces:
-            union_class_names.append(mother_class_name)
-
-        assert (
-            len(union_class_names) != 0
-        ), f"You have set 'always_resolve_interfaces' to True but you have no sub-fragments in your query of {base_name}"
-
-        if len(union_class_names) > 1:
-            registry.register_import("typing.Union")
-            union_slice = ast.Tuple(
-                elts=[
-                    ast.Name(id=clsname, ctx=ast.Load())
-                    for clsname in union_class_names
-                ],
-                ctx=ast.Load(),
+                    body=[generate_typename_field(i.name, registry, config)] + inline_fields,
             )
 
-            if is_optional:
-                registry.register_import("typing.Optional")
+            subtree.append(implementing_class)
+            union_class_names.append(class_name)
 
-                return ast.Subscript(
-                    value=ast.Name("Optional", ctx=ast.Load()),
-                    slice=ast.Subscript(
-                        value=ast.Name("Union", ctx=ast.Load()),
-                        slice=union_slice,
-                    ),
-                    ctx=ast.Load(),
-                )
-            else:
-                registry.register_import("typing.Union")
-                return ast.Subscript(
+
+
+        registry.register_import("typing.Annotated")
+        registry.register_import("typing.Union")
+        union_slice = ast.Tuple(
+            elts=[
+                ast.Name(id=clsname, ctx=ast.Load())
+                for clsname in union_class_names
+            ],
+            ctx=ast.Load(),
+        )
+
+        slice = ast.Tuple(
+            elts=[
+                ast.Subscript(
                     value=ast.Name("Union", ctx=ast.Load()),
                     slice=union_slice,
                     ctx=ast.Load(),
+                ),
+                ast.Call(
+                    func=ast.Name(id="Field", ctx=ast.Load()),
+                    args=[],
+                    keywords=[ast.keyword(arg="discriminator", value=ast.Constant("typename"))],
                 )
-        else:
-            if is_optional:
-                registry.register_import("typing.Optional")
+            ],
+            ctx=ast.Load(),
+        )
 
-                return ast.Subscript(
-                    value=ast.Name("Optional", ctx=ast.Load()),
-                    slice=ast.Name(id=union_class_names[0], ctx=ast.Load()),
+        # Resort to base class if we have no sub-fragments
+        annotated_slice = ast.Subscript(
+                    value=ast.Name("Annotated", ctx=ast.Load()),
+                    slice=slice,
                     ctx=ast.Load(),
                 )
-            return ast.Name(id=union_class_names[0], ctx=ast.Load())
+        
+
+
+
+
+
+        if is_optional:
+            registry.register_import("typing.Optional")
+
+            return ast.Subscript(
+                value=ast.Name("Optional", ctx=ast.Load()),
+                slice=annotated_slice,
+                ctx=ast.Load(),
+            )
+        else:
+            registry.register_import("typing.Union")
+            return annotated_slice
 
     if isinstance(type, GraphQLObjectType):
         pick_fields = []
-        additional_bases = get_additional_bases_for_type(type.name, config, registry)
 
         target = target_from_node(node)
         object_class_name = f"{parent}{target.capitalize()}"
@@ -370,10 +345,14 @@ def recurse_annotation(
 
         pick_fields += [generate_typename_field(type.name, registry, config)]
 
+        sub_nodes = non_typename_fields(node)
+
         # Single Item collapse
-        if len(node.selection_set.selections) == 1:
-            sub_node = node.selection_set.selections[0]
+        if len(sub_nodes) == 1:
+            sub_node = sub_nodes[0]
+
             if isinstance(sub_node, FragmentSpreadNode):
+
                 if is_optional:
                     registry.register_import("typing.Optional")
                     return ast.Subscript(
@@ -389,15 +368,24 @@ def recurse_annotation(
                         sub_node.name.value, parent
                     )  # needs to be parent not object as reference will be to parent
 
-        for sub_node in node.selection_set.selections:
+
+
+        additional_bases = []
+
+        for sub_node in sub_nodes:
 
             if isinstance(sub_node, FragmentSpreadNode):
-                additional_bases.append(
-                    ast.Name(
-                        id=registry.inherit_fragment(sub_node.name.value),
-                        ctx=ast.Load(),
+
+                if registry.is_interface_fragment(sub_node.name.value):
+                    raise Exception("Interface Fragments with additional subfields are not yet implemented")
+                
+                else:
+                    additional_bases.append(
+                        ast.Name(
+                            id=registry.inherit_fragment(sub_node.name.value),
+                            ctx=ast.Load(),
+                        )
                     )
-                )
 
             if isinstance(sub_node, FieldNode):
                 if sub_node.name.value == "__typename":
@@ -415,6 +403,11 @@ def recurse_annotation(
 
             if isinstance(sub_node, InlineFragmentNode):
                 raise NotImplementedError("Inline Fragments are not yet implemented")
+            
+        if not additional_bases:
+            # We need to add the base class if we have no fragments
+            additional_bases = get_additional_bases_for_type(type.name, config, registry)
+            
 
         body = pick_fields if pick_fields else [ast.Pass()]
 

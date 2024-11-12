@@ -4,11 +4,12 @@ from typing import List, Optional, Set, Union
 from turms.config import GeneratorConfig
 from turms.errors import GenerationError
 from graphql.utilities.build_client_schema import GraphQLSchema
-from graphql.language.ast import DocumentNode, FieldNode
+from graphql.language.ast import DocumentNode, FieldNode, NameNode
 from graphql.error.graphql_error import GraphQLError
 from graphql import (
     BooleanValueNode,
     FloatValueNode,
+    FragmentDefinitionNode,
     GraphQLEnumType,
     GraphQLList,
     GraphQLNonNull,
@@ -21,9 +22,11 @@ from graphql import (
     NonNullTypeNode,
     NullValueNode,
     OperationDefinitionNode,
+    SelectionSetNode,
     StringValueNode,
     ValueNode,
     parse,
+    print_ast,
     validate,
     GraphQLInterfaceType,
 )
@@ -65,6 +68,13 @@ def target_from_node(node: FieldNode) -> str:
     )
 
 
+def non_typename_fields(node: FieldNode) -> List[FieldNode]:
+    """Returns all fields in a FieldNode that are not __typename"""
+    if not node.selection_set:
+        return []
+    return [field for field in node.selection_set.selections if not (isinstance(field, FieldNode) and field.name.value == "__typename")]
+
+
 def inspect_operation_for_documentation(operation: OperationDefinitionNode):
     """Checks for operation level documentatoin"""
 
@@ -104,14 +114,36 @@ def generate_typename_field(
     return ast.AnnAssign(
         target=ast.Name(id="typename", ctx=ast.Store()),
         annotation=ast.Subscript(
-            value=ast.Name(id="Optional", ctx=ast.Load()),
-            slice=ast.Subscript(
                 value=ast.Name("Literal", ctx=ast.Load()),
                 slice=ast.Constant(value=typename),
                 ctx=ast.Load(),
             ),
-            ctx=ast.Load(),
+        value=ast.Call(
+            func=ast.Name(id="Field", ctx=ast.Load()),
+            args=[],
+            keywords=keywords,
         ),
+        simple=1,
+    )
+
+def generate_generic_typename_field(
+    registry: ClassRegistry, config: GeneratorConfig
+):
+    """Generates the typename field a specific type, this will be used to determine the type of the object in the response"""
+
+    registry.register_import("pydantic.Field")
+    registry.register_import("typing.Optional")
+    registry.register_import("typing.Literal")
+
+    keywords = [
+        ast.keyword(arg="alias", value=ast.Constant(value="__typename")),
+    ]
+    if config.exclude_typenames:
+        keywords.append(ast.keyword(arg="exclude", value=ast.Constant(value=True)))
+
+    return ast.AnnAssign(
+        target=ast.Name(id="typename", ctx=ast.Store()),
+        annotation=ast.Name("str", ctx=ast.Load()),
         value=ast.Call(
             func=ast.Name(id="Field", ctx=ast.Load()),
             args=[],
@@ -370,6 +402,46 @@ def generate_pydantic_config(
         return generate_config_class_pydantic(graphQLType, config, typename)
 
 
+
+def add_typename_recursively(selection_set: SelectionSetNode, skip=False) -> None:
+    if selection_set is None:
+        return
+
+    # Collect all existing fields in the selection set
+    selections = list(selection_set.selections)
+    has_typename = any(
+        isinstance(field, FieldNode) and field.name.value == "__typename"
+        for field in selections
+    )
+
+    # Add __typename if it's not already present
+    if not has_typename and not skip:
+        selections.append(
+            FieldNode(
+                name=NameNode(value="__typename"),
+                arguments=[],
+                directives=[],
+                selection_set=None,
+            )
+        )
+
+    # Apply the function recursively to nested selection sets
+    for field in selections:
+        if isinstance(field, FieldNode) and field.selection_set:
+            add_typename_recursively(field.selection_set)
+
+    # Update the selection set with potentially added __typename fields
+    selection_set.selections = tuple(selections)
+
+def auto_add_typename_field_to_all_objects(document: DocumentNode) -> DocumentNode:
+    for definition in document.definitions:
+        if isinstance(definition, (OperationDefinitionNode, FragmentDefinitionNode)):
+            add_typename_recursively(definition.selection_set, skip=isinstance(definition, OperationDefinitionNode))
+    
+    
+    return document
+
+
 def parse_documents(client_schema: GraphQLSchema, scan_glob) -> DocumentNode:
     """ """
     if not scan_glob:
@@ -397,11 +469,44 @@ def parse_documents(client_schema: GraphQLSchema, scan_glob) -> DocumentNode:
         raise InvalidDocuments(
             "Invalid Documents \n" + "\n".join(str(e) for e in errors)
         )
+    
+    
+    nodes = auto_add_typename_field_to_all_objects(nodes)
+
+   
 
     return nodes
 
 
 fragment_searcher = re.compile(r"\.\.\.(?P<fragment>[a-zA-Z]*)")
+
+
+
+def auto_add_typename_field_to_fragment_str(fragment_str: str) -> str:
+    x = parse(fragment_str)
+    for fragment in x.definitions:
+        if isinstance(fragment, FragmentDefinitionNode):
+            selections = list(fragment.selection_set.selections)
+            if not any(field.name.value == "__typename" for field in selections):
+                selections.append(
+                    FieldNode(
+                        name=NameNode(value="__typename"),
+                        arguments=[],
+                        directives=[],
+                        selection_set=None,
+                    )
+                )
+                fragment.selection_set.selections = tuple(selections)
+
+
+
+
+
+    return print_ast(x)
+
+
+
+
 
 
 def replace_iteratively(
@@ -416,7 +521,7 @@ def replace_iteratively(
     else:
         try:
             level_down_pattern = "\n\n".join(
-                [registry.get_fragment_document(key) for key in new_fragments]
+                [auto_add_typename_field_to_fragment_str(registry.get_fragment_document(key)) for key in new_fragments]
                 + [pattern]
             )
             return replace_iteratively(
