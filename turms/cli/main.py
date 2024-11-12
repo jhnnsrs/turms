@@ -1,6 +1,8 @@
 from enum import Enum
 import os
-from turms.run import generate, write_code_to_file
+from typing import Dict
+from turms.config import GraphQLProject
+from turms.run import generate, write_code_to_file, write_project, write_schema_to_file
 from rich import get_console
 from rich.panel import Panel
 from rich.live import Live
@@ -63,7 +65,7 @@ projects:
 """
 
 
-def generate_projects(projects, title="Turms"):
+def generate_projects(projects: Dict[str, GraphQLProject], title="Turms"):
     generation_message = f"Generating the {'.'.join(projects.keys())} projects. This may take a while...\n"
 
     tree = Tree("Generating projects", style="bold green")
@@ -90,7 +92,7 @@ def generate_projects(projects, title="Turms"):
                     project_tree.add(Tree(message, style="yellow"))
 
             try:
-                generated_code = generate(project, log=log)
+                generated_code, schema = generate(project, log=log)
 
                 project_tree.label = f"{key} ✔️"
                 live.update(panel)
@@ -100,6 +102,12 @@ def generate_projects(projects, title="Turms"):
                     project.extensions.turms.out_dir,
                     project.extensions.turms.generated_name,
                 )
+
+                if project.extensions.turms.dump_schema:
+                    write_schema_to_file(schema, project.extensions.turms.out_dir, project.extensions.turms.schema_name)
+
+                if project.extensions.turms.dump_configuration:
+                    write_project(project, project.extensions.turms.out_dir, project.extensions.turms.configuration_name)
 
             except Exception as e:
                 project_tree.style = "red"
@@ -190,7 +198,7 @@ def watch_projects(projects, title="Turms"):  # pragma: no cover
                 tree.style = "blue"
                 live.update(panel)
 
-                generated_code = generate(
+                generated_code, schema = generate(
                     project,
                 )
 

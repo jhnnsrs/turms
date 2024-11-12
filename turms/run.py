@@ -1,9 +1,9 @@
 import ast
 import os
-from typing import Dict, List, Optional, Callable
+from typing import Dict, List, Optional, Callable, Tuple
 
 import yaml
-from graphql import GraphQLSchema, parse, build_ast_schema, build_client_schema
+from graphql import GraphQLSchema, parse, build_ast_schema, build_client_schema, print_ast, print_schema
 from pydantic import AnyHttpUrl, ValidationError
 from rich import get_console
 
@@ -175,6 +175,44 @@ def write_code_to_file(code: str, outdir: str, filepath: str):
     return generated_file
 
 
+def write_schema_to_file(schema: GraphQLSchema, outdir: str, filepath: str):
+    if not os.path.isdir(outdir):  # pragma: no cover
+        os.makedirs(outdir)
+
+    generated_file = os.path.join(
+        outdir,
+        filepath,
+    )
+
+    with open(
+        generated_file,
+        "w",
+        encoding="utf-8",
+    ) as file:
+        file.write(print_schema(schema))
+
+    return generated_file
+
+
+def write_project(project: GraphQLProject, outdir: str, filepath: str):
+    if not os.path.isdir(outdir):  # pragma: no cover
+        os.makedirs(outdir)
+
+    generated_file = os.path.join(
+        outdir,
+        filepath,
+    )
+
+    with open(
+        generated_file,
+        "w",
+        encoding="utf-8",
+    ) as file:
+        file.write(project.model_dump_json(indent=4))
+
+    return generated_file
+
+
 def gen(
     filepath: Optional[str] = None,
     project_name: Optional[str] = None,
@@ -206,6 +244,22 @@ def gen(
                 overwrite_path or project.extensions.turms.out_dir,
                 project.extensions.turms.generated_name,
             )
+
+            if project.extensions.turms.dump_schema:
+                schema = build_schema_from_schema_type(
+                            project.schema_url,
+                            allow_introspection=project.extensions.turms.allow_introspection,
+                        )
+                
+                write_schema_to_file(schema, project.extensions.turms.out_dir, project.extensions.turms.schema_name)
+
+            if project.extensions.turms.dump_configuration:
+                write_project(project, project.extensions.turms.out_dir, project.extensions.turms.configuration_name)
+
+
+
+
+
 
             get_console().print("Sucessfull!! :right-facing_fist::left-facing_fist:")
         except Exception as e:
@@ -310,7 +364,7 @@ def build_schema_from_schema_type(
     raise GenerationError("Could not build schema with type " + str(type(schema)))
 
 
-def generate(project: GraphQLProject, log: Optional[LogFunction] = None) -> str:
+def generate(project: GraphQLProject, log: Optional[LogFunction] = None) -> Tuple[str, GraphQLSchema ]:
     """Genrates the code according to the configugration
 
     The code is generated in the following order:
@@ -378,16 +432,7 @@ def generate(project: GraphQLProject, log: Optional[LogFunction] = None) -> str:
             get_console().print(f"Using Processor {styler}")
         processors.append(styler)
 
-    generated_ast = generate_ast(
-        gen_config,
-        schema,
-        plugins=plugins,
-        stylers=stylers,
-        skip_forwards=gen_config.skip_forwards,
-        log=log,
-    )
-
-    return generate_code(
+    code = generate_code(
         gen_config,
         schema,
         plugins=plugins,
@@ -396,6 +441,8 @@ def generate(project: GraphQLProject, log: Optional[LogFunction] = None) -> str:
         processors=processors,
         log=log,
     )
+
+    return code, schema
 
 
 def parse_asts_to_string(generated_ast: List[ast.AST]) -> str:
