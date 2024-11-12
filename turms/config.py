@@ -206,6 +206,10 @@ class GeneratorConfig(BaseSettings):
     """The domain of the GraphQL API ( will be set as a config variable)"""
     out_dir: str = "api"
     """The output directory for the generated models"""
+    dump_configuration: bool = False
+    configuration_name: str = "project.json"
+    dump_schema: bool = False
+    schema_name: str = "schema.graphql"
     generated_name: str = "schema.py"
     """ The name of the generated file within the output directory"""
     documents: Optional[str] = None
@@ -249,7 +253,7 @@ class GeneratorConfig(BaseSettings):
     skip_forwards: bool = False
     """Skip generating automatic forwards reference for the generated models"""
 
-    additional_bases: Dict[str, List[PythonType]] = Field(
+    additional_bases: Dict[str, List[str]] = Field(
         default_factory=dict,
         description="Additional bases for the generated models as map of GraphQL Type to importable base class (e.g. module.package.Class)",
     )
@@ -294,6 +298,19 @@ class GeneratorConfig(BaseSettings):
             raise ValueError(f"Invalid import: {parser.type} {e}") from e
 
         return v
+    
+
+    @field_validator("additional_bases")
+    def validate_additional_bases(cls, v):
+        for key, value_list in v.items():
+            for value in value_list:
+                if not isinstance(value, str):
+                    raise ValueError("string required")
+                if value not in dir(builtins):
+                    if "." not in value:
+                        raise ValueError("You need to point to a module if its not a builtin type")
+        return v
+
 
 
 class Extensions(BaseModel):
