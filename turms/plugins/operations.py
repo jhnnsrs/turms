@@ -18,7 +18,7 @@ from graphql.utilities.get_operation_root_type import get_operation_root_type
 from graphql.utilities.type_info import get_field_def
 
 import re
-from graphql import NonNullTypeNode, language
+from graphql import NonNullTypeNode, VariableDefinitionNode, language
 from turms.registry import ClassRegistry
 from turms.utils import (
     generate_pydantic_config,
@@ -36,7 +36,7 @@ fragment_searcher = re.compile(r"\.\.\.(?P<fragment>[a-zA-Z]*)")
 
 
 class OperationsPluginConfig(PluginConfig):
-    model_config = SettingsConfigDict(env_prefix = "TURMS_PLUGINS_OPERATIONS_")
+    model_config = SettingsConfigDict(env_prefix="TURMS_PLUGINS_OPERATIONS_")
     type: str = "turms.plugins.operations.OperationsPlugin"
     query_bases: List[str] = []
     arguments_bases: List[str] = []
@@ -46,7 +46,6 @@ class OperationsPluginConfig(PluginConfig):
     create_arguments: bool = True
     extract_documentation: bool = True
     arguments_allow_population_by_field_name: bool = False
-
 
 
 def get_query_bases(
@@ -101,30 +100,61 @@ def generate_arguments_config(
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
 ):
-    config_fields = []
 
-    if plugin_config.arguments_allow_population_by_field_name:
-        config_fields.append(
-            ast.Assign(
-                targets=[
-                    ast.Name(id="allow_population_by_field_name", ctx=ast.Store())
-                ],
-                value=ast.Constant(value=True),
-            )
-        )
+    if config.pydantic_version == "1":
+        config_fields = []
 
-    if len(config_fields) > 0:
-        return [
-            ast.ClassDef(
-                name="Config",
-                bases=[],
-                keywords=[],
-                body=config_fields,
-                decorator_list=[],
+        if plugin_config.arguments_allow_population_by_field_name:
+            config_fields.append(
+                ast.Assign(
+                    targets=[
+                        ast.Name(id="allow_population_by_field_name", ctx=ast.Store())
+                    ],
+                    value=ast.Constant(value=True),
+                )
             )
-        ]
+
+        if len(config_fields) > 0:
+            return [
+                ast.ClassDef(
+                    name="Config",
+                    bases=[],
+                    keywords=[],
+                    body=config_fields,
+                    decorator_list=[],
+                )
+            ]
+        else:
+            return []
+
     else:
-        return []
+
+        config_keywords = []
+
+        if plugin_config.arguments_allow_population_by_field_name is not None:
+            config_keywords.append(
+                ast.keyword(
+                    arg="populate_by_name",
+                    value=ast.Constant(
+                        value=config.options.allow_population_by_field_name
+                    ),
+                )
+            )
+
+        if len(config_keywords) > 0:
+            registry.register_import("pydantic.ConfigDict")
+            return [
+                ast.Assign(
+                    targets=[ast.Name(id="model_config", ctx=ast.Store())],
+                    value=ast.Call(
+                        func=ast.Name(id="ConfigDict", ctx=ast.Load()),
+                        args=[],
+                        keywords=config_keywords,
+                    ),
+                )
+            ]
+        else:
+            return []
 
 
 def get_arguments_bases(
@@ -171,6 +201,67 @@ def get_subscription_bases(
                 ast.Name(id=base.split(".")[-1], ctx=ast.Load())
                 for base in config.object_bases
             ]
+
+
+def generate_expanded_types(
+    v: VariableDefinitionNode,
+    client_schema: GraphQLSchema,
+    config: GeneratorConfig,
+    plugin_config: OperationsPluginConfig,
+    registry: ClassRegistry,
+):
+
+    if isinstance(v.type, NonNullTypeNode):
+        type_node = v.type.type
+    else:
+        type_node = v.type
+
+    type_name = type_node.name.value
+    type_definition = client_schema.get_type(type_name)
+
+    if type_definition is None:
+        return []
+
+    if type_definition.ast_node is None:
+        return []
+
+    if type_definition.ast_node.kind != "InputObjectTypeDefinition":
+        return []
+
+    fields = type_definition.ast_node.fields
+
+    fields_body = []
+
+    additional_keywords = []
+
+    for field in fields:
+        field_name = field.name.value
+        field_type = field.type
+
+        is_optional = not isinstance(field_type, NonNullTypeNode)
+        annotation = recurse_type_annotation(field_type, registry)
+
+        if is_optional:
+            assign = ast.AnnAssign(
+                target=ast.Name(field_name, ctx=ast.Store()),
+                annotation=annotation,
+                value=ast.Call(
+                    func=ast.Name(id="Field", ctx=ast.Load()),
+                    args=[],
+                    keywords=[
+                        ast.keyword(arg="alias", value=ast.Constant(value=field_name))
+                    ],
+                ),
+                simple=1,
+            )
+        else:
+            assign = ast.AnnAssign(
+                target=ast.Name(field_name, ctx=ast.Store()),
+                annotation=annotation,
+                simple=1,
+            )
+
+        fields_body += [assign]
 
 
 def generate_operation(
@@ -350,7 +441,8 @@ def generate_operation(
             bases=extra_bases,
             decorator_list=[],
             keywords=[],
-            body=class_body_fields + generate_pydantic_config(o.operation, config, registry),
+            body=class_body_fields
+            + generate_pydantic_config(o.operation, config, registry),
         )
     )
 

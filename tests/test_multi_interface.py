@@ -83,5 +83,5 @@ def test_fragment_generation(multi_interface_schema):
 
     unit_test_with(
         generated_ast,
-        "assert FlowNodeBaseReactiveNode(id='soinosins', position={'x': 3, 'y': 3}).id, 'Needs to be not nown'",
+        "assert FlowNodesBaseReactiveNode(id='soinosins', position={'x': 3, 'y': 3}).id, 'Needs to be not nown'",
     )

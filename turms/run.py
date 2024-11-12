@@ -349,19 +349,25 @@ def generate(project: GraphQLProject, log: Optional[LogFunction] = None) -> str:
     processors = []
 
     for parser_config in gen_config.parsers:
-        styler = instantiate(parser_config.type, config=parser_config.model_dump(), log=log)
+        styler = instantiate(
+            parser_config.type, config=parser_config.model_dump(), log=log
+        )
         if verbose:
             get_console().print(f"Using Parser {styler}")
         parsers.append(styler)
 
     for plugins_config in gen_config.plugins:
-        styler = instantiate(plugins_config.type, config=plugins_config.model_dump(), log=log)
+        styler = instantiate(
+            plugins_config.type, config=plugins_config.model_dump(), log=log
+        )
         if verbose:
             get_console().print(f"Using Plugin {styler}")
         plugins.append(styler)
 
     for styler_config in gen_config.stylers:
-        styler = instantiate(styler_config.type, config=styler_config.model_dump(), log=log)
+        styler = instantiate(
+            styler_config.type, config=styler_config.model_dump(), log=log
+        )
         if verbose:
             get_console().print(f"Using Styler {styler}")
         stylers.append(styler)

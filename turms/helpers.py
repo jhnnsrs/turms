@@ -96,9 +96,11 @@ def load_dsl_from_url(url: AnyHttpUrl, headers: Dict[str, str] = None) -> DSLStr
         default_headers.update(headers)
     try:
         req = requests.get(url, headers=default_headers)
-        x = req.text()
-    except Exception:
-        raise GenerationError(f"Failed to fetch schema from {url}")
+        assert req.status_code == 200, "Incorrect status code"
+        assert req.content, "No content"
+        x = req.content.decode()
+    except Exception as e:
+        raise GenerationError(f"Failed to fetch schema from {url}") from e
     return x
 
 

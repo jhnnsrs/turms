@@ -101,9 +101,13 @@ class ClassRegistry(object):
         self.subscription_class_map = {}
         self.mutation_class_map = {}
 
+        self.registered_interfaces_fragments = {}
+
         self.forward_references = set()
+        self.fragment_type_map = {}
 
         self.interfacefragments_class_map = {}
+        self.interfacefragments_impl_map = {}
         self.log = log
 
     def style_inputtype_class(self, typename: str):
@@ -264,9 +268,26 @@ class ClassRegistry(object):
             fragmentname not in self.fragment_class_map
         ), f"Fragment {fragmentname} was already registered, cannot register annew"
         classname = self.style_fragment_class(fragmentname)
-        real_classname = classname if not is_interface else classname + "Base"
+        real_classname = classname if not is_interface else classname
         self.fragment_class_map[fragmentname] = real_classname
         return real_classname
+
+    def register_fragment_type(self, fragmentname: str, typename: str):
+        self.fragment_type_map[fragmentname] = typename
+
+
+    def register_interface_fragment_implementations(self, fragmentname: str, implementationMap: Dict[str, str]):
+        self.interfacefragments_impl_map[fragmentname] = implementationMap
+
+
+    def get_interface_fragment_implementations(self, fragmentname: str):
+        return self.interfacefragments_impl_map[fragmentname]
+
+
+    def get_fragment_type(self, fragmentname: str):
+        return self.fragment_type_map[fragmentname]
+
+
 
     def reference_fragment(
         self, typename: str, parent: str, allow_forward=True
@@ -279,6 +300,16 @@ class ClassRegistry(object):
             "Fragment",
             allow_forward,
         )
+    
+    def is_interface_fragment(self, typename: str):
+        return typename in self.registered_interfaces_fragments
+    
+
+    def reference_interface_fragment(self, typename: str, parent: str, allow_forward=True) -> ast.AST:
+        return self.registered_interfaces_fragments[typename]
+    
+    def register_interface_fragment(self, typename: str, ast: ast.AST):
+        self.registered_interfaces_fragments[typename] = ast
 
     def inherit_fragment(self, typename: str, allow_forward=True) -> ast.AST:
         if typename not in self.fragment_class_map:
@@ -439,7 +470,11 @@ class ClassRegistry(object):
                                 id=reference,
                                 ctx=ast.Load(),
                             ),
-                            attr="model_rebuild" if self.config.pydantic_version == "v2" else "update_forward_refs",
+                            attr=(
+                                "model_rebuild"
+                                if self.config.pydantic_version == "v2"
+                                else "update_forward_refs"
+                            ),
                             ctx=ast.Load(),
                         ),
                         keywords=[],

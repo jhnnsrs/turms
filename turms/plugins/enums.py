@@ -19,13 +19,14 @@ class EnumsPluginsError(Exception):
 
 
 class EnumsPluginConfig(PluginConfig):
-    model_config = SettingsConfigDict(env_prefix = "TURMS_PLUGINS_ENUMS_")
+    model_config = SettingsConfigDict(env_prefix="TURMS_PLUGINS_ENUMS_")
     type: str = "turms.plugins.enums.EnumsPlugin"
     skip_underscore: bool = False
     skip_double_underscore: bool = True
     skip_unreferenced: bool = True
     prepend: str = ""
     append: str = ""
+
 
 def generate_enums(
     client_schema: GraphQLSchema,

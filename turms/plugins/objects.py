@@ -30,12 +30,11 @@ from turms.config import GraphQLTypes
 
 
 class ObjectsPluginConfig(PluginConfig):
-    model_config = SettingsConfigDict(env_prefix = "TURMS_PLUGINS_OBJECTS_")
+    model_config = SettingsConfigDict(env_prefix="TURMS_PLUGINS_OBJECTS_")
     type: str = "turms.plugins.objects.ObjectsPlugin"
     types_bases: List[str] = ["pydantic.BaseModel"]
     skip_underscore: bool = False
     skip_double_underscore: bool = True
-
 
 
 def generate_object_field_annotation(
@@ -161,7 +160,7 @@ def generate_object_field_annotation(
             def list_builder(x):
                 return ast.Subscript(
                     value=ast.Name("Tuple", ctx=ast.Load()),
-                    slice=ast.Tuple(elts=[x,  ast.Constant(value=...)], ctx=ast.Load()),
+                    slice=ast.Tuple(elts=[x, ast.Constant(value=...)], ctx=ast.Load()),
                     ctx=ast.Load(),
                 )
 
@@ -287,7 +286,9 @@ def generate_types(
 
             keywords = []
             if not isinstance(value.type, GraphQLNonNull):
-                keywords.append(ast.keyword(arg="default", value=ast.Constant(value=None)))
+                keywords.append(
+                    ast.keyword(arg="default", value=ast.Constant(value=None))
+                )
 
             if field_name != value_key:
                 registry.register_import("pydantic.Field")
@@ -304,11 +305,11 @@ def generate_types(
                     value=ast.Call(
                         func=ast.Name(id="Field", ctx=ast.Load()),
                         args=[],
-                        keywords=keywords + [
+                        keywords=keywords
+                        + [
                             ast.keyword(
                                 arg="alias", value=ast.Constant(value=value_key)
                             )
-
                         ],
                     ),
                     simple=1,
@@ -326,11 +327,15 @@ def generate_types(
                         registry,
                         is_optional=True,
                     ),
-                    value=ast.Call(
-                        func=ast.Name(id="Field", ctx=ast.Load()),
-                        args=[],
-                        keywords=keywords,
-                    ) if keywords else None,
+                    value=(
+                        ast.Call(
+                            func=ast.Name(id="Field", ctx=ast.Load()),
+                            args=[],
+                            keywords=keywords,
+                        )
+                        if keywords
+                        else None
+                    ),
                     simple=1,
                 )
 
@@ -359,7 +364,8 @@ def generate_types(
                 ],
                 decorator_list=[],
                 keywords=[],
-                body=fields + generate_pydantic_config(GraphQLTypes.OBJECT, config, registry, key),
+                body=fields
+                + generate_pydantic_config(GraphQLTypes.OBJECT, config, registry, key),
             )
         )
 

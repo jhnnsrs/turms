@@ -26,6 +26,7 @@ from turms.plugins.base import Plugin, PluginConfig
 from turms.registry import ClassRegistry
 from turms.utils import (
     inspect_operation_for_documentation,
+    non_typename_fields,
     parse_documents,
     parse_value_node,
     recurse_outputtype_annotation,
@@ -323,17 +324,23 @@ def get_return_type_annotation(
     o_name = get_operation_class_name(o, registry)
     root = get_operation_root_type(client_schema, o)
 
+
     if collapse is True:
+
+
         collapsable_field = o.selection_set.selections[0]
+
+        sub_nodes = non_typename_fields(collapsable_field)
         field_definition = get_field_def(client_schema, root, collapsable_field)
 
-        if collapsable_field.selection_set is None:  # pragma: no cover
+        if len(sub_nodes) == 0:  # pragma: no cover
             return recurse_outputtype_annotation(field_definition.type, registry)
+        
 
         if (
-            len(collapsable_field.selection_set.selections) == 1
+            len(sub_nodes) == 1
         ):  # Dealing with one Element
-            collapsable_fragment_field = collapsable_field.selection_set.selections[0]
+            collapsable_fragment_field = sub_nodes[0]
             if isinstance(
                 collapsable_fragment_field, FragmentSpreadNode
             ):  # Dealing with a on element fragment
