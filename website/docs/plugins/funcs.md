@@ -27,10 +27,10 @@ project:
     extensions:
       turms:
         plugins:
-          - type: turms.plugins.operations.OperationsPlugin
+          - type: turms.plugins.funcs.FuncsPlugin
             prepend_sync: ""
             prepend_async: "a"
-            collapse_lonely: True #bool = True Collapses one operation query and return the collapsed type
+            collapse_lonely: True # bool = True Collapses one operation query and return the collapsed type
             global_args: #List[Arg] = [] global additional arguments for the functions to be called
             global_kwargs: #List[Kwarg] = []
             definitions: #List[FunctionDefinition] = []
@@ -53,15 +53,35 @@ Args can be defined as such
 extra_args:
   key: #str
   type: #str
-  description: #str = "Specify that in turms.plugin.funcs.OperationsFuncPlugin"
+  description: #str = "Specify that in turms.plugin.funcs.FuncsPlugin"
 ```
 
 ```yaml
 extra_kwargs:
   key: #str
   type: #str
-  description: #str = "Specify that in turms.plugin.funcs.OperationsFuncPlugin"
+  description: #str = "Specify that in turms.plugin.funcs.FuncsPlugin"
   default: #str = None
 ```
 
 ### Example Config
+
+```yaml
+project:
+  default:
+    schema: ...
+    extensions:
+      turms:
+        plugins:
+          - type: turms.plugins.funcs.FuncsPlugin
+            prepend_sync: ""
+            prepend_async: "a"
+            collapse_lonely: True # bool = True Collapses one operation query and return the collapsed type
+            global_args: #List[Arg] = [] global additional arguments for the functions to be called
+            global_kwargs: #List[Kwarg] = []
+            definitions:
+              - type: query
+                use:  my_pkg.my_module.my_graphql_runner_function
+              - type: mutation
+                use:  my_pkg.my_module.my_graphql_runner_function
+```
