@@ -8,7 +8,14 @@ from typing import Any, List, Optional, Tuple
 
 from graphql import (
     FragmentSpreadNode,
+    GraphQLInputObjectType,
+    GraphQLObjectType,
+    Undefined,
+    VariableNode,
     is_wrapping_type,
+)
+from graphql.type.definition import (
+    GraphQLEnumType,
 )
 from graphql.language.ast import (
     FieldNode,
@@ -34,6 +41,13 @@ from turms.utils import (
     recurse_type_annotation,
     recurse_type_label,
     target_from_node,
+)
+from graphql import (
+    GraphQLInputObjectType,
+    GraphQLInputType,
+    GraphQLList,
+    GraphQLNonNull,
+    GraphQLScalarType,
 )
 
 logger = logging.getLogger(__name__)
@@ -73,6 +87,7 @@ class FuncsPluginConfig(PluginConfig):
     definitions: List[FunctionDefinition] = []
     extract_documentation: bool = True
     argument_key_is_styled: bool = False
+    expand_input_types: List[str] = ["input"]
 
 
 def camel_to_snake(name):
@@ -157,15 +172,185 @@ def get_definitions_for_onode(
     return definitions
 
 
+
+def generate_input_annotation(
+    type: GraphQLInputObjectType,
+    registry: ClassRegistry,
+    is_optional=True,
+):
+    if isinstance(type, GraphQLScalarType):
+        if is_optional:
+            registry.register_import("typing.Optional")
+            return ast.Subscript(
+                value=ast.Name("Optional", ctx=ast.Load()),
+                slice=registry.reference_scalar(type.name),
+            )
+
+        return registry.reference_scalar(type.name)
+
+    if isinstance(type, GraphQLInputObjectType):
+        if is_optional:
+            registry.register_import("typing.Optional")
+            return ast.Subscript(
+                value=ast.Name("Optional", ctx=ast.Load()),
+                slice=registry.reference_inputtype(type.name, "SHOULD_NOT_BE_USED"),
+                ctx=ast.Load(),
+            )
+        return registry.reference_inputtype(type.name, "SHOULD_NOT_BE_USED")
+
+    if isinstance(type, GraphQLEnumType):
+        if is_optional:
+            registry.register_import("typing.Optional")
+            return ast.Subscript(
+                value=ast.Name("Optional", ctx=ast.Load()),
+                slice=registry.reference_enum(
+                    type.name, "SHOULD_NOT_BE_USED", allow_forward=False
+                ),
+                ctx=ast.Load(),
+            )
+        return registry.reference_enum(
+            type.name, "SHOULD_NOT_BE_USED", allow_forward=False
+        )
+
+    if isinstance(type, GraphQLNonNull):
+        return generate_input_annotation(
+            type.of_type, registry, is_optional=False
+        )
+
+    if isinstance(type, GraphQLList):
+        registry.register_import("typing.Iterable")
+
+        def list_builder(x):
+            return ast.Subscript(
+                value=ast.Name("Iterable", ctx=ast.Load()), slice=x, ctx=ast.Load()
+            )
+
+        if is_optional:
+            registry.register_import("typing.Optional")
+            return ast.Subscript(
+                value=ast.Name("Optional", ctx=ast.Load()),
+                slice=list_builder(
+                    generate_input_annotation(
+                        type.of_type,
+                        registry,
+                        is_optional=True,
+                    )
+                ),
+                ctx=ast.Load(),
+            )
+
+        return list_builder(
+            generate_input_annotation(
+                type.of_type, registry, is_optional=True
+            )
+        )
+
+    raise NotImplementedError(f"Unknown input type {type}")
+
+
+def generate_input_description(
+    type: GraphQLInputObjectType,
+    registry: ClassRegistry,
+    is_optional=True,
+):
+    if isinstance(type, GraphQLScalarType):
+        return type.description or ""
+
+    if isinstance(type, GraphQLInputObjectType):
+        return type.description or ""
+
+    if isinstance(type, GraphQLEnumType):
+        return type.name or ""
+
+    if isinstance(type, GraphQLNonNull):
+        return generate_input_description(
+            type.of_type, registry, is_optional=False
+        ) + " (required)"
+    
+    if isinstance(type, GraphQLList):
+        return generate_input_description(
+            type.of_type, registry, is_optional=True
+        ) + " (list)"
+
+    raise NotImplementedError(f"Unknown input type {type}")
+
+
+def generate_input_type_descriptions(input_type: GraphQLInputObjectType, registry: ClassRegistry):
+    description = ""
+
+    for value_key, value in input_type.fields.items():
+        field_name = registry.generate_node_name(value_key)
+
+    
+        description += f"    {registry.generate_parameter_name(value_key)}: {value.description or generate_input_description(value.type, registry)}\n"
+
+    return description
+
+
+
+def generate_input_type_params(
+    input_type: GraphQLInputObjectType, registry: ClassRegistry
+):
+    
+
+
+
+    pos_args = []
+    kw_args = []
+    kw_values = []
+
+    for value_key, value in input_type.fields.items():
+
+        field_name = registry.generate_node_name(value_key)
+
+        if isinstance(value.type, GraphQLNonNull):
+            pos_args.append(
+                ast.arg(
+                    arg=field_name,
+                    annotation=generate_input_annotation(
+                        value.type,
+                        registry,
+                        is_optional=True,
+                    ),
+                )
+            )
+        else:
+            kw_args.append(
+                ast.arg(
+                    arg=field_name,
+                    annotation=generate_input_annotation(
+                        value.type,
+                        registry,
+                        is_optional=True,
+                    ),
+                )
+            )
+            kw_values.append(ast.Constant(value=value.default_value if value.default_value and value.default_value is not Undefined else None))
+
+
+    return pos_args, kw_args, kw_values
+
+
+
+
+
 def generate_parameters(
     definition: FunctionDefinition,
     operation_definition: OperationDefinitionNode,
     config: GeneratorConfig,
     plugin_config: FuncsPluginConfig,
     registry: ClassRegistry,
+    client_schema: GraphQLSchema,
 ):
-    extra_args = get_extra_args_for_onode(definition, plugin_config)
+    
+
     pos_args = []
+    kw_args = []
+    kw_values = []
+
+
+    extra_args = get_extra_args_for_onode(definition, plugin_config)
+    
 
     for arg in extra_args:
         registry.register_import(arg.type)
@@ -189,17 +374,41 @@ def generate_parameters(
         for v in operation_definition.variable_definitions
         if not isinstance(v.type, NonNullTypeNode) or v.default_value
     ]
+    
+
+
+
+    non_expandable_args = []
 
     for v in arg_variables:
+        if v.variable.name.value in plugin_config.expand_input_types:
+
+            input_type = v.type
+            print(input_type)
+
+            type = client_schema.type_map[input_type.type.name.value]
+
+
+
+            expanded_pos_args, expanded_kw_args, expanded_kw_values = generate_input_type_params(
+               type, registry
+            )
+
+            pos_args += expanded_pos_args
+            kw_args += expanded_kw_args
+            kw_values += expanded_kw_values
+
+        else:
+            non_expandable_args.append(v)
+
+
+    for v in non_expandable_args:
         pos_args.append(
             ast.arg(
                 arg=registry.generate_parameter_name(v.variable.name.value),
                 annotation=recurse_type_annotation(v.type, registry),
             )
         )
-
-    kw_args = []
-    kw_values = []
 
     for v in kwarg_variables:
         kw_args.append(
@@ -249,16 +458,57 @@ def generate_parameters(
     )
 
 
+
+def input_type_to_dict(input_type: GraphQLInputObjectType, registry: ClassRegistry):
+
+    keys = []
+    values = []
+
+    for value_key, value in input_type.fields.items():
+        field_name = registry.generate_node_name(value_key)
+
+        keys.append(ast.Constant(value=field_name))
+        values.append(ast.Name(id=field_name, ctx=ast.Load()))
+
+
+
+    return ast.Dict(
+        keys=keys,
+        values=values,
+    )
+
+
+
+
+
+
+
 def generate_variable_dict(
     o: OperationDefinitionNode,
     plugin_config: FuncsPluginConfig,
     registry: ClassRegistry,
+    client_schema: GraphQLSchema,
 ):
     keys = []
     values = []
 
     for v in o.variable_definitions:
-        if plugin_config.argument_key_is_styled:
+        if v.variable.name.value in plugin_config.expand_input_types:
+            input_type = v.type
+
+            type = client_schema.type_map[input_type.type.name.value]
+
+
+
+            keys.append(
+                ast.Constant(
+                    value=registry.generate_parameter_name(v.variable.name.value)
+                )
+            )
+            values.append(
+                input_type_to_dict(type, registry)
+            )
+        elif plugin_config.argument_key_is_styled:
             keys.append(
                 ast.Constant(
                     value=registry.generate_parameter_name(v.variable.name.value)
@@ -381,29 +631,32 @@ def get_return_type_string(
     root = get_operation_root_type(client_schema, o)
 
     if collapse is True:
+        
         potential_return_field = o.selection_set.selections[0]
+
+        sub_nodes = non_typename_fields(potential_return_field)
         potential_return_type = get_field_def(
             client_schema, root, potential_return_field
         )
 
         if (
-            potential_return_field.selection_set is None
+            len(sub_nodes) == 0
         ):  # Dealing with a scalar type  # pragma: no cover
             return recurse_outputtype_label(potential_return_type.type, registry)
 
         if (
-            len(potential_return_field.selection_set.selections) == 1
+            len(sub_nodes)  == 1
         ):  # Dealing with one Element
-            collapsable_field = potential_return_field.selection_set.selections[0]
+            collapsable_fragment_field = sub_nodes[0]
 
             if isinstance(
-                collapsable_field, FragmentSpreadNode
+                collapsable_fragment_field, FragmentSpreadNode
             ):  # Dealing with a on element fragment
                 return recurse_outputtype_label(
                     potential_return_type.type,
                     registry,
                     overwrite_final=registry.reference_fragment(
-                        collapsable_field.name.value, "", allow_forward=False
+                        collapsable_fragment_field.name.value, "", allow_forward=False
                     ).id,
                 )
 
@@ -415,6 +668,37 @@ def get_return_type_string(
 
     else:
         return o_name
+    
+
+def estimate_variable_name(o: OperationDefinitionNode, client_schema: GraphQLSchema, root: GraphQLObjectType, description_map: dict):
+
+    if o.selection_set is None:
+        return
+    for field in o.selection_set.selections:
+        if isinstance(field, FieldNode):
+
+
+            for arg in field.arguments:
+                the_field = get_field_def(client_schema, root, field)
+                if isinstance(arg.value, VariableNode):
+                    if arg.value.name.value in the_field.args:
+                        mapped_description = the_field.args[arg.value.name.value].description
+
+                        if mapped_description:
+                            if arg.value.name.value in description_map:
+                                description_map[arg.value.name.value] = f"{description_map[arg.value.name.value]} AND {mapped_description}"
+                            else:
+                                description_map[arg.value.name.value] = mapped_description
+
+            for sub in non_typename_fields(field):
+                if isinstance(sub, FieldNode):
+                    estimate_variable_name(sub, client_schema, get_field_def(client_schema, root, field), description_map)
+
+
+
+
+
+
 
 
 def generate_query_doc(
@@ -433,7 +717,7 @@ def generate_query_doc(
 
     return_type = get_return_type_string(o, client_schema, registry, collapse)
 
-    header = f"{o.name.value} \n\n"
+    header = f"{o.name.value} \n"
 
     operation_documentation = (
         inspect_operation_for_documentation(o)
@@ -441,21 +725,33 @@ def generate_query_doc(
         else None
     )
 
-    op_descriptions = []
+    description_map = {}
+    estimate_variable_name(o, client_schema, x, description_map)
+
 
     if not operation_documentation:
-        op_descriptions = []
+        op_descriptions_dict = {}
 
         for field in o.selection_set.selections:
             if isinstance(field, FieldNode):
                 target = target_from_node(field)
-                operation_type = get_field_def(client_schema, x, field).type
-                while is_wrapping_type(operation_type):
-                    operation_type = operation_type.of_type
+                operation_type = get_field_def(client_schema, x, field)
                 if operation_type.description:
-                    op_descriptions.append(f"{target}: {operation_type.description}\n")
+                    op_descriptions_dict[target] = f"{operation_type.description}"
 
-        description = "\n ".join([header] + op_descriptions)
+        if collapse and len(op_descriptions_dict) == 1:
+            op_descriptions = [
+                f"{v}" for k, v in op_descriptions_dict.items()
+            ]
+
+        else:
+            op_descriptions = [
+                f"{k}: {v}" for k, v in op_descriptions_dict.items()
+            ]
+
+
+
+        description = "\n".join([header] + op_descriptions)
 
     else:
         description = header + operation_documentation
@@ -468,12 +764,29 @@ def generate_query_doc(
         description += f"    {arg.key} ({arg.type}): {arg.description}\n"
 
     for v in o.variable_definitions:
-        if isinstance(v.type, NonNullTypeNode) and not v.default_value:
-            description += f"    {registry.generate_parameter_name(v.variable.name.value)} ({recurse_type_label(v.type, registry)}): {v.variable.name.value}\n"
+        if v.variable.name.value in plugin_config.expand_input_types:
+
+            input_type = v.type
+
+            type = client_schema.type_map[input_type.type.name.value]
+
+
+            description += generate_input_type_descriptions(type, registry)
+
+        else:
+
+            field_description = description_map.get(v.variable.name.value, "No description")
+
+
+            if isinstance(v.type, NonNullTypeNode) and not v.default_value:
+                description += f"    {registry.generate_parameter_name(v.variable.name.value)} ({recurse_type_label(v.type, registry)}): {field_description}\n"
 
     for v in o.variable_definitions:
+
+        field_description = description_map.get(v.variable.name.value, "No description")
+
         if not isinstance(v.type, NonNullTypeNode) or v.default_value:
-            description += f"    {registry.generate_parameter_name(v.variable.name.value)} ({recurse_type_label(v.type, registry)}, optional): {v.variable.name.value}. {'' if not v.default_value else  'Defaults to ' + str(v.default_value.value)}\n"
+            description += f"    {registry.generate_parameter_name(v.variable.name.value)} ({recurse_type_label(v.type, registry)}, optional): {field_description}. {'' if not v.default_value else  'Defaults to ' + str(v.default_value.value)}\n"
 
     extra_kwargs = get_extra_kwargs_for_onode(definition, plugin_config)
     for kwarg in extra_kwargs:
@@ -482,7 +795,7 @@ def generate_query_doc(
         )
 
     description += "\nReturns:\n"
-    description += f"    {return_type}"
+    description += f"    {return_type}\n"
 
     return ast.Expr(value=ast.Constant(value=description))
 
@@ -514,7 +827,7 @@ def genereate_async_call(
                     )
                     + [
                         generate_document_arg(o, registry),
-                        generate_variable_dict(o, plugin_config, registry),
+                        generate_variable_dict(o, plugin_config, registry, client_schema),
                     ],
                 )
             )
@@ -542,7 +855,7 @@ def genereate_async_call(
                         )
                         + [
                             generate_document_arg(o, registry),
-                            generate_variable_dict(o, plugin_config, registry),
+                            generate_variable_dict(o, plugin_config, registry, client_schema),
                         ],
                     )
                 ),
@@ -575,7 +888,7 @@ def genereate_sync_call(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o, registry),
-                    generate_variable_dict(o, plugin_config, registry),
+                    generate_variable_dict(o, plugin_config, registry, client_schema),
                 ],
             )
         )
@@ -601,7 +914,7 @@ def genereate_sync_call(
                     )
                     + [
                         generate_document_arg(o, registry),
-                        generate_variable_dict(o, plugin_config, registry),
+                        generate_variable_dict(o, plugin_config, registry, client_schema),
                     ],
                 ),
                 attr=registry.generate_node_name(correct_attr),
@@ -634,7 +947,7 @@ def genereate_async_iterator(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o, registry),
-                    generate_variable_dict(o, plugin_config, registry),
+                    generate_variable_dict(o, plugin_config, registry, client_schema),
                 ],
             ),
             body=[
@@ -662,7 +975,7 @@ def genereate_async_iterator(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o, registry),
-                    generate_variable_dict(o, plugin_config, registry),
+                    generate_variable_dict(o, plugin_config, registry, client_schema),
                 ],
             ),
             body=[
@@ -704,7 +1017,7 @@ def genereate_sync_iterator(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o, registry),
-                    generate_variable_dict(o, plugin_config, registry),
+                    generate_variable_dict(o, plugin_config, registry, client_schema),
                 ],
             ),
             body=[
@@ -732,7 +1045,7 @@ def genereate_sync_iterator(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o, registry),
-                    generate_variable_dict(o, plugin_config, registry),
+                    generate_variable_dict(o, plugin_config, registry, client_schema),
                 ],
             ),
             body=[
@@ -788,6 +1101,7 @@ def generate_operation_func(
                     config,
                     plugin_config,
                     registry,
+                    client_schema
                 ),
                 body=[
                     doc,
@@ -838,6 +1152,7 @@ def generate_operation_func(
                     config,
                     plugin_config,
                     registry,
+                    client_schema
                 ),
                 body=[
                     doc,

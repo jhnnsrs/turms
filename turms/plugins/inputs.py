@@ -47,6 +47,7 @@ def generate_input_annotation(
     is_optional=True,
 ):
     if isinstance(type, GraphQLScalarType):
+
         if is_optional:
             registry.register_import("typing.Optional")
             return ast.Subscript(
@@ -55,6 +56,7 @@ def generate_input_annotation(
             )
 
         return registry.reference_scalar(type.name)
+        
 
     if isinstance(type, GraphQLInputObjectType):
         if is_optional:

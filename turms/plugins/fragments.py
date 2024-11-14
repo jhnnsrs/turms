@@ -113,6 +113,7 @@ class FragmentsPluginConfig(PluginConfig):
     type: str = "turms.plugins.fragments.FragmentsPlugin"
     fragment_bases: List[str] = []
     fragments_glob: Optional[str] = None
+    add_documentation: bool = True
 
 
 def get_fragment_bases(
@@ -179,7 +180,7 @@ def generate_fragment(
         base_fragment_name =  registry.style_fragment_class(f.name.value)
         additional_bases = get_additional_bases_for_type(type.name, config, registry)
 
-        if type.description:
+        if type.description and plugin_config.add_documentation:
             mother_class_fields.append(
                 ast.Expr(value=ast.Constant(value=type.description))
             )
@@ -194,6 +195,7 @@ def generate_fragment(
 
 
         inline_fragment_fields = {}
+
 
 
         for sub_node in sub_nodes:
@@ -293,6 +295,11 @@ def generate_fragment(
         additional_bases = get_additional_bases_for_type(
             f.type_condition.name.value, config, registry
         )
+
+        if type.description and plugin_config.add_documentation:
+            fields.append(
+                ast.Expr(value=ast.Constant(value=type.description))
+            )
 
         fields += [generate_typename_field(type.name, registry, config)]
 
