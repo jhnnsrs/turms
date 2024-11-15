@@ -1,0 +1,22 @@
+"""
+The directive is responsible for authorization check.
+"""
+directive @auth(
+  """
+  Permissions which are required for field access.
+  """
+  permissions: [String!]
+
+  """
+  The list of roles that an authorized user should have to get the access.
+  """
+  roles: [String!] = []
+) on FIELD_DEFINITION
+
+type X {
+  name: String! @auth(permissions: ["read"])
+}
+
+type Query {
+  x: [X!]! @auth(permissions: ["read"])
+}

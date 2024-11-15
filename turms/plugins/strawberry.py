@@ -1,4 +1,10 @@
 from graphql import (
+    BooleanValueNode,
+    ConstListValueNode,
+    ConstObjectValueNode,
+    ConstValueNode,
+    EnumValueNode,
+    FloatValueNode,
     GraphQLField,
     GraphQLInputObjectType,
     GraphQLInterfaceType,
@@ -8,6 +14,11 @@ from graphql import (
     GraphQLScalarType,
     GraphQLType,
     GraphQLUnionType,
+    IntValueNode,
+    ListValueNode,
+    NullValueNode,
+    ObjectValueNode,
+    StringValueNode,
     Undefined,
     GraphQLArgument,
     ObjectTypeDefinitionNode,
@@ -41,6 +52,133 @@ class StrawberryGenerateFunc(ImportableFunctionMixin, Protocol):
         plugin_config: "StrawberryPluginConfig",
         registry: ClassRegistry,
     ) -> List[ast.AST]: ...  # pragma: no cover
+
+
+def build_directive_type_annotation(value: GraphQLType, registry: ClassRegistry, is_optional=True):
+
+    if isinstance(value, GraphQLScalarType):
+        if is_optional:
+            registry.register_import("typing.Optional")
+            return ast.Subscript(
+                value=ast.Name("Optional", ctx=ast.Load()),
+                slice=registry.reference_scalar(value.name),
+                ctx=ast.Load(),
+            )
+        
+        return registry.reference_scalar(value.name)
+    if isinstance(value, GraphQLObjectType):
+        raise NotImplementedError("Object types cannot be used as arguments")
+    if isinstance(value, GraphQLInterfaceType):
+        raise NotImplementedError("Interface types cannot be used as arguments")
+    if isinstance(value, GraphQLUnionType):
+        raise NotImplementedError("Union types cannot be used as arguments")
+    if isinstance(value, GraphQLEnumType):
+        if is_optional:
+            registry.register_import("typing.Optional")
+            return ast.Subscript(
+                value=ast.Name("Optional", ctx=ast.Load()),
+                slice=registry.reference_enum(value.name),
+                ctx=ast.Load(),
+            )
+
+        return registry.reference_enum(value.name)
+    if isinstance(value, GraphQLNonNull):
+        return build_directive_type_annotation(value.of_type, registry, is_optional=False)
+    if isinstance(value, GraphQLList):
+        registry.register_import("typing.List")
+
+        if is_optional:
+            registry.register_import("typing.Optional")
+
+            return ast.Subscript(
+                value=ast.Name("Optional", ctx=ast.Load()),
+                slice=ast.Subscript(
+                    value=ast.Name("List", ctx=ast.Load()),
+                    slice=build_directive_type_annotation(value.of_type, registry, is_optional=True),
+                    ctx=ast.Load(),
+                ),
+                ctx=ast.Load(),
+            )
+
+        return ast.Subscript(
+            value=ast.Name("List", ctx=ast.Load()),
+            slice=build_directive_type_annotation(value.of_type, registry, is_optional=True),
+            ctx=ast.Load(),
+        )
+    if isinstance(value, GraphQLInputObjectType):
+        raise NotImplementedError("Input types cannot be used as arguments")
+    
+    raise NotImplementedError(f"Unknown type {repr(value)}")
+
+
+
+def convert_valuenode_to_ast(value: ConstValueNode):
+    if isinstance(value, NullValueNode):
+        return ast.Constant(value=None)
+    if isinstance(value, StringValueNode):
+        return ast.Constant(value=value.value)
+    if isinstance(value, IntValueNode):
+        return ast.Constant(value=value.value)
+    if isinstance(value, FloatValueNode):
+        return ast.Constant(value=value.value)
+    if isinstance(value, BooleanValueNode):
+        return ast.Constant(value=value.value)
+
+    if isinstance(value, EnumValueNode):
+        return ast.Constant(value=value)
+    if isinstance(value, ListValueNode):
+        return ast.List(elts=[convert_valuenode_to_ast(x) for x in value.values], ctx=ast.Load())
+    if isinstance(value, ObjectValueNode):
+
+        keys = []
+        values = []
+
+        for field in value.fields:
+            keys.append(field.name.value)
+            values.append(convert_valuenode_to_ast(field.value))
+
+        return ast.Dict(
+            keys=keys,
+            values=values,
+        )
+    
+    raise NotImplementedError(f"Unknown default value {repr(value)}")
+
+    
+
+def convert_default_value_to_ast(value):
+    if value is Undefined:
+        return None
+    if value is None:
+        return ast.Constant(value=None)
+    if isinstance(value, str):
+        return ast.Constant(value=value)
+    if isinstance(value, int):
+        return ast.Constant(value=value)
+    if isinstance(value, float):
+        return ast.Constant(value=value)
+    if isinstance(value, bool):
+        return ast.Constant(value=value)
+    if isinstance(value, list):
+        return ast.List(elts=[convert_default_value_to_ast(x) for x in value], ctx=ast.Load())
+    if isinstance(value, dict):
+        keys = []
+        values = []
+
+        for key, value in value.items():
+            keys.append(key)
+            values.append(convert_default_value_to_ast(value))
+
+        return ast.Dict(
+            keys=keys,
+            values=values,
+        )
+    raise NotImplementedError(f"Unknown default value {repr(value)}")
+
+
+
+
+
 
 
 def default_generate_directives(
@@ -96,23 +234,53 @@ def default_generate_directives(
 
             type = value.type
 
-            if isinstance(value.type, GraphQLNonNull):
-                type = value.type.of_type
-
-            assert isinstance(
-                type, GraphQLScalarType
-            ), "Only scalar (or nonnull version of this) are supported"
-
-            if value.default_value:
-                default = ast.Constant(value=value.default_value)
+            if value.default_value is not None:
+                default = convert_default_value_to_ast(value.default_value)
             else:
                 default = None
+
+            needs_factory = False
+            if isinstance(default, ast.List):
+                needs_factory = True
+            if isinstance(default, ast.Dict):
+                needs_factory = True
+
+
+            field_value = None
+
+            if default:
+                if needs_factory:
+                    field_value = ast.Call(
+                        func=ast.Name(id="strawberry.field", ctx=ast.Load()),
+                        keywords=[
+                            ast.keyword(
+                                arg="default_factory",
+                                value=ast.Lambda(
+                                    args=[], body=default
+                                ),
+                            ),
+                        ],
+                        args=[],
+                    )
+                else:
+                    field_value = ast.Call(
+                        func=ast.Name(id="strawberry.field", ctx=ast.Load()),
+                        keywords=[
+                            ast.keyword(
+                                arg="default",
+                                value=default,
+                            ),
+                        ],
+                        args=[],
+                    )
+
+
             assign = ast.AnnAssign(
                 target=ast.Name(
                     id=registry.generate_node_name(value_key), ctx=ast.Store()
                 ),
-                annotation=registry.reference_scalar(type.name),
-                value=default,
+                annotation=build_directive_type_annotation(type, registry),
+                value=field_value,
                 simple=1,
             )
 
@@ -560,7 +728,7 @@ def generate_directive_keywords(
                     ctx=ast.Load(),
                 ),
                 keywords=[
-                    ast.keyword(arg=arg.name.value, value=ast.Constant(arg.value.value))
+                    ast.keyword(arg=arg.name.value, value=convert_valuenode_to_ast(arg.value))
                     for arg in directive.arguments
                 ],
                 args=[],

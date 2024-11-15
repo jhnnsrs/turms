@@ -87,7 +87,7 @@ class FuncsPluginConfig(PluginConfig):
     definitions: List[FunctionDefinition] = []
     extract_documentation: bool = True
     argument_key_is_styled: bool = False
-    expand_input_types: List[str] = ["input"]
+    expand_input_types: List[str] = []
 
 
 def camel_to_snake(name):
