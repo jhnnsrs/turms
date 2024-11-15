@@ -60,6 +60,10 @@ def nested_input_schema():
 def union_schema():
     return build_schema_from_schema_type(build_relative_glob("/schemas/union.graphql"))
 
+@pytest.fixture(scope="session")
+def directive_schema():
+    return build_schema_from_schema_type(build_relative_glob("/schemas/list_field_directive.graphql"))
+
 
 @pytest.fixture(scope="session")
 def schema_directive_schema():
