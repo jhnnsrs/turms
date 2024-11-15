@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "turms"
-version = "0.8.0"
+version = "0.8.2"
 description = "graphql-codegen powered by pydantic"
 authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
 license = "MIT"

@@ -384,7 +384,6 @@ def generate_parameters(
         if v.variable.name.value in plugin_config.expand_input_types:
 
             input_type = v.type
-            print(input_type)
 
             type = client_schema.type_map[input_type.type.name.value]
 
