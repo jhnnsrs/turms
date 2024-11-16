@@ -32,5 +32,5 @@ def test_list_directive_funcs(directive_schema):
 
     unit_test_with(
         generated_ast,
-        ""
+        "schema = strawberry.Schema(query=Query)",
     )

@@ -1,3 +1,9 @@
+enum Role {
+  ADMIN
+  USER
+}
+
+
 """
 The directive is responsible for authorization check.
 """
@@ -10,7 +16,7 @@ directive @auth(
   """
   The list of roles that an authorized user should have to get the access.
   """
-  roles: [String!] = []
+  roles: [Role!] = []
 ) on FIELD_DEFINITION
 
 type X {

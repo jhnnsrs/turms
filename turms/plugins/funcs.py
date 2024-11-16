@@ -669,29 +669,46 @@ def get_return_type_string(
         return o_name
     
 
-def estimate_variable_name(o: OperationDefinitionNode, client_schema: GraphQLSchema, root: GraphQLObjectType, description_map: dict):
-
+def estimate_variable_name(o: OperationDefinitionNode | FieldNode, client_schema: GraphQLSchema, root: GraphQLObjectType, description_map: dict):
+    """Recursively estimate variable descriptions from field arguments.
+    
+    Args:
+        o: Operation or field node to analyze
+        client_schema: The GraphQL schema
+        root: The root type for the current level
+        description_map: Dictionary to store variable descriptions
+    """
     if o.selection_set is None:
         return
+        
     for field in o.selection_set.selections:
         if isinstance(field, FieldNode):
+            field_def = get_field_def(client_schema, root, field)
+            if not field_def:
+                continue
 
-
+            # Handle arguments and their variable descriptions
             for arg in field.arguments:
-                the_field = get_field_def(client_schema, root, field)
                 if isinstance(arg.value, VariableNode):
-                    if arg.value.name.value in the_field.args:
-                        mapped_description = the_field.args[arg.value.name.value].description
-
-                        if mapped_description:
-                            if arg.value.name.value in description_map:
-                                description_map[arg.value.name.value] = f"{description_map[arg.value.name.value]} AND {mapped_description}"
+                    var_name = arg.value.name.value
+                    
+                    if arg.name.value in field_def.args:
+                        arg_description = field_def.args[arg.name.value].description
+                        if arg_description:
+                            if var_name in description_map:
+                                description_map[var_name] = f"{description_map[var_name]} AND {arg_description}"
                             else:
-                                description_map[arg.value.name.value] = mapped_description
+                                description_map[var_name] = arg_description
 
-            for sub in non_typename_fields(field):
-                if isinstance(sub, FieldNode):
-                    estimate_variable_name(sub, client_schema, get_field_def(client_schema, root, field), description_map)
+            # Recurse into selection set if present
+            if field.selection_set:
+                field_type = field_def.type
+                # Unwrap non-null and list types to get the actual object type
+                while is_wrapping_type(field_type):
+                    field_type = field_type.of_type
+                
+                if isinstance(field_type, GraphQLObjectType):
+                    estimate_variable_name(field, client_schema, field_type, description_map)
 
 
 

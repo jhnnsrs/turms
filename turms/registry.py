@@ -159,7 +159,7 @@ class ClassRegistry(object):
     def get_enum_class(self, typename) -> str:
         return self.enum_class_map[typename]
 
-    def reference_enum(self, typename: str, parent: str, allow_forward=True) -> ast.AST:
+    def reference_enum(self, typename: str, parent: str, allow_forward=True, needs_rebuild=True) -> ast.AST:
         if typename in built_in_map:
             # Builtin enums
             self._builtins.add(typename)
@@ -172,7 +172,8 @@ class ClassRegistry(object):
                 raise NoEnumFound(
                     f"Input type {typename} is not yet defined but referenced by {parent}. And we dont allow forward references"
                 )
-            self.forward_references.add(parent)
+            if needs_rebuild:
+                self.forward_references.add(parent)
             return ast.Constant(value=classname, ctx=ast.Load())
         return ast.Name(id=classname, ctx=ast.Load())
 
