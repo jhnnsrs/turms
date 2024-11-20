@@ -466,7 +466,7 @@ def input_type_to_dict(input_type: GraphQLInputObjectType, registry: ClassRegist
     for value_key, value in input_type.fields.items():
         field_name = registry.generate_node_name(value_key)
 
-        keys.append(ast.Constant(value=field_name))
+        keys.append(ast.Constant(value=value_key))
         values.append(ast.Name(id=field_name, ctx=ast.Load()))
 
 
@@ -499,28 +499,16 @@ def generate_variable_dict(
 
 
 
-            keys.append(
-                ast.Constant(
-                    value=registry.generate_parameter_name(v.variable.name.value)
-                )
-            )
-            values.append(
-                input_type_to_dict(type, registry)
-            )
-        elif plugin_config.argument_key_is_styled:
-            keys.append(
-                ast.Constant(
-                    value=registry.generate_parameter_name(v.variable.name.value)
-                )
-            )
+            keys.append(ast.Constant(value=v.variable.name.value))
+            values.append(input_type_to_dict(type, registry))
         else:
             keys.append(ast.Constant(value=v.variable.name.value))
-        values.append(
-            ast.Name(
-                id=registry.generate_parameter_name(v.variable.name.value),
-                ctx=ast.Load(),
+            values.append(
+                ast.Name(
+                    id=registry.generate_parameter_name(v.variable.name.value),
+                    ctx=ast.Load(),
+                )
             )
-        )
 
     return ast.Dict(keys=keys, values=values)
 
