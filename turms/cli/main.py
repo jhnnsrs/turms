@@ -104,10 +104,18 @@ def generate_projects(projects: Dict[str, GraphQLProject], title="Turms"):
                 )
 
                 if project.extensions.turms.dump_schema:
-                    write_schema_to_file(schema, project.extensions.turms.out_dir, project.extensions.turms.schema_name)
+                    write_schema_to_file(
+                        schema,
+                        project.extensions.turms.out_dir,
+                        project.extensions.turms.schema_name,
+                    )
 
                 if project.extensions.turms.dump_configuration:
-                    write_project(project, project.extensions.turms.out_dir, project.extensions.turms.configuration_name)
+                    write_project(
+                        project,
+                        project.extensions.turms.out_dir,
+                        project.extensions.turms.configuration_name,
+                    )
 
             except Exception as e:
                 project_tree.style = "red"

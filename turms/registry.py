@@ -159,7 +159,9 @@ class ClassRegistry(object):
     def get_enum_class(self, typename) -> str:
         return self.enum_class_map[typename]
 
-    def reference_enum(self, typename: str, parent: str, allow_forward=True, needs_rebuild=True) -> ast.AST:
+    def reference_enum(
+        self, typename: str, parent: str, allow_forward=True, needs_rebuild=True
+    ) -> ast.AST:
         if typename in built_in_map:
             # Builtin enums
             self._builtins.add(typename)
@@ -276,19 +278,16 @@ class ClassRegistry(object):
     def register_fragment_type(self, fragmentname: str, typename: str):
         self.fragment_type_map[fragmentname] = typename
 
-
-    def register_interface_fragment_implementations(self, fragmentname: str, implementationMap: Dict[str, str]):
+    def register_interface_fragment_implementations(
+        self, fragmentname: str, implementationMap: Dict[str, str]
+    ):
         self.interfacefragments_impl_map[fragmentname] = implementationMap
-
 
     def get_interface_fragment_implementations(self, fragmentname: str):
         return self.interfacefragments_impl_map[fragmentname]
 
-
     def get_fragment_type(self, fragmentname: str):
         return self.fragment_type_map[fragmentname]
-
-
 
     def reference_fragment(
         self, typename: str, parent: str, allow_forward=True
@@ -301,14 +300,15 @@ class ClassRegistry(object):
             "Fragment",
             allow_forward,
         )
-    
+
     def is_interface_fragment(self, typename: str):
         return typename in self.registered_interfaces_fragments
-    
 
-    def reference_interface_fragment(self, typename: str, parent: str, allow_forward=True) -> ast.AST:
+    def reference_interface_fragment(
+        self, typename: str, parent: str, allow_forward=True
+    ) -> ast.AST:
         return self.registered_interfaces_fragments[typename]
-    
+
     def register_interface_fragment(self, typename: str, ast: ast.AST):
         self.registered_interfaces_fragments[typename] = ast
 
