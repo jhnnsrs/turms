@@ -298,7 +298,6 @@ class GeneratorConfig(BaseSettings):
             raise ValueError(f"Invalid import: {parser.type} {e}") from e
 
         return v
-    
 
     @field_validator("additional_bases")
     def validate_additional_bases(cls, v):
@@ -308,9 +307,10 @@ class GeneratorConfig(BaseSettings):
                     raise ValueError("string required")
                 if value not in dir(builtins):
                     if "." not in value:
-                        raise ValueError("You need to point to a module if its not a builtin type")
+                        raise ValueError(
+                            "You need to point to a module if its not a builtin type"
+                        )
         return v
-
 
 
 class Extensions(BaseModel):

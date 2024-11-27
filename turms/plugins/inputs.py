@@ -56,7 +56,6 @@ def generate_input_annotation(
             )
 
         return registry.reference_scalar(type.name)
-        
 
     if isinstance(type, GraphQLInputObjectType):
         if is_optional:
@@ -136,7 +135,6 @@ def generate_input_annotation(
     raise NotImplementedError(f"Unknown input type {type}")
 
 
-
 @dataclass
 class Discriminator:
     discriminator: str
@@ -153,9 +151,9 @@ def generate_input_type(
     key: str,
     discriminator: Optional[Discriminator] = None,
 ):
-    
+
     additional_bases = get_additional_bases_for_type(type.name, config, registry)
-    
+
     fields = (
         [ast.Expr(value=ast.Constant(value=type.description))]
         if type.description
@@ -166,11 +164,19 @@ def generate_input_type(
         fields.append(
             ast.AnnAssign(
                 target=ast.Name(discriminator.discriminator, ctx=ast.Store()),
-                annotation=ast.Subscript(value=ast.Name("Literal", ctx=ast.Load()), slice=ast.Constant(value=discriminator.value), ctx=ast.Load()),
+                annotation=ast.Subscript(
+                    value=ast.Name("Literal", ctx=ast.Load()),
+                    slice=ast.Constant(value=discriminator.value),
+                    ctx=ast.Load(),
+                ),
                 value=ast.Call(
                     func=ast.Name(id="Field", ctx=ast.Load()),
                     args=[],
-                    keywords=[ast.keyword(arg="default", value=ast.Constant(value=discriminator.value))]
+                    keywords=[
+                        ast.keyword(
+                            arg="default", value=ast.Constant(value=discriminator.value)
+                        )
+                    ],
                 ),
                 simple=1,
             )
@@ -179,20 +185,12 @@ def generate_input_type(
     for value_key, value in type.fields.items():
         field_name = registry.generate_node_name(value_key)
 
-
-
-
         if field_name != value_key:
             registry.register_import("pydantic.Field")
 
-            keywords = [
-                ast.keyword(arg="alias", value=ast.Constant(value=value_key))
-            ]
+            keywords = [ast.keyword(arg="alias", value=ast.Constant(value=value_key))]
             if not isinstance(value.type, GraphQLNonNull):
-                keywords.append(
-                    ast.keyword(arg="default", value=ast.Constant(None))
-                )
-
+                keywords.append(ast.keyword(arg="default", value=ast.Constant(None)))
 
             assign = ast.AnnAssign(
                 target=ast.Name(field_name, ctx=ast.Store()),
@@ -246,26 +244,18 @@ def generate_input_type(
         else:
             fields += [assign]
 
-    
-
     return ast.ClassDef(
-            name,
-            bases=additional_bases
-            + [
-                ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                for base in plugin_config.inputtype_bases
-            ],
-            decorator_list=[],
-            keywords=[],
-            body=fields
-            + generate_pydantic_config(
-                GraphQLTypes.INPUT, config, registry, typename=key
-            ),
-        )
-
-
-
-
+        name,
+        bases=additional_bases
+        + [
+            ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+            for base in plugin_config.inputtype_bases
+        ],
+        decorator_list=[],
+        keywords=[],
+        body=fields
+        + generate_pydantic_config(GraphQLTypes.INPUT, config, registry, typename=key),
+    )
 
 
 def generate_inputs(
@@ -292,8 +282,6 @@ def generate_inputs(
     for base in plugin_config.inputtype_bases:
         registry.register_import(base)
 
-
-
     union_input_types = {}
     union_type_discriminators = {}
 
@@ -304,7 +292,7 @@ def generate_inputs(
             directive_name = directive.name.value
             if directive_name == "unionElementOf":
 
-                union_type = None 
+                union_type = None
                 discriminator = None
                 key = None
                 for arg in directive.arguments:
@@ -315,24 +303,30 @@ def generate_inputs(
                     if arg.name.value == "key":
                         key = arg.value.value
 
-
                 if union_type in ref_registry.inputs:
                     if union_type not in union_input_types:
                         union_input_types[union_type] = []
                     if union_type not in union_type_discriminators:
                         union_type_discriminators[union_type] = discriminator
 
-                    assert union_type_discriminators[union_type] == discriminator, f"Discriminator mismatch for {union_type} expected {union_type_discriminators[union_type]} got {discriminator}"
+                    assert (
+                        union_type_discriminators[union_type] == discriminator
+                    ), f"Discriminator mismatch for {union_type} expected {union_type_discriminators[union_type]} got {discriminator}"
 
                     name = registry.generate_inputtype(type.name)
                     union_input_types[union_type].append(name)
-                    tree.append(generate_input_type(name, union_type_discriminators, type, config, plugin_config, registry, type.name, Discriminator(discriminator=discriminator, value=key)))
-
-                
-                
-
-
-
+                    tree.append(
+                        generate_input_type(
+                            name,
+                            union_type_discriminators,
+                            type,
+                            config,
+                            plugin_config,
+                            registry,
+                            type.name,
+                            Discriminator(discriminator=discriminator, value=key),
+                        )
+                    )
 
     for key, type in inputobjects_type.items():
         if ref_registry and key not in ref_registry.inputs:
@@ -363,14 +357,18 @@ def generate_inputs(
                     ast.Call(
                         func=ast.Name(id="Field", ctx=ast.Load()),
                         args=[],
-                        keywords=[ast.keyword(arg="discriminator", value=ast.Constant(union_type_discriminators[type.name]))],
-                    )
+                        keywords=[
+                            ast.keyword(
+                                arg="discriminator",
+                                value=ast.Constant(
+                                    union_type_discriminators[type.name]
+                                ),
+                            )
+                        ],
+                    ),
                 ],
                 ctx=ast.Load(),
             )
-
-
-
 
             tree.append(
                 ast.Assign(
@@ -389,7 +387,6 @@ def generate_inputs(
             )
 
             continue
-
 
         additional_bases = get_additional_bases_for_type(type.name, config, registry)
         name = registry.generate_inputtype(key)
@@ -464,8 +461,6 @@ def generate_inputs(
             else:
                 fields += [assign]
 
-        
-
         tree.append(
             ast.ClassDef(
                 name,
@@ -482,11 +477,6 @@ def generate_inputs(
                 ),
             )
         )
-
-
-        
-
-
 
     return tree
 

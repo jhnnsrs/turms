@@ -54,7 +54,9 @@ class StrawberryGenerateFunc(ImportableFunctionMixin, Protocol):
     ) -> List[ast.AST]: ...  # pragma: no cover
 
 
-def build_directive_type_annotation(value: GraphQLType, registry: ClassRegistry, is_optional=True):
+def build_directive_type_annotation(
+    value: GraphQLType, registry: ClassRegistry, parent, is_optional=True
+):
 
     if isinstance(value, GraphQLScalarType):
         if is_optional:
@@ -64,7 +66,7 @@ def build_directive_type_annotation(value: GraphQLType, registry: ClassRegistry,
                 slice=registry.reference_scalar(value.name),
                 ctx=ast.Load(),
             )
-        
+
         return registry.reference_scalar(value.name)
     if isinstance(value, GraphQLObjectType):
         raise NotImplementedError("Object types cannot be used as arguments")
@@ -77,13 +79,19 @@ def build_directive_type_annotation(value: GraphQLType, registry: ClassRegistry,
             registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
-                slice=registry.reference_enum(value.name),
+                slice=registry.reference_enum(
+                    value.name, parent, allow_forward=True, needs_rebuild=False
+                ),
                 ctx=ast.Load(),
             )
 
-        return registry.reference_enum(value.name)
+        return registry.reference_enum(
+            value.name, parent, allow_forward=True, needs_rebuild=False
+        )
     if isinstance(value, GraphQLNonNull):
-        return build_directive_type_annotation(value.of_type, registry, is_optional=False)
+        return build_directive_type_annotation(
+            value.of_type, registry, parent, is_optional=False
+        )
     if isinstance(value, GraphQLList):
         registry.register_import("typing.List")
 
@@ -94,7 +102,9 @@ def build_directive_type_annotation(value: GraphQLType, registry: ClassRegistry,
                 value=ast.Name("Optional", ctx=ast.Load()),
                 slice=ast.Subscript(
                     value=ast.Name("List", ctx=ast.Load()),
-                    slice=build_directive_type_annotation(value.of_type, registry, is_optional=True),
+                    slice=build_directive_type_annotation(
+                        value.of_type, registry, parent, is_optional=True
+                    ),
                     ctx=ast.Load(),
                 ),
                 ctx=ast.Load(),
@@ -102,14 +112,15 @@ def build_directive_type_annotation(value: GraphQLType, registry: ClassRegistry,
 
         return ast.Subscript(
             value=ast.Name("List", ctx=ast.Load()),
-            slice=build_directive_type_annotation(value.of_type, registry, is_optional=True),
+            slice=build_directive_type_annotation(
+                value.of_type, registry, parent, is_optional=True
+            ),
             ctx=ast.Load(),
         )
     if isinstance(value, GraphQLInputObjectType):
         raise NotImplementedError("Input types cannot be used as arguments")
-    
-    raise NotImplementedError(f"Unknown type {repr(value)}")
 
+    raise NotImplementedError(f"Unknown type {repr(value)}")
 
 
 def convert_valuenode_to_ast(value: ConstValueNode):
@@ -127,7 +138,9 @@ def convert_valuenode_to_ast(value: ConstValueNode):
     if isinstance(value, EnumValueNode):
         return ast.Constant(value=value)
     if isinstance(value, ListValueNode):
-        return ast.List(elts=[convert_valuenode_to_ast(x) for x in value.values], ctx=ast.Load())
+        return ast.List(
+            elts=[convert_valuenode_to_ast(x) for x in value.values], ctx=ast.Load()
+        )
     if isinstance(value, ObjectValueNode):
 
         keys = []
@@ -141,10 +154,9 @@ def convert_valuenode_to_ast(value: ConstValueNode):
             keys=keys,
             values=values,
         )
-    
+
     raise NotImplementedError(f"Unknown default value {repr(value)}")
 
-    
 
 def convert_default_value_to_ast(value):
     if value is Undefined:
@@ -160,7 +172,9 @@ def convert_default_value_to_ast(value):
     if isinstance(value, bool):
         return ast.Constant(value=value)
     if isinstance(value, list):
-        return ast.List(elts=[convert_default_value_to_ast(x) for x in value], ctx=ast.Load())
+        return ast.List(
+            elts=[convert_default_value_to_ast(x) for x in value], ctx=ast.Load()
+        )
     if isinstance(value, dict):
         keys = []
         values = []
@@ -174,11 +188,6 @@ def convert_default_value_to_ast(value):
             values=values,
         )
     raise NotImplementedError(f"Unknown default value {repr(value)}")
-
-
-
-
-
 
 
 def default_generate_directives(
@@ -245,7 +254,6 @@ def default_generate_directives(
             if isinstance(default, ast.Dict):
                 needs_factory = True
 
-
             field_value = None
 
             if default:
@@ -255,9 +263,7 @@ def default_generate_directives(
                         keywords=[
                             ast.keyword(
                                 arg="default_factory",
-                                value=ast.Lambda(
-                                    args=[], body=default
-                                ),
+                                value=ast.Lambda(args=[], body=default),
                             ),
                         ],
                         args=[],
@@ -274,12 +280,13 @@ def default_generate_directives(
                         args=[],
                     )
 
-
             assign = ast.AnnAssign(
                 target=ast.Name(
                     id=registry.generate_node_name(value_key), ctx=ast.Store()
                 ),
-                annotation=build_directive_type_annotation(type, registry),
+                annotation=build_directive_type_annotation(
+                    type, registry, directive.name
+                ),
                 value=field_value,
                 simple=1,
             )
@@ -507,12 +514,16 @@ def generate_object_field_annotation(
                 slice=registry.reference_enum(
                     graphql_type.name,
                     parent,
-                    allow_forward=not config.force_plugin_order,
+                    allow_forward=True,
+                    needs_rebuild=False,
                 ),
                 ctx=ast.Load(),
             )
         return registry.reference_enum(
-            graphql_type.name, parent, allow_forward=not config.force_plugin_order
+            graphql_type.name,
+            parent,
+            allow_forward=not config.force_plugin_order,
+            needs_rebuild=False,
         )
 
     if isinstance(graphql_type, GraphQLNonNull):
@@ -651,11 +662,15 @@ def recurse_argument_annotation(
                     graphql_type.name,
                     parent,
                     allow_forward=not config.force_plugin_order,
+                    needs_rebuild=False,
                 ),
                 ctx=ast.Load(),
             )
         return registry.reference_enum(
-            graphql_type.name, parent, allow_forward=not config.force_plugin_order
+            graphql_type.name,
+            parent,
+            allow_forward=not config.force_plugin_order,
+            needs_rebuild=False,
         )
 
     if isinstance(graphql_type, GraphQLNonNull):
@@ -728,7 +743,9 @@ def generate_directive_keywords(
                     ctx=ast.Load(),
                 ),
                 keywords=[
-                    ast.keyword(arg=arg.name.value, value=convert_valuenode_to_ast(arg.value))
+                    ast.keyword(
+                        arg=arg.name.value, value=convert_valuenode_to_ast(arg.value)
+                    )
                     for arg in directive.arguments
                 ],
                 args=[],
@@ -1206,7 +1223,7 @@ class StrawberryPlugin(Plugin):
 
         scalars = (
             generate_scalars(client_schema, config, self.config, registry)
-            if self.config.generate_directives
+            if self.config.generate_scalars
             else []
         )
 
@@ -1217,6 +1234,7 @@ class StrawberryPlugin(Plugin):
             if self.config.generate_enums
             else []
         )
+
         inputs = (
             generate_inputs(client_schema, config, self.config, registry)
             if self.config.generate_inputs
@@ -1228,4 +1246,4 @@ class StrawberryPlugin(Plugin):
             else []
         )
 
-        return directives + scalars + enums + inputs + types
+        return directives + enums + scalars + inputs + types

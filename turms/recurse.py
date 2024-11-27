@@ -186,15 +186,9 @@ def recurse_annotation(
 
         implementing_types = client_schema.get_implementations(type)
 
-
-        implementing_class_base_classes = {
-
-        }
+        implementing_class_base_classes = {}
 
         inline_fragment_fields = {}
-
-
-        
 
         for sub_node in sub_nodes:
 
@@ -202,14 +196,19 @@ def recurse_annotation(
                 # Spread nodes are like inheritance?
                 try:
                     # We are dealing with a fragment that is an interface
-                    implementation_map = registry.get_interface_fragment_implementations(sub_node.name.value)
+                    implementation_map = (
+                        registry.get_interface_fragment_implementations(
+                            sub_node.name.value
+                        )
+                    )
                     for k, v in implementation_map.items():
                         implementing_class_base_classes.setdefault(k, []).append(v)
 
                 except KeyError:
                     x = registry.get_fragment_type(sub_node.name.value)
-                    implementing_class_base_classes.setdefault(x.name, []).append(registry.inherit_fragment(sub_node.name.value))
-
+                    implementing_class_base_classes.setdefault(x.name, []).append(
+                        registry.inherit_fragment(sub_node.name.value)
+                    )
 
             if isinstance(sub_node, FieldNode):
 
@@ -226,7 +225,6 @@ def recurse_annotation(
 
             if isinstance(sub_node, InlineFragmentNode):
 
-
                 on_type_name = sub_node.type_condition.name.value
 
                 inline_fragment_fields.setdefault(on_type_name, []).append(
@@ -235,18 +233,12 @@ def recurse_annotation(
                     )
                 )
 
-
-
-
-
         # We first genrate the mother class that will provide common fields of this fragment. This will never be reference
         # though
         mother_class_name = f"{base_name}Base"
         additional_bases = get_additional_bases_for_type(type.name, config, registry)
 
         body = mother_class_fields if mother_class_fields else [ast.Pass()]
-
-
 
         mother_class = ast.ClassDef(
             mother_class_name,
@@ -265,31 +257,33 @@ def recurse_annotation(
 
             class_name = f"{mother_class_name}{i.name}"
 
-            ast_base_nodes = [ast.Name(id=x, ctx=ast.Load()) for x in implementing_class_base_classes.get(i.name, [])]
+            ast_base_nodes = [
+                ast.Name(id=x, ctx=ast.Load())
+                for x in implementing_class_base_classes.get(i.name, [])
+            ]
             implementaionMap[i.name] = class_name
 
             inline_fields = inline_fragment_fields.get(i, [])
-        
 
             implementing_class = ast.ClassDef(
-                    class_name,
-                    bases=ast_base_nodes + [ast.Name(id=mother_class_name, ctx=ast.Load())] + get_interface_bases(config, registry),  # Todo: fill with base
-                    decorator_list=[],
-                    keywords=[],
-                    body=[generate_typename_field(i.name, registry, config)] + inline_fields,
+                class_name,
+                bases=ast_base_nodes
+                + [ast.Name(id=mother_class_name, ctx=ast.Load())]
+                + get_interface_bases(config, registry),  # Todo: fill with base
+                decorator_list=[],
+                keywords=[],
+                body=[generate_typename_field(i.name, registry, config)]
+                + inline_fields,
             )
 
             subtree.append(implementing_class)
             union_class_names.append(class_name)
 
-
-
         registry.register_import("typing.Annotated")
         registry.register_import("typing.Union")
         union_slice = ast.Tuple(
             elts=[
-                ast.Name(id=clsname, ctx=ast.Load())
-                for clsname in union_class_names
+                ast.Name(id=clsname, ctx=ast.Load()) for clsname in union_class_names
             ],
             ctx=ast.Load(),
         )
@@ -304,23 +298,20 @@ def recurse_annotation(
                 ast.Call(
                     func=ast.Name(id="Field", ctx=ast.Load()),
                     args=[],
-                    keywords=[ast.keyword(arg="discriminator", value=ast.Constant("typename"))],
-                )
+                    keywords=[
+                        ast.keyword(arg="discriminator", value=ast.Constant("typename"))
+                    ],
+                ),
             ],
             ctx=ast.Load(),
         )
 
         # Resort to base class if we have no sub-fragments
         annotated_slice = ast.Subscript(
-                    value=ast.Name("Annotated", ctx=ast.Load()),
-                    slice=slice,
-                    ctx=ast.Load(),
-                )
-        
-
-
-
-
+            value=ast.Name("Annotated", ctx=ast.Load()),
+            slice=slice,
+            ctx=ast.Load(),
+        )
 
         if is_optional:
             registry.register_import("typing.Optional")
@@ -368,8 +359,6 @@ def recurse_annotation(
                         sub_node.name.value, parent
                     )  # needs to be parent not object as reference will be to parent
 
-
-
         additional_bases = []
 
         for sub_node in sub_nodes:
@@ -377,8 +366,10 @@ def recurse_annotation(
             if isinstance(sub_node, FragmentSpreadNode):
 
                 if registry.is_interface_fragment(sub_node.name.value):
-                    raise Exception("Interface Fragments with additional subfields are not yet implemented")
-                
+                    raise Exception(
+                        "Interface Fragments with additional subfields are not yet implemented"
+                    )
+
                 else:
                     additional_bases.append(
                         ast.Name(
@@ -403,11 +394,12 @@ def recurse_annotation(
 
             if isinstance(sub_node, InlineFragmentNode):
                 raise NotImplementedError("Inline Fragments are not yet implemented")
-            
+
         if not additional_bases:
             # We need to add the base class if we have no fragments
-            additional_bases = get_additional_bases_for_type(type.name, config, registry)
-            
+            additional_bases = get_additional_bases_for_type(
+                type.name, config, registry
+            )
 
         body = pick_fields if pick_fields else [ast.Pass()]
 
