@@ -16,6 +16,7 @@ from graphql import (
     GraphQLObjectType,
     GraphQLOutputType,
     GraphQLScalarType,
+    GraphQLUnionType,
     IntValueNode,
     ListTypeNode,
     NamedTypeNode,
@@ -701,7 +702,7 @@ def recurse_outputtype_annotation(
         else:
             return registry.reference_scalar(type.name)
 
-    if isinstance(type, GraphQLObjectType) or isinstance(type, GraphQLInterfaceType):
+    if isinstance(type, (GraphQLObjectType, GraphQLInterfaceType, GraphQLUnionType)):
         assert overwrite_final, "Needs to be set"
         if optional:
             registry.register_import("typing.Optional")
@@ -713,7 +714,7 @@ def recurse_outputtype_annotation(
         else:
             return ast.Name(id=overwrite_final, ctx=ast.Load())
 
-    raise NotImplementedError("oisnosin")  # pragma: no cover
+    raise NotImplementedError(f"recurse over {type.__class__.__name__}")  # pragma: no cover
 
 
 def recurse_outputtype_label(
@@ -762,7 +763,7 @@ def recurse_outputtype_label(
         else:
             return registry.reference_scalar(type.name).id
 
-    if isinstance(type, GraphQLObjectType) or isinstance(type, GraphQLInterfaceType):
+    if isinstance(type, (GraphQLObjectType, GraphQLInterfaceType, GraphQLUnionType)):
         assert overwrite_final, "Needs to be set"
         if optional:
             return "Optional[" + overwrite_final + "]"
