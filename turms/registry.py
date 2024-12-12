@@ -102,12 +102,12 @@ class ClassRegistry(object):
         self.mutation_class_map = {}
 
         self.registered_interfaces_fragments = {}
-
+        self.registered_union_fragments = {}
         self.forward_references = set()
         self.fragment_type_map = {}
 
-        self.interfacefragments_class_map = {}
         self.interfacefragments_impl_map = {}
+        self.unionfragments_impl_map = {}
         self.log = log
 
     def style_inputtype_class(self, typename: str):
@@ -282,6 +282,14 @@ class ClassRegistry(object):
 
     def get_interface_fragment_implementations(self, fragmentname: str):
         return self.interfacefragments_impl_map[fragmentname]
+    
+
+    def register_union_fragment_implementations(self, fragmentname: str, implementationMap: Dict[str, str]):
+        self.unionfragments_impl_map[fragmentname] = implementationMap
+
+
+    def get_union_fragment_implementations(self, fragmentname: str):
+        return self.unionfragments_impl_map[fragmentname]
 
 
     def get_fragment_type(self, fragmentname: str):
@@ -310,6 +318,15 @@ class ClassRegistry(object):
     
     def register_interface_fragment(self, typename: str, ast: ast.AST):
         self.registered_interfaces_fragments[typename] = ast
+    
+    def is_union_fragment(self, typename: str):
+        return typename in self.registered_union_fragments
+    
+    def reference_union_fragment(self, typename: str, parent: str, allow_forward=True) -> ast.AST:
+        return self.registered_union_fragments[typename]
+    
+    def register_union_fragment(self, typename: str, ast: ast.AST):
+        self.registered_union_fragments[typename] = ast
 
     def inherit_fragment(self, typename: str, allow_forward=True) -> ast.AST:
         if typename not in self.fragment_class_map:
