@@ -1,29 +1,31 @@
 from typing import Dict, Set
-from graphql.utilities.build_client_schema import GraphQLSchema
-from graphql.language.ast import DocumentNode, FieldNode
+
 from graphql import (
+    FragmentDefinitionNode,
     GraphQLEnumType,
+    GraphQLInputField,
+    GraphQLInputObjectType,
+    GraphQLInterfaceType,
     GraphQLList,
     GraphQLNonNull,
     GraphQLObjectType,
-    GraphQLInputObjectType,
     GraphQLScalarType,
     ListTypeNode,
     NamedTypeNode,
     NonNullTypeNode,
     OperationDefinitionNode,
-    FragmentDefinitionNode,
-    GraphQLInterfaceType,
-    GraphQLInputField,
+)
+from graphql.language.ast import (
+    DocumentNode,
+    FieldNode,
+    FragmentSpreadNode,
+    InlineFragmentNode,
 )
 from graphql.type.definition import (
     GraphQLType,
     GraphQLUnionType,
 )
-from graphql.language.ast import (
-    FragmentSpreadNode,
-    InlineFragmentNode,
-)
+from graphql.utilities.build_client_schema import GraphQLSchema
 
 
 class ReferenceRegistry:
@@ -214,6 +216,19 @@ def create_reference_registry_from_documents(
                     schema,
                     registry,
                 )
+            elif isinstance(selection, InlineFragmentNode):
+                sub_type = schema.get_type(selection.type_condition.name.value)
+                for sub_selection in selection.selection_set.selections:
+                    if isinstance(sub_selection, FieldNode):
+                        if sub_selection.name.value == "__typename":
+                            continue
+                        sub_this_type = sub_type.fields[sub_selection.name.value]
+                        recurse_find_references(
+                            sub_selection,
+                            sub_this_type.type,
+                            schema,
+                            registry,
+                        )
 
     for operation in operations.values():
         type = schema.get_root_type(operation.operation)
