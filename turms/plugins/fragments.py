@@ -368,14 +368,8 @@ def generate_fragment(
         return tree
 
     elif isinstance(type, GraphQLUnionType):
-        mother_class_fields = []
         base_fragment_name = registry.style_fragment_class(f.name.value)
         additional_bases = get_additional_bases_for_type(type.name, config, registry)
-
-        if type.description and plugin_config.add_documentation:
-            mother_class_fields.append(
-                ast.Expr(value=ast.Constant(value=type.description))
-            )
 
         sub_nodes = non_typename_fields(f)
 
@@ -442,8 +436,10 @@ def generate_fragment(
                             ] + additional_bases  # needs to be prepended (MRO)
                         continue
 
+                    field_type = client_schema.get_type(on_type_name)
+
                     field_definition = get_field_def(
-                        client_schema, client_schema.get_type(on_type_name), field
+                        client_schema, field_type, field
                     )
                     assert (
                         field_definition
@@ -510,7 +506,13 @@ def generate_fragment(
             ),
             simple=1,
         )
+
         tree.append(mother_class)
+
+        if type.description and plugin_config.add_documentation:
+            tree.append(
+                ast.Expr(value=ast.Constant(value=type.description))
+            )
 
         return tree
 
