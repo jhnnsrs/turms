@@ -1,10 +1,55 @@
 query Nana {
   hallo {
+    __typename
     ... on Bar {
       nana
     }
     ... on Foo {
       forward
+      blip
     }
+  }
+}
+
+query Nana2 {
+  hallo {
+    ...BazFragment
+  }
+}
+
+query Nana3 {
+  hallo {
+    ...VeryNestedFragment
+  }
+}
+
+query Nana4 {
+  hallo {
+    ...DelegatingFragment
+  }
+}
+
+fragment BazFragment on Element {
+  ... on Baz {
+    __typename
+    bloop
+  }
+}
+
+fragment VeryNestedFragment on Element {
+  __typename
+  ...BazFragment
+  ... on Bar {
+    nana
+  }
+}
+
+fragment DelegateFragment on Bar {
+  nana
+}
+
+fragment DelegatingFragment on Element {
+  ... on Bar {
+    ...DelegateFragment
   }
 }

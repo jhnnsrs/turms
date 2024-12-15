@@ -1,16 +1,14 @@
+import ast
 import glob
 import re
 from typing import List, Optional, Set, Union
-from turms.config import GeneratorConfig
-from turms.errors import GenerationError
-from graphql.utilities.build_client_schema import GraphQLSchema
-from graphql.language.ast import DocumentNode, FieldNode, NameNode
-from graphql.error.graphql_error import GraphQLError
+
 from graphql import (
     BooleanValueNode,
     FloatValueNode,
     FragmentDefinitionNode,
     GraphQLEnumType,
+    GraphQLInterfaceType,
     GraphQLList,
     GraphQLNonNull,
     GraphQLObjectType,
@@ -29,19 +27,21 @@ from graphql import (
     parse,
     print_ast,
     validate,
-    GraphQLInterfaceType,
 )
-import ast
-from turms.registry import ClassRegistry
+from graphql.error.graphql_error import GraphQLError
+from graphql.language.ast import DocumentNode, FieldNode, NameNode
+from graphql.utilities.build_client_schema import GraphQLSchema
+
+from turms.config import GeneratorConfig
 from turms.errors import (
     GenerationError,
     NoEnumFound,
     NoInputTypeFound,
     NoScalarFound,
 )
-from .config import GraphQLTypes
-import re
+from turms.registry import ClassRegistry
 
+from .config import GraphQLTypes
 
 commentline_regex = re.compile(r"^.*#(.*)")
 
@@ -488,7 +488,7 @@ def auto_add_typename_field_to_fragment_str(fragment_str: str) -> str:
     for fragment in x.definitions:
         if isinstance(fragment, FragmentDefinitionNode):
             selections = list(fragment.selection_set.selections)
-            if not any(field.name.value == "__typename" for field in selections):
+            if not any(isinstance(field, FieldNode) and field.name.value == "__typename" for field in selections):
                 selections.append(
                     FieldNode(
                         name=NameNode(value="__typename"),

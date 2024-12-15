@@ -1,7 +1,18 @@
+enum TestEnum1 {
+  A
+  B
+}
+
+enum TestEnum2 {
+  C
+  D
+}
+
 "This is foo"
 type Foo {
   "This is a forward ref"
   forward: String!
+  blip: TestEnum1
 }
 
 type Bar {
@@ -9,7 +20,12 @@ type Bar {
   nana: Int!
 }
 
-union Element = Foo | Bar
+type Baz {
+  bloop: TestEnum2!
+}
+
+"This is a union"
+union Element = Foo | Bar | Baz
 
 type Query {
   hallo: Element

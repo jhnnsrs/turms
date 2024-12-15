@@ -81,7 +81,7 @@ def recurse_find_references(
                             continue
 
                         field_type = sub_sub_node_type.fields[sub_sub_node.name.value]
-                        return recurse_find_references(
+                        recurse_find_references(
                             sub_sub_node,
                             field_type.type,
                             client_schema,
