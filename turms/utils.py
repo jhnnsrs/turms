@@ -1,21 +1,20 @@
+import ast
 import glob
 import re
 from typing import List, Optional, Set, Union
-from turms.config import GeneratorConfig
-from turms.errors import GenerationError
-from graphql.utilities.build_client_schema import GraphQLSchema
-from graphql.language.ast import DocumentNode, FieldNode, NameNode
-from graphql.error.graphql_error import GraphQLError
+
 from graphql import (
     BooleanValueNode,
     FloatValueNode,
     FragmentDefinitionNode,
     GraphQLEnumType,
+    GraphQLInterfaceType,
     GraphQLList,
     GraphQLNonNull,
     GraphQLObjectType,
     GraphQLOutputType,
     GraphQLScalarType,
+    GraphQLUnionType,
     IntValueNode,
     ListTypeNode,
     NamedTypeNode,
@@ -28,19 +27,21 @@ from graphql import (
     parse,
     print_ast,
     validate,
-    GraphQLInterfaceType,
 )
-import ast
-from turms.registry import ClassRegistry
+from graphql.error.graphql_error import GraphQLError
+from graphql.language.ast import DocumentNode, FieldNode, NameNode
+from graphql.utilities.build_client_schema import GraphQLSchema
+
+from turms.config import GeneratorConfig
 from turms.errors import (
     GenerationError,
     NoEnumFound,
     NoInputTypeFound,
     NoScalarFound,
 )
-from .config import GraphQLTypes
-import re
+from turms.registry import ClassRegistry
 
+from .config import GraphQLTypes
 
 commentline_regex = re.compile(r"^.*#(.*)")
 
@@ -487,7 +488,7 @@ def auto_add_typename_field_to_fragment_str(fragment_str: str) -> str:
     for fragment in x.definitions:
         if isinstance(fragment, FragmentDefinitionNode):
             selections = list(fragment.selection_set.selections)
-            if not any(field.name.value == "__typename" for field in selections):
+            if not any(isinstance(field, FieldNode) and field.name.value == "__typename" for field in selections):
                 selections.append(
                     FieldNode(
                         name=NameNode(value="__typename"),
@@ -701,7 +702,7 @@ def recurse_outputtype_annotation(
         else:
             return registry.reference_scalar(type.name)
 
-    if isinstance(type, GraphQLObjectType) or isinstance(type, GraphQLInterfaceType):
+    if isinstance(type, (GraphQLObjectType, GraphQLInterfaceType, GraphQLUnionType)):
         assert overwrite_final, "Needs to be set"
         if optional:
             registry.register_import("typing.Optional")
@@ -713,7 +714,7 @@ def recurse_outputtype_annotation(
         else:
             return ast.Name(id=overwrite_final, ctx=ast.Load())
 
-    raise NotImplementedError("oisnosin")  # pragma: no cover
+    raise NotImplementedError(f"recurse over {type.__class__.__name__}")  # pragma: no cover
 
 
 def recurse_outputtype_label(
@@ -762,7 +763,7 @@ def recurse_outputtype_label(
         else:
             return registry.reference_scalar(type.name).id
 
-    if isinstance(type, GraphQLObjectType) or isinstance(type, GraphQLInterfaceType):
+    if isinstance(type, (GraphQLObjectType, GraphQLInterfaceType, GraphQLUnionType)):
         assert overwrite_final, "Needs to be set"
         if optional:
             return "Optional[" + overwrite_final + "]"

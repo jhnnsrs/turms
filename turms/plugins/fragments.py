@@ -1,13 +1,27 @@
 import ast
+import logging
+from collections import defaultdict, deque
 from typing import List, Optional
 
-from pydantic_settings import SettingsConfigDict
-from turms.config import GeneratorConfig
+from graphql import (
+    FieldNode,
+    FragmentDefinitionNode,
+    FragmentSpreadNode,
+    GraphQLInterfaceType,
+    GraphQLObjectType,
+    GraphQLUnionType,
+    InlineFragmentNode,
+    SelectionSetNode,
+    language,
+)
 from graphql.utilities.build_client_schema import GraphQLSchema
-from turms.recurse import type_field_node
-from turms.plugins.base import Plugin, PluginConfig
+from graphql.utilities.type_info import get_field_def
 from pydantic import Field
-from graphql.language.ast import FragmentDefinitionNode
+from pydantic_settings import SettingsConfigDict
+
+from turms.config import GeneratorConfig, GraphQLTypes
+from turms.plugins.base import Plugin, PluginConfig
+from turms.recurse import type_field_node
 from turms.registry import ClassRegistry
 from turms.utils import (
     generate_generic_typename_field,
@@ -18,21 +32,9 @@ from turms.utils import (
     non_typename_fields,
     parse_documents,
 )
-from graphql import (
-    FieldNode,
-    FragmentSpreadNode,
-    GraphQLInterfaceType,
-    GraphQLObjectType,
-    InlineFragmentNode,
-    SelectionSetNode,
-    language,
-)
-from turms.config import GraphQLTypes
-from graphql import parse, print_ast
-from graphql.language.ast import (
-    DocumentNode, OperationDefinitionNode, FragmentDefinitionNode, FragmentSpreadNode
-)
-from collections import defaultdict, deque
+
+logger = logging.getLogger(__name__)
+
 
 def find_fragment_dependencies_recursive(selection_set: SelectionSetNode, fragment_definitions, visited):
     """Recursively find all fragment dependencies within a selection set."""
@@ -99,13 +101,6 @@ def topological_sort(dependency_graph):
     sorted_fragments.extend(frag for frag in dependency_graph if frag not in sorted_fragments)
     
     return sorted_fragments
-
-
-from graphql.utilities.type_info import get_field_def
-import logging
-
-
-logger = logging.getLogger(__name__)
 
 
 class FragmentsPluginConfig(PluginConfig):
@@ -359,13 +354,135 @@ def generate_fragment(
         )
         return tree
 
+    elif isinstance(type, GraphQLUnionType):
+        base_fragment_name = registry.style_fragment_class(f.name.value)
+        additional_bases = get_additional_bases_for_type(type.name, config, registry)
+
+        sub_nodes = non_typename_fields(f)
+
+        mother_class_name = base_fragment_name  # + "Base"
+
+        member_class_base_classes = {}
+
+        inline_fragment_fields = {}
+
+        for sub_node in sub_nodes:
+
+            if isinstance(sub_node, FragmentSpreadNode):
+                # Spread nodes are like inheritance
+                # We are dealing with a fragment that is a union
+                implementation_map = registry.get_union_fragment_members(
+                    sub_node.name.value
+                )
+                for k, v in implementation_map.items():
+                    member_class_base_classes.setdefault(k, []).append(v)
+
+            elif isinstance(sub_node, FieldNode):
+                if sub_node.name.value == "__typename":
+                    continue
+                raise AssertionError("Union types should not have fields")
+
+            elif isinstance(sub_node, InlineFragmentNode):
+                on_type_name = sub_node.type_condition.name.value
+
+                fields = []
+                for field in sub_node.selection_set.selections:
+
+                    if field.name.value == "__typename":
+                        continue
+
+                    if isinstance(field, FragmentSpreadNode):
+                        member_class_base_classes.setdefault(on_type_name, []).append(
+                            field.name.value
+                        )
+                        continue
+
+                    field_type = client_schema.get_type(on_type_name)
+
+                    field_definition = get_field_def(
+                        client_schema, field_type, field
+                    )
+                    assert (
+                        field_definition
+                    ), f"Couldn't find field definition for {on_type_name}.{field.name.value}"
+
+                    fields += type_field_node(
+                        field,
+                        name,
+                        field_definition,
+                        client_schema,
+                        config,
+                        tree,
+                        registry,
+                    )
+
+                inline_fragment_fields.setdefault(on_type_name, []).extend(fields)
+            else:
+                raise AssertionError(f"Unknown node type: {type(sub_node)}")
+
+        implementationMap = {}
+
+        for i in type.types:
+
+            class_name = f"{base_fragment_name}{i.name}"
+
+            ast_base_nodes = [
+                ast.Name(id=x, ctx=ast.Load())
+                for x in member_class_base_classes.get(i.name, [])
+            ]
+            implementationMap[i.name] = class_name
+
+            inline_fields = inline_fragment_fields.get(i.name, [])
+
+            implementing_class = ast.ClassDef(
+                class_name,
+                bases=ast_base_nodes
+                + get_fragment_bases(config, plugin_config, registry),
+                decorator_list=[],
+                keywords=[],
+                body=[generate_typename_field(i.name, registry, config)]
+                + inline_fields,
+            )
+
+            tree.append(implementing_class)
+
+        registry.register_union_fragment_members(
+            f.name.value, implementationMap
+        )
+
+        registry.register_import("typing.Union")
+        mother_class = ast.Assign(
+            targets=[ast.Name(id=base_fragment_name, ctx=ast.Load())],
+            value=ast.Subscript(
+                value=ast.Name(id="Union", ctx=ast.Load()),
+                slice=ast.Tuple(
+                    elts=[
+                        ast.Name(id=f"{base_fragment_name}{i.name}", ctx=ast.Load())
+                        for i in type.types
+                    ],
+                    ctx=ast.Load(),
+                ),
+            ),
+            simple=1,
+        )
+
+        tree.append(mother_class)
+
+        if type.description and plugin_config.add_documentation:
+            tree.append(
+                ast.Expr(value=ast.Constant(value=type.description))
+            )
+
+        return tree
+
+
 def reorder_definitions(document, sorted_fragments):
     """Reorder document definitions to place fragments in dependency order."""
     fragment_definitions = {defn.name.value: defn for defn in document.definitions if isinstance(defn, FragmentDefinitionNode)}
-    
+
     # Order fragments according to the topologically sorted order
     ordered_fragments = [fragment_definitions[name] for name in sorted_fragments if name in fragment_definitions]
-    
+
     # Combine operations and ordered fragments
     return ordered_fragments
 

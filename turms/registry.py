@@ -1,7 +1,8 @@
 import ast
-from typing import Dict, List
-from turms.config import GeneratorConfig, LogFunction
 from keyword import iskeyword
+from typing import Dict, List
+
+from turms.config import GeneratorConfig, LogFunction
 from turms.errors import (
     NoEnumFound,
     NoInputTypeFound,
@@ -102,12 +103,12 @@ class ClassRegistry(object):
         self.mutation_class_map = {}
 
         self.registered_interfaces_fragments = {}
-
+        self.registered_union_fragments = {}
         self.forward_references = set()
         self.fragment_type_map = {}
 
-        self.interfacefragments_class_map = {}
         self.interfacefragments_impl_map = {}
+        self.unionfragment_members_map = {}
         self.log = log
 
     def style_inputtype_class(self, typename: str):
@@ -282,6 +283,14 @@ class ClassRegistry(object):
 
     def get_interface_fragment_implementations(self, fragmentname: str):
         return self.interfacefragments_impl_map[fragmentname]
+
+
+    def register_union_fragment_members(self, fragmentname: str, membersMap: Dict[str, str]):
+        self.unionfragment_members_map[fragmentname] = membersMap
+
+
+    def get_union_fragment_members(self, fragmentname: str):
+        return self.unionfragment_members_map[fragmentname]
 
 
     def get_fragment_type(self, fragmentname: str):

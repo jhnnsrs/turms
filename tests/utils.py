@@ -1,10 +1,12 @@
-import subprocess
-import os
 import ast
+import os
+import subprocess
 import sys
-from typing import List
-from turms.run import write_code_to_file
 import tempfile
+from textwrap import dedent
+from typing import List
+
+from turms.run import write_code_to_file
 
 DIR_NAME = os.path.dirname(os.path.realpath(__file__))
 
@@ -65,7 +67,7 @@ def parse_to_code(tree: List[ast.AST]) -> str:
 
 def unit_test_with(generated_ast: List[ast.AST], test_string: str):
 
-    added_code = ast.parse(test_string).body
+    added_code = ast.parse(dedent(test_string)).body
     # We need to unparse before otherwise there might be complaints with missing lineno
     parsed_code = parse_to_code(generated_ast + added_code)
 
