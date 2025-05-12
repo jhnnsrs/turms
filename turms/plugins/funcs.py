@@ -9,10 +9,11 @@ from typing import Any, List, Optional, Tuple
 from graphql import (
     FragmentSpreadNode,
     GraphQLInputObjectType,
+    GraphQLInputType,
     GraphQLObjectType,
+    NamedTypeNode,
     Undefined,
     VariableNode,
-    is_wrapping_type,
 )
 from graphql.type.definition import (
     GraphQLEnumType,
@@ -23,7 +24,7 @@ from graphql.language.ast import (
     OperationDefinitionNode,
     OperationType,
 )
-from graphql.utilities.build_client_schema import GraphQLSchema
+from graphql import GraphQLSchema
 from graphql.utilities.get_operation_root_type import get_operation_root_type
 from graphql.utilities.type_info import get_field_def
 from pydantic import BaseModel, Field
@@ -44,7 +45,6 @@ from turms.utils import (
 )
 from graphql import (
     GraphQLInputObjectType,
-    GraphQLInputType,
     GraphQLList,
     GraphQLNonNull,
     GraphQLScalarType,
@@ -90,7 +90,7 @@ class FuncsPluginConfig(PluginConfig):
     expand_input_types: List[str] = []
 
 
-def camel_to_snake(name):
+def camel_to_snake(name: str) -> str:
     name = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
     return re.sub("([a-z0-9])([A-Z])", r"\1_\2", name).lower()
 
@@ -101,6 +101,8 @@ def generate_async_func_name(
     config: GeneratorConfig,
     registry: ClassRegistry,
 ):
+    if not o.name:
+        raise Exception("Operation name is None")
     return f"{plugin_config.prepend_async}{camel_to_snake(o.name.value)}"
 
 
@@ -110,6 +112,8 @@ def generate_sync_func_name(
     config: GeneratorConfig,
     registry: ClassRegistry,
 ):
+    if not o.name:  # pragma: no cover
+        raise Exception("Operation name is None")
     return f"{plugin_config.prepend_sync}{camel_to_snake(o.name.value)}"
 
 
@@ -151,7 +155,7 @@ def get_extra_kwargs_for_onode(
 def get_definitions_for_onode(
     operation_definition: OperationDefinitionNode,
     plugin_config: FuncsPluginConfig,
-) -> List[Arg]:
+) -> List[FunctionDefinition]:
     """Checks the Plugin Config if the operation definition should be included
     in the generated functions
 
@@ -172,11 +176,10 @@ def get_definitions_for_onode(
     return definitions
 
 
-
 def generate_input_annotation(
-    type: GraphQLInputObjectType,
+    type: GraphQLInputType,
     registry: ClassRegistry,
-    is_optional=True,
+    is_optional: bool = True,
 ):
     if isinstance(type, GraphQLScalarType):
         if is_optional:
@@ -213,9 +216,7 @@ def generate_input_annotation(
         )
 
     if isinstance(type, GraphQLNonNull):
-        return generate_input_annotation(
-            type.of_type, registry, is_optional=False
-        )
+        return generate_input_annotation(type.of_type, registry, is_optional=False)
 
     if isinstance(type, GraphQLList):
         registry.register_import("typing.Iterable")
@@ -240,9 +241,7 @@ def generate_input_annotation(
             )
 
         return list_builder(
-            generate_input_annotation(
-                type.of_type, registry, is_optional=True
-            )
+            generate_input_annotation(type.of_type, registry, is_optional=True)
         )
 
     raise NotImplementedError(f"Unknown input type {type}")
@@ -263,44 +262,41 @@ def generate_input_description(
         return type.name or ""
 
     if isinstance(type, GraphQLNonNull):
-        return generate_input_description(
-            type.of_type, registry, is_optional=False
-        ) + " (required)"
-    
+        return (
+            generate_input_description(type.of_type, registry, is_optional=False)
+            + " (required)"
+        )
+
     if isinstance(type, GraphQLList):
-        return generate_input_description(
-            type.of_type, registry, is_optional=True
-        ) + " (list)"
+        return (
+            generate_input_description(type.of_type, registry, is_optional=True)
+            + " (list)"
+        )
 
     raise NotImplementedError(f"Unknown input type {type}")
 
 
-def generate_input_type_descriptions(input_type: GraphQLInputObjectType, registry: ClassRegistry):
+def generate_input_type_descriptions(
+    input_type: GraphQLInputObjectType, registry: ClassRegistry
+):
     description = ""
 
     for value_key, value in input_type.fields.items():
         field_name = registry.generate_node_name(value_key)
 
-    
         description += f"    {registry.generate_parameter_name(value_key)}: {value.description or generate_input_description(value.type, registry)}\n"
 
     return description
 
 
-
 def generate_input_type_params(
     input_type: GraphQLInputObjectType, registry: ClassRegistry
 ):
-    
-
-
-
     pos_args = []
     kw_args = []
     kw_values = []
 
     for value_key, value in input_type.fields.items():
-
         field_name = registry.generate_node_name(value_key)
 
         if isinstance(value.type, GraphQLNonNull):
@@ -325,13 +321,15 @@ def generate_input_type_params(
                     ),
                 )
             )
-            kw_values.append(ast.Constant(value=value.default_value if value.default_value and value.default_value is not Undefined else None))
-
+            kw_values.append(
+                ast.Constant(
+                    value=value.default_value
+                    if value.default_value and value.default_value is not Undefined
+                    else None
+                )
+            )
 
     return pos_args, kw_args, kw_values
-
-
-
 
 
 def generate_parameters(
@@ -342,15 +340,11 @@ def generate_parameters(
     registry: ClassRegistry,
     client_schema: GraphQLSchema,
 ):
-    
-
     pos_args = []
     kw_args = []
     kw_values = []
 
-
     extra_args = get_extra_args_for_onode(definition, plugin_config)
-    
 
     for arg in extra_args:
         registry.register_import(arg.type)
@@ -374,23 +368,17 @@ def generate_parameters(
         for v in operation_definition.variable_definitions
         if not isinstance(v.type, NonNullTypeNode) or v.default_value
     ]
-    
-
-
 
     non_expandable_args = []
 
     for v in arg_variables:
         if v.variable.name.value in plugin_config.expand_input_types:
-
             input_type = v.type
 
             type = client_schema.type_map[input_type.type.name.value]
 
-
-
-            expanded_pos_args, expanded_kw_args, expanded_kw_values = generate_input_type_params(
-               type, registry
+            expanded_pos_args, expanded_kw_args, expanded_kw_values = (
+                generate_input_type_params(type, registry)
             )
 
             pos_args += expanded_pos_args
@@ -399,7 +387,6 @@ def generate_parameters(
 
         else:
             non_expandable_args.append(v)
-
 
     for v in non_expandable_args:
         pos_args.append(
@@ -457,9 +444,7 @@ def generate_parameters(
     )
 
 
-
 def input_type_to_dict(input_type: GraphQLInputObjectType, registry: ClassRegistry):
-
     keys = []
     values = []
 
@@ -469,17 +454,10 @@ def input_type_to_dict(input_type: GraphQLInputObjectType, registry: ClassRegist
         keys.append(ast.Constant(value=value_key))
         values.append(ast.Name(id=field_name, ctx=ast.Load()))
 
-
-
     return ast.Dict(
         keys=keys,
         values=values,
     )
-
-
-
-
-
 
 
 def generate_variable_dict(
@@ -496,8 +474,6 @@ def generate_variable_dict(
             input_type = v.type
 
             type = client_schema.type_map[input_type.type.name.value]
-
-
 
             keys.append(ast.Constant(value=v.variable.name.value))
             values.append(input_type_to_dict(type, registry))
@@ -534,6 +510,8 @@ def get_operation_class_name(
     Returns:
         str: _description_
     """
+    if not o.name:
+        raise Exception("Operation name is None")
 
     if o.operation == OperationType.QUERY:
         return registry.style_query_class(o.name.value)
@@ -561,9 +539,11 @@ def get_return_type_annotation(
     o_name = get_operation_class_name(o, registry)
     root = get_operation_root_type(client_schema, o)
 
-
     if collapse is True:
+        root_operation = registry.get_operation_single_or_none(o.name.value)
 
+        if root_operation:
+            return root_operation
 
         collapsable_field = o.selection_set.selections[0]
 
@@ -572,11 +552,8 @@ def get_return_type_annotation(
 
         if len(sub_nodes) == 0:  # pragma: no cover
             return recurse_outputtype_annotation(field_definition.type, registry)
-        
 
-        if (
-            len(sub_nodes) == 1
-        ):  # Dealing with one Element
+        if len(sub_nodes) == 1:  # Dealing with one Element
             collapsable_fragment_field = sub_nodes[0]
             if isinstance(
                 collapsable_fragment_field, FragmentSpreadNode
@@ -618,7 +595,6 @@ def get_return_type_string(
     root = get_operation_root_type(client_schema, o)
 
     if collapse is True:
-        
         potential_return_field = o.selection_set.selections[0]
 
         sub_nodes = non_typename_fields(potential_return_field)
@@ -626,14 +602,10 @@ def get_return_type_string(
             client_schema, root, potential_return_field
         )
 
-        if (
-            len(sub_nodes) == 0
-        ):  # Dealing with a scalar type  # pragma: no cover
+        if len(sub_nodes) == 0:  # Dealing with a scalar type  # pragma: no cover
             return recurse_outputtype_label(potential_return_type.type, registry)
 
-        if (
-            len(sub_nodes)  == 1
-        ):  # Dealing with one Element
+        if len(sub_nodes) == 1:  # Dealing with one Element
             collapsable_fragment_field = sub_nodes[0]
 
             if isinstance(
@@ -655,37 +627,44 @@ def get_return_type_string(
 
     else:
         return o_name
-    
 
-def estimate_variable_name(o: OperationDefinitionNode, client_schema: GraphQLSchema, root: GraphQLObjectType, description_map: dict):
 
+def estimate_variable_name(
+    o: OperationDefinitionNode,
+    client_schema: GraphQLSchema,
+    root: GraphQLObjectType,
+    description_map: dict,
+):
     if o.selection_set is None:
         return
     for field in o.selection_set.selections:
         if isinstance(field, FieldNode):
-
-
             for arg in field.arguments:
                 the_field = get_field_def(client_schema, root, field)
                 if isinstance(arg.value, VariableNode):
                     if arg.value.name.value in the_field.args:
-                        mapped_description = the_field.args[arg.value.name.value].description
+                        mapped_description = the_field.args[
+                            arg.value.name.value
+                        ].description
 
                         if mapped_description:
                             if arg.value.name.value in description_map:
-                                description_map[arg.value.name.value] = f"{description_map[arg.value.name.value]} AND {mapped_description}"
+                                description_map[arg.value.name.value] = (
+                                    f"{description_map[arg.value.name.value]} AND {mapped_description}"
+                                )
                             else:
-                                description_map[arg.value.name.value] = mapped_description
+                                description_map[arg.value.name.value] = (
+                                    mapped_description
+                                )
 
             for sub in non_typename_fields(field):
                 if isinstance(sub, FieldNode):
-                    estimate_variable_name(sub, client_schema, get_field_def(client_schema, root, field), description_map)
-
-
-
-
-
-
+                    estimate_variable_name(
+                        sub,
+                        client_schema,
+                        get_field_def(client_schema, root, field),
+                        description_map,
+                    )
 
 
 def generate_query_doc(
@@ -715,7 +694,6 @@ def generate_query_doc(
     description_map = {}
     estimate_variable_name(o, client_schema, x, description_map)
 
-
     if not operation_documentation:
         op_descriptions_dict = {}
 
@@ -727,16 +705,10 @@ def generate_query_doc(
                     op_descriptions_dict[target] = f"{operation_type.description}"
 
         if collapse and len(op_descriptions_dict) == 1:
-            op_descriptions = [
-                f"{v}" for k, v in op_descriptions_dict.items()
-            ]
+            op_descriptions = [f"{v}" for k, v in op_descriptions_dict.items()]
 
         else:
-            op_descriptions = [
-                f"{k}: {v}" for k, v in op_descriptions_dict.items()
-            ]
-
-
+            op_descriptions = [f"{k}: {v}" for k, v in op_descriptions_dict.items()]
 
         description = "\n".join([header] + op_descriptions)
 
@@ -752,28 +724,25 @@ def generate_query_doc(
 
     for v in o.variable_definitions:
         if v.variable.name.value in plugin_config.expand_input_types:
-
             input_type = v.type
 
             type = client_schema.type_map[input_type.type.name.value]
 
-
             description += generate_input_type_descriptions(type, registry)
 
         else:
-
-            field_description = description_map.get(v.variable.name.value, "No description")
-
+            field_description = description_map.get(
+                v.variable.name.value, "No description"
+            )
 
             if isinstance(v.type, NonNullTypeNode) and not v.default_value:
                 description += f"    {registry.generate_parameter_name(v.variable.name.value)} ({recurse_type_label(v.type, registry)}): {field_description}\n"
 
     for v in o.variable_definitions:
-
         field_description = description_map.get(v.variable.name.value, "No description")
 
         if not isinstance(v.type, NonNullTypeNode) or v.default_value:
-            description += f"    {registry.generate_parameter_name(v.variable.name.value)} ({recurse_type_label(v.type, registry)}, optional): {field_description}. {'' if not v.default_value else  'Defaults to ' + str(v.default_value.value)}\n"
+            description += f"    {registry.generate_parameter_name(v.variable.name.value)} ({recurse_type_label(v.type, registry)}, optional): {field_description}. {'' if not v.default_value else 'Defaults to ' + str(v.default_value.value)}\n"
 
     extra_kwargs = get_extra_kwargs_for_onode(definition, plugin_config)
     for kwarg in extra_kwargs:
@@ -814,7 +783,9 @@ def genereate_async_call(
                     )
                     + [
                         generate_document_arg(o, registry),
-                        generate_variable_dict(o, plugin_config, registry, client_schema),
+                        generate_variable_dict(
+                            o, plugin_config, registry, client_schema
+                        ),
                     ],
                 )
             )
@@ -842,7 +813,9 @@ def genereate_async_call(
                         )
                         + [
                             generate_document_arg(o, registry),
-                            generate_variable_dict(o, plugin_config, registry, client_schema),
+                            generate_variable_dict(
+                                o, plugin_config, registry, client_schema
+                            ),
                         ],
                     )
                 ),
@@ -901,7 +874,9 @@ def genereate_sync_call(
                     )
                     + [
                         generate_document_arg(o, registry),
-                        generate_variable_dict(o, plugin_config, registry, client_schema),
+                        generate_variable_dict(
+                            o, plugin_config, registry, client_schema
+                        ),
                     ],
                 ),
                 attr=registry.generate_node_name(correct_attr),
@@ -1083,12 +1058,7 @@ def generate_operation_func(
             ast.AsyncFunctionDef(
                 name=generate_async_func_name(o, plugin_config, config, registry),
                 args=generate_parameters(
-                    definition,
-                    o,
-                    config,
-                    plugin_config,
-                    registry,
-                    client_schema
+                    definition, o, config, plugin_config, registry, client_schema
                 ),
                 body=[
                     doc,
@@ -1134,12 +1104,7 @@ def generate_operation_func(
             ast.FunctionDef(
                 name=generate_sync_func_name(o, plugin_config, config, registry),
                 args=generate_parameters(
-                    definition,
-                    o,
-                    config,
-                    plugin_config,
-                    registry,
-                    client_schema
+                    definition, o, config, plugin_config, registry, client_schema
                 ),
                 body=[
                     doc,

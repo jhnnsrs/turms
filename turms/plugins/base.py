@@ -1,16 +1,26 @@
 from abc import abstractmethod
 import ast
-from typing import List
+from typing import List, TYPE_CHECKING, Literal, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from graphql.utilities.build_client_schema import GraphQLSchema
-from turms.config import LogFunction
+from graphql import GraphQLSchema
+from turms.config import GeneratorConfig, LogFunction
+
+from turms.config import GeneratorConfig
+from turms.registry import ClassRegistry
 
 
 class PluginConfig(BaseSettings):
     model_config = SettingsConfigDict(extra="forbid")
     type: str
+
+
+def print_logger(
+    message: str,
+    level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO",
+) -> None:
+    print(f"[{level}] {message}")
 
 
 class Plugin(BaseModel):
@@ -22,13 +32,12 @@ class Plugin(BaseModel):
     schema. THe all received the graphql schema and the config of the plugin."""
 
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
-    config: PluginConfig
-    log: LogFunction = Field(default=lambda *args, **kwargs: print(*args))
+    log: LogFunction = Field(default=print_logger)
 
     @abstractmethod
     def generate_ast(
         self,
-        config,
         client_schema: GraphQLSchema,
-        registry,
-    ) -> List[ast.AST]: ...  # pragma: no cover
+        config: GeneratorConfig,
+        registry: ClassRegistry,
+    ) -> Sequence[ast.AST]: ...  # pragma: no cover

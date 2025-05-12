@@ -1,5 +1,6 @@
+from typing import Any, Dict, List, Union, cast
 from turms.config import GeneratorConfig
-from graphql.utilities.build_client_schema import GraphQLSchema
+from graphql import GraphQLSchema, GraphQLWrappingType
 from graphql.language.ast import (
     FieldNode,
     FragmentSpreadNode,
@@ -12,6 +13,8 @@ from turms.utils import (
     generate_typename_field,
     get_additional_bases_for_type,
     get_interface_bases,
+    merge_bases_sequences,
+    merge_body_sequences,
     non_typename_fields,
     target_from_node,
 )
@@ -37,10 +40,10 @@ def recurse_annotation(
     type: GraphQLType,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    subtree: ast.AST,
+    subtree: list[ast.ClassDef],
     registry: ClassRegistry,
-    is_optional=True,
-) -> ast.AST:
+    is_optional: bool = True,
+) -> ast.Subscript | ast.Name | ast.Constant:
     """Recurse Annotations
 
     Resolves the type of a field and returns the appropriate annotation.
@@ -72,13 +75,11 @@ def recurse_annotation(
     """
 
     if isinstance(type, GraphQLUnionType):
-
-        union_class_names = []
+        union_class_names: List[str] = []
 
         sub_nodes = non_typename_fields(node)
 
         for sub_node in sub_nodes:
-
             if isinstance(sub_node, FragmentSpreadNode):
                 fragment_name = registry.inherit_fragment(sub_node.name.value)
                 union_class_names.append(fragment_name)
@@ -87,16 +88,18 @@ def recurse_annotation(
                 inline_fragment_name = (
                     f"{parent}{sub_node.type_condition.name.value}InlineFragment"
                 )
-                inline_fragment_fields = []
-
-                inline_fragment_fields += [
+                this_inline_fragment_fields: list[ast.AnnAssign | ast.Expr] = [
                     generate_typename_field(
                         sub_node.type_condition.name.value, registry, config
                     )
                 ]
 
-                for sub_sub_node in sub_node.selection_set.selections:
+                if not sub_node.selection_set:
+                    raise NotImplementedError(
+                        f"Inline fragments without selection sets are not supported. Please add a selection set to {inline_fragment_name}"
+                    )
 
+                for sub_sub_node in sub_node.selection_set.selections:
                     if isinstance(sub_sub_node, FieldNode):
                         sub_sub_node_type = client_schema.get_type(
                             sub_node.type_condition.name.value
@@ -105,8 +108,13 @@ def recurse_annotation(
                         if sub_sub_node.name.value == "__typename":
                             continue
 
+                        if not isinstance(sub_sub_node_type, GraphQLObjectType):
+                            raise NotImplementedError(
+                                f"Inline fragments on non-object types are not supported. Please use a union type instead of {inline_fragment_name}"
+                            )
+
                         field_type = sub_sub_node_type.fields[sub_sub_node.name.value]
-                        inline_fragment_fields += type_field_node(
+                        this_inline_fragment_fields += type_field_node(
                             sub_sub_node,
                             inline_fragment_name,
                             field_type,
@@ -119,25 +127,28 @@ def recurse_annotation(
                 additional_bases = get_additional_bases_for_type(
                     sub_node.type_condition.name.value, config, registry
                 )
+
+                config_bases = [
+                    ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+                    for base in config.object_bases
+                ]
+
                 cls = ast.ClassDef(
                     inline_fragment_name,
-                    bases=additional_bases
-                    + [
-                        ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                        for base in config.object_bases
-                    ],
+                    bases=merge_bases_sequences(additional_bases, config_bases),
                     decorator_list=[],
                     keywords=[],
-                    body=inline_fragment_fields
-                    + generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry),
+                    type_params=[],
+                    body=merge_body_sequences(
+                        this_inline_fragment_fields,
+                        generate_pydantic_config(
+                            GraphQLTypes.FRAGMENT, config, registry
+                        ),
+                    ),
                 )
 
                 subtree.append(cls)
                 union_class_names.append(inline_fragment_name)
-
-        assert (
-            len(union_class_names) != 0
-        ), f"You have set 'always_resolve_interfaces' to True but you have no sub-fragments in your query of {base_name}"
 
         if len(union_class_names) > 1:
             registry.register_import("typing.Union")
@@ -172,7 +183,7 @@ def recurse_annotation(
 
     if isinstance(type, GraphQLInterfaceType):
         # Lets Create Base Class to Inherit from for this
-        mother_class_fields = []
+        mother_class_fields: list[ast.Expr | ast.AnnAssign] = []
         target = target_from_node(node)
 
         sub_nodes = non_typename_fields(node)
@@ -183,36 +194,37 @@ def recurse_annotation(
             mother_class_fields.append(
                 ast.Expr(value=ast.Constant(value=type.description))
             )
+        else:
+            mother_class_fields.append(
+                ast.Expr(value=ast.Constant(value="No documentation"))
+            )
 
         implementing_types = client_schema.get_implementations(type)
 
+        implementing_class_base_classes: Dict[str, List[str]] = {}
 
-        implementing_class_base_classes = {
-
-        }
-
-        inline_fragment_fields = {}
-
-
-        
+        inline_fragment_fields: Dict[str, List[ast.AnnAssign | ast.Expr]] = {}
 
         for sub_node in sub_nodes:
-
             if isinstance(sub_node, FragmentSpreadNode):
                 # Spread nodes are like inheritance?
                 try:
                     # We are dealing with a fragment that is an interface
-                    implementation_map = registry.get_interface_fragment_implementations(sub_node.name.value)
+                    implementation_map = (
+                        registry.get_interface_fragment_implementations(
+                            sub_node.name.value
+                        )
+                    )
                     for k, v in implementation_map.items():
                         implementing_class_base_classes.setdefault(k, []).append(v)
 
                 except KeyError:
                     x = registry.get_fragment_type(sub_node.name.value)
-                    implementing_class_base_classes.setdefault(x.name, []).append(registry.inherit_fragment(sub_node.name.value))
-
+                    implementing_class_base_classes.setdefault(x.name, []).append(
+                        registry.inherit_fragment(sub_node.name.value)
+                    )
 
             if isinstance(sub_node, FieldNode):
-
                 field_type = type.fields[sub_node.name.value]
                 mother_class_fields += type_field_node(
                     sub_node,
@@ -225,8 +237,6 @@ def recurse_annotation(
                 )
 
             if isinstance(sub_node, InlineFragmentNode):
-
-
                 on_type_name = sub_node.type_condition.name.value
 
                 inline_fragment_fields.setdefault(on_type_name, []).append(
@@ -235,10 +245,6 @@ def recurse_annotation(
                     )
                 )
 
-
-
-
-
         # We first genrate the mother class that will provide common fields of this fragment. This will never be reference
         # though
         mother_class_name = f"{base_name}Base"
@@ -246,15 +252,17 @@ def recurse_annotation(
 
         body = mother_class_fields if mother_class_fields else [ast.Pass()]
 
-
-
         mother_class = ast.ClassDef(
             mother_class_name,
-            bases=additional_bases + get_interface_bases(config, registry),
+            bases=merge_bases_sequences(
+                additional_bases, get_interface_bases(config, registry)
+            ),
             decorator_list=[],
             keywords=[],
-            body=body
-            + generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry),
+            type_params=[],
+            body=merge_body_sequences(
+                body, generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry)
+            ),
         )
         subtree.append(mother_class)
 
@@ -262,34 +270,54 @@ def recurse_annotation(
         union_class_names = []
 
         for i in implementing_types.objects:
-
             class_name = f"{mother_class_name}{i.name}"
 
-            ast_base_nodes = [ast.Name(id=x, ctx=ast.Load()) for x in implementing_class_base_classes.get(i.name, [])]
+            additional_bases = get_additional_bases_for_type(i.name, config, registry)
+
+            description_field = (
+                ast.Expr(value=ast.Constant(value=i.description))
+                if i.description
+                else ast.Expr(value=ast.Constant(value="No documentation"))
+            )
+
+            ast_base_nodes = [
+                ast.Name(id=x, ctx=ast.Load())
+                for x in implementing_class_base_classes.get(i.name, [])
+            ]
             implementaionMap[i.name] = class_name
 
-            inline_fields = inline_fragment_fields.get(i, [])
-        
+            inline_fields: List[ast.AnnAssign | ast.Expr] = inline_fragment_fields.get(
+                i.name, cast(List[ast.AnnAssign | ast.Expr], [])
+            )
 
             implementing_class = ast.ClassDef(
-                    class_name,
-                    bases=ast_base_nodes + [ast.Name(id=mother_class_name, ctx=ast.Load())] + get_interface_bases(config, registry),  # Todo: fill with base
-                    decorator_list=[],
-                    keywords=[],
-                    body=[generate_typename_field(i.name, registry, config)] + inline_fields,
+                class_name,
+                bases=merge_bases_sequences(
+                    ast_base_nodes,
+                    [ast.Name(id=mother_class_name, ctx=ast.Load())],
+                    additional_bases,
+                    get_interface_bases(config, registry),
+                ),  # Todo: fill with base
+                decorator_list=[],
+                keywords=[],
+                type_params=[],
+                body=merge_body_sequences(
+                    [
+                        description_field,
+                        generate_typename_field(i.name, registry, config),
+                    ],
+                    inline_fields,
+                ),
             )
 
             subtree.append(implementing_class)
             union_class_names.append(class_name)
 
-
-
         registry.register_import("typing.Annotated")
         registry.register_import("typing.Union")
         union_slice = ast.Tuple(
             elts=[
-                ast.Name(id=clsname, ctx=ast.Load())
-                for clsname in union_class_names
+                ast.Name(id=clsname, ctx=ast.Load()) for clsname in union_class_names
             ],
             ctx=ast.Load(),
         )
@@ -304,44 +332,81 @@ def recurse_annotation(
                 ast.Call(
                     func=ast.Name(id="Field", ctx=ast.Load()),
                     args=[],
-                    keywords=[ast.keyword(arg="discriminator", value=ast.Constant("typename"))],
-                )
+                    keywords=[
+                        ast.keyword(arg="discriminator", value=ast.Constant("typename"))
+                    ],
+                ),
             ],
             ctx=ast.Load(),
         )
 
         # Resort to base class if we have no sub-fragments
         annotated_slice = ast.Subscript(
-                    value=ast.Name("Annotated", ctx=ast.Load()),
-                    slice=slice,
+            value=ast.Name("Annotated", ctx=ast.Load()),
+            slice=slice,
+            ctx=ast.Load(),
+        )
+
+        if config.create_catchall:
+            catch_all_class_name = f"{mother_class_name}CatchAll"
+            catch_all_class = ast.ClassDef(
+                catch_all_class_name,
+                bases=merge_bases_sequences(
+                    [ast.Name(id=mother_class_name, ctx=ast.Load())],
+                    get_interface_bases(config, registry),
+                ),  # Todo: fill with base
+                decorator_list=[],
+                keywords=[],
+                type_params=[],
+                body=[
+                    ast.Expr(
+                        value=ast.Constant(
+                            value=f"Catch all class for {mother_class_name}"
+                        )
+                    ),
+                    generate_generic_typename_field(registry=registry, config=config),
+                ],
+            )
+
+            subtree.append(catch_all_class)
+
+            registry.register_import("typing.Union")
+            final_union = ast.Subscript(
+                value=ast.Name("Union", ctx=ast.Load()),
+                slice=ast.Tuple(
+                    elts=[
+                        annotated_slice,
+                        ast.Name(id=catch_all_class_name, ctx=ast.Load()),
+                    ],
                     ctx=ast.Load(),
-                )
-        
-
-
-
-
+                ),
+                ctx=ast.Load(),
+            )
+        else:
+            final_union = annotated_slice
 
         if is_optional:
             registry.register_import("typing.Optional")
 
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
-                slice=annotated_slice,
+                slice=final_union,
                 ctx=ast.Load(),
             )
         else:
             registry.register_import("typing.Union")
-            return annotated_slice
+            return final_union
 
     if isinstance(type, GraphQLObjectType):
-        pick_fields = []
+        pick_fields: list[ast.Expr | ast.AnnAssign] = []
 
         target = target_from_node(node)
         object_class_name = f"{parent}{target.capitalize()}"
 
         if type.description:
             pick_fields.append(ast.Expr(value=ast.Constant(value=type.description)))
+        else:
+            pick_fields.append(ast.Expr(value=ast.Constant(value="No documentation")))
 
         pick_fields += [generate_typename_field(type.name, registry, config)]
 
@@ -352,7 +417,6 @@ def recurse_annotation(
             sub_node = sub_nodes[0]
 
             if isinstance(sub_node, FragmentSpreadNode):
-
                 if is_optional:
                     registry.register_import("typing.Optional")
                     return ast.Subscript(
@@ -368,17 +432,15 @@ def recurse_annotation(
                         sub_node.name.value, parent
                     )  # needs to be parent not object as reference will be to parent
 
-
-
-        additional_bases = []
+        additional_bases: list[ast.Name] = []
 
         for sub_node in sub_nodes:
-
             if isinstance(sub_node, FragmentSpreadNode):
-
                 if registry.is_interface_fragment(sub_node.name.value):
-                    raise Exception("Interface Fragments with additional subfields are not yet implemented")
-                
+                    raise Exception(
+                        "Interface Fragments with additional subfields are not yet implemented"
+                    )
+
                 else:
                     additional_bases.append(
                         ast.Name(
@@ -403,24 +465,30 @@ def recurse_annotation(
 
             if isinstance(sub_node, InlineFragmentNode):
                 raise NotImplementedError("Inline Fragments are not yet implemented")
-            
+
         if not additional_bases:
             # We need to add the base class if we have no fragments
-            additional_bases = get_additional_bases_for_type(type.name, config, registry)
-            
+            additional_bases = get_additional_bases_for_type(
+                type.name, config, registry
+            )
 
         body = pick_fields if pick_fields else [ast.Pass()]
 
         cls = ast.ClassDef(
             object_class_name,
-            bases=additional_bases
-            + [
-                ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                for base in config.object_bases
-            ],
+            bases=merge_bases_sequences(
+                additional_bases,
+                [
+                    ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+                    for base in config.object_bases
+                ],
+            ),
             decorator_list=[],
             keywords=[],
-            body=body + generate_pydantic_config(GraphQLTypes.OBJECT, config, registry),
+            type_params=[],
+            body=merge_body_sequences(
+                body, generate_pydantic_config(GraphQLTypes.OBJECT, config, registry)
+            ),
         )
 
         subtree.append(cls)
@@ -443,7 +511,6 @@ def recurse_annotation(
             )
 
     if isinstance(type, GraphQLScalarType):
-
         if is_optional:
             registry.register_import("typing.Optional")
             return ast.Subscript(
@@ -455,7 +522,6 @@ def recurse_annotation(
             return registry.reference_scalar(type.name)
 
     if isinstance(type, GraphQLEnumType):
-
         if is_optional:
             registry.register_import("typing.Optional")
             return ast.Subscript(
@@ -470,7 +536,7 @@ def recurse_annotation(
         return recurse_annotation(
             node,
             parent,
-            type.of_type,
+            type.of_type,  # type: ignore type.of_type is the non-nullable type
             client_schema,
             config,
             subtree,
@@ -479,11 +545,10 @@ def recurse_annotation(
         )
 
     if isinstance(type, GraphQLList):
-
         if config.freeze.enabled:
             registry.register_import("typing.Tuple")
 
-            def list_builder(x):
+            def list_builder(x: ast.Name | ast.Subscript | ast.Constant):
                 return ast.Subscript(
                     value=ast.Name("Tuple", ctx=ast.Load()),
                     slice=ast.Tuple(elts=[x, ast.Constant(value=...)], ctx=ast.Load()),
@@ -491,10 +556,9 @@ def recurse_annotation(
                 )
 
         else:
-
             registry.register_import("typing.List")
 
-            def list_builder(x):
+            def list_builder(x: ast.Name | ast.Subscript | ast.Constant):
                 return ast.Subscript(
                     value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
                 )
@@ -508,7 +572,7 @@ def recurse_annotation(
                     recurse_annotation(
                         node,
                         parent,
-                        type.of_type,
+                        type.of_type,  # type: ignore type.of_type is the non-nullable type
                         client_schema,
                         config,
                         subtree,
@@ -523,7 +587,7 @@ def recurse_annotation(
                 recurse_annotation(
                     node,
                     parent,
-                    type.of_type,
+                    type.of_type,  # type: ignore type.of_type is the non-nullable type
                     client_schema,
                     config,
                     subtree,
@@ -532,16 +596,26 @@ def recurse_annotation(
             )
 
 
+BoundType = Union[
+    GraphQLScalarType,
+    GraphQLObjectType,
+    GraphQLInterfaceType,
+    GraphQLUnionType,
+    GraphQLEnumType,
+    GraphQLWrappingType[Any],
+]
+
+
 def type_field_node(
     node: FieldNode,
     parent: str,
     field: GraphQLField,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    subtree: ast.AST,
+    subtree: List[ast.ClassDef | ast.Assign],
     registry: ClassRegistry,
-    is_optional=True,
-):
+    is_optional: bool = True,
+) -> List[ast.AnnAssign | ast.Expr]:
     """Types a field node
 
     This
@@ -563,8 +637,11 @@ def type_field_node(
     target = target_from_node(node)
     field_name = registry.generate_node_name(target)
 
-    keywords = []
-    if not isinstance(field.type, GraphQLNonNull):
+    keywords: list[ast.keyword] = []
+
+    type = cast(BoundType, field.type)
+
+    if not isinstance(type, GraphQLNonNull):
         keywords.append(ast.keyword(arg="default", value=ast.Constant(value=None)))
 
     if target != field_name:
@@ -574,7 +651,7 @@ def type_field_node(
             annotation=recurse_annotation(
                 node,
                 parent,
-                field.type,
+                type,
                 client_schema,
                 config,
                 subtree,
@@ -597,7 +674,7 @@ def type_field_node(
             annotation=recurse_annotation(
                 node,
                 parent,
-                field.type,
+                type,
                 client_schema,
                 config,
                 subtree,

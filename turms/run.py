@@ -3,8 +3,14 @@ import os
 from typing import Dict, List, Optional, Callable, Tuple
 
 import yaml
-from graphql import GraphQLSchema, parse, build_ast_schema, build_client_schema, print_ast, print_schema
-from pydantic import AnyHttpUrl, ValidationError
+from graphql import (
+    GraphQLSchema,
+    parse,
+    build_ast_schema,
+    build_client_schema,
+    print_schema,
+)
+from pydantic import ValidationError
 from rich import get_console
 
 from turms.config import (
@@ -247,19 +253,22 @@ def gen(
 
             if project.extensions.turms.dump_schema:
                 schema = build_schema_from_schema_type(
-                            project.schema_url,
-                            allow_introspection=project.extensions.turms.allow_introspection,
-                        )
-                
-                write_schema_to_file(schema, project.extensions.turms.out_dir, project.extensions.turms.schema_name)
+                    project.schema_url,
+                    allow_introspection=project.extensions.turms.allow_introspection,
+                )
+
+                write_schema_to_file(
+                    schema,
+                    project.extensions.turms.out_dir,
+                    project.extensions.turms.schema_name,
+                )
 
             if project.extensions.turms.dump_configuration:
-                write_project(project, project.extensions.turms.out_dir, project.extensions.turms.configuration_name)
-
-
-
-
-
+                write_project(
+                    project,
+                    project.extensions.turms.out_dir,
+                    project.extensions.turms.configuration_name,
+                )
 
             get_console().print("Sucessfull!! :right-facing_fist::left-facing_fist:")
         except Exception as e:
@@ -364,7 +373,9 @@ def build_schema_from_schema_type(
     raise GenerationError("Could not build schema with type " + str(type(schema)))
 
 
-def generate(project: GraphQLProject, log: Optional[LogFunction] = None) -> Tuple[str, GraphQLSchema ]:
+def generate(
+    project: GraphQLProject, log: Optional[LogFunction] = None
+) -> Tuple[str, GraphQLSchema]:
     """Genrates the code according to the configugration
 
     The code is generated in the following order:

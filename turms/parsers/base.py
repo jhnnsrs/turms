@@ -1,6 +1,6 @@
 import ast
 from typing import List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,8 +14,6 @@ class Parser(BaseModel):
 
     Parsers are used to parse the AST of the generated python code. They can be used to
     modify the AST before it is written to the file."""
-
-    config: ParserConfig
 
     def parse_ast(
         self,

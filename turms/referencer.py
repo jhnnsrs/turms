@@ -1,5 +1,4 @@
 from typing import Dict, Set
-
 from graphql import (
     FragmentDefinitionNode,
     GraphQLEnumType,
@@ -25,7 +24,7 @@ from graphql.type.definition import (
     GraphQLType,
     GraphQLUnionType,
 )
-from graphql.utilities.build_client_schema import GraphQLSchema
+from graphql import GraphQLSchema
 
 
 class ReferenceRegistry:
@@ -61,11 +60,16 @@ def recurse_find_references(
     graphql_type: GraphQLType,
     client_schema: GraphQLSchema,
     registry: ReferenceRegistry,
-    is_optional=True,
+    is_optional: bool = True,
 ):
     if isinstance(
         graphql_type, (GraphQLUnionType, GraphQLObjectType, GraphQLInterfaceType)
     ):
+        if not node.selection_set:
+            raise Exception(
+                "No selection set found for node", node, graphql_type, client_schema
+            )
+
         for sub_node in node.selection_set.selections:
             if isinstance(sub_node, FragmentSpreadNode):
                 registry.register_fragment(sub_node.name.value)
@@ -80,6 +84,16 @@ def recurse_find_references(
                         if sub_sub_node.name.value == "__typename":
                             continue
 
+                        if not isinstance(
+                            sub_sub_node_type,
+                            (GraphQLObjectType, GraphQLInterfaceType),
+                        ):
+                            raise Exception(
+                                "Expected GraphQLObjectType",
+                                sub_sub_node_type,
+                                sub_node.type_condition.name.value,
+                            )
+
                         field_type = sub_sub_node_type.fields[sub_sub_node.name.value]
                         recurse_find_references(
                             sub_sub_node,
@@ -90,6 +104,17 @@ def recurse_find_references(
             elif isinstance(sub_node, FieldNode):
                 if sub_node.name.value == "__typename":
                     continue
+
+                if not isinstance(
+                    graphql_type,
+                    (GraphQLObjectType, GraphQLInterfaceType),
+                ):
+                    raise Exception(
+                        "Expected GraphQLObjectType",
+                        graphql_type,
+                        sub_node.name.value,
+                    )
+
                 this_type = graphql_type.fields[sub_node.name.value]
 
                 recurse_find_references(
@@ -110,7 +135,7 @@ def recurse_find_references(
     elif isinstance(graphql_type, GraphQLNonNull):
         recurse_find_references(
             node,
-            graphql_type.of_type,
+            graphql_type.of_type,  # type: ignore
             client_schema,
             registry,
             is_optional=False,
@@ -119,7 +144,7 @@ def recurse_find_references(
     elif isinstance(graphql_type, GraphQLList):
         recurse_find_references(
             node,
-            graphql_type.of_type,
+            graphql_type.of_type,  # type: ignore
             client_schema,
             registry,
             is_optional=False,
@@ -128,18 +153,13 @@ def recurse_find_references(
         raise Exception("Unknown Type", type(graphql_type), graphql_type)
 
 
-def break_recursion_loop(*args, **kwargs):
-    return recurse_type_annotation(*args, **kwargs)
-
-
 def recurse_type_annotation(
     field: GraphQLInputField,
     graphql_type: NamedTypeNode,
     schema: GraphQLSchema,
     registry: ReferenceRegistry,
-    optional=True,
-):
-
+    optional: bool = True,
+) -> None:
     if isinstance(graphql_type, NonNullTypeNode):
         return recurse_type_annotation(
             field, graphql_type.type, schema, registry, optional=False
@@ -173,7 +193,6 @@ def recurse_type_annotation(
         # Only and only is we have not registered this input object type yet
         # we need to register it (otherwise we might get into a recursion loop)
         if not registry.is_input_registered(graphql_type.name):
-
             registry.register_input(graphql_type.name)
 
             # We need to get all input objects that this graphql input object type references

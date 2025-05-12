@@ -1,10 +1,9 @@
 from pydantic_settings import SettingsConfigDict
 from turms.plugins.base import Plugin, PluginConfig
 import ast
-from typing import List
+from typing import List, Sequence
 from turms.config import GeneratorConfig
-from graphql.utilities.build_client_schema import GraphQLSchema
-from turms.plugins.base import Plugin
+from graphql import GraphQLSchema
 from pydantic import Field
 from graphql.type.definition import (
     GraphQLEnumType,
@@ -33,8 +32,8 @@ def generate_enums(
     config: GeneratorConfig,
     plugin_config: EnumsPluginConfig,
     registry: ClassRegistry,
-):
-    tree = []
+) -> List[ast.ClassDef]:
+    tree: List[ast.ClassDef] = []
 
     enum_types = {
         key: value
@@ -61,10 +60,10 @@ def generate_enums(
 
         classname = registry.generate_enum(key)
 
-        fields = (
+        fields: list[ast.stmt] = (
             [ast.Expr(value=ast.Constant(value=type.description))]
             if type.description
-            else []
+            else [ast.Expr(value=ast.Constant(value="No documentation"))]
         )
 
         for value_key, value in type.values.items():
@@ -103,6 +102,7 @@ def generate_enums(
                 decorator_list=[],
                 keywords=[],
                 body=fields,
+                type_params=[],
             )
         )
 
@@ -124,7 +124,7 @@ class EnumsPlugin(Plugin):
         client_schema: GraphQLSchema,
         config: GeneratorConfig,
         registry: ClassRegistry,
-    ) -> List[ast.AST]:
+    ) -> Sequence[ast.AST]:
         registry.register_import("enum.Enum")
 
         return generate_enums(client_schema, config, self.config, registry)

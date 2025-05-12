@@ -13,13 +13,13 @@ IntrospectionResult = Dict[str, Any]
 DSLString = str
 
 
-def import_class(module_path, class_name):
+def import_class(module_path: str, class_name: str) -> Any:
     """Import a module from a module_path and return the class"""
     module = import_module(module_path)
     return getattr(module, class_name)
 
 
-def import_string(dotted_path):
+def import_string(dotted_path: str) -> Any:
     """
     Import a dotted module path and return the attribute/class designated by the
     last name in the path. Raise ImportError if the import failed. Simliar to
@@ -66,7 +66,7 @@ def load_introspection_from_url(
     if headers:
         default_headers.update(headers)
     try:
-        req = requests.post(url, data=jdata, headers=default_headers)
+        req = requests.post(url, data=jdata, headers=default_headers)  # type: ignore
         x = req.json()
     except Exception:
         raise GenerationError(f"Failed to fetch schema from {url}")
@@ -83,7 +83,9 @@ def load_introspection_from_url(
     return x["data"]
 
 
-def load_dsl_from_url(url: AnyHttpUrl, headers: Dict[str, str] = None) -> DSLString:
+def load_dsl_from_url(
+    url: AnyHttpUrl, headers: Optional[Dict[str, str]] = None
+) -> DSLString:
     try:  # pragma: no cover
         import requests  # pragma: no cover
     except ImportError:  # pragma: no cover
@@ -91,11 +93,11 @@ def load_dsl_from_url(url: AnyHttpUrl, headers: Dict[str, str] = None) -> DSLStr
             "The requests library is required to introspect a schema from a url"
         )  # pragma: no cover
 
-    default_headers = {}
+    default_headers: Dict[str, str] = {}
     if headers:
         default_headers.update(headers)
     try:
-        req = requests.get(url, headers=default_headers)
+        req = requests.get(url, headers=default_headers)  # type: ignore
         assert req.status_code == 200, "Incorrect status code"
         assert req.content, "No content"
         x = req.content.decode()
