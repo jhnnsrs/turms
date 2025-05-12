@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.8.7 (2025-05-12)
+
+### Bug Fixes
+
+- Add requests dependency to project and update version in lock file
+  ([`7df85d4`](https://github.com/jhnnsrs/turms/commit/7df85d4d40b1f435e6f2040576203b0307cd5261))
+
+
 ## v0.8.6 (2025-05-12)
 
 ### Bug Fixes
