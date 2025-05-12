@@ -1,6 +1,6 @@
 [project]
 name = "turms"
-version = "0.8.5"
+version = "0.8.6"
 description = "graphql-codegen powered by pydantic"
 authors = [{ name = "jhnnsrs", email = "jhnnsrs@gmail.com" }]
 requires-python = ">=3.10"
