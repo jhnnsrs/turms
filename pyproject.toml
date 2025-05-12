@@ -71,3 +71,10 @@ search_path = ["turms"]
 [tool.pydoc-markdown.renderer]
 type = "docusaurus"
 docs_base_path = "website/docs"
+
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+upload_to_pypi = true
+branch = "main"
+build_command = "uv build"
