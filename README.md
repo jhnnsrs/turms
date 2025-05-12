@@ -59,9 +59,11 @@ turms is a pure development library and will not introduce any dependency on its
 code, so we recommend installing turms as a development dependency.
 
 ```bash
-uv add --dev turms
+uvx turms init
 
 ```
+
+
 
 As of now turms only supports python 3.9 and higher (as we rely on ast unparsing)
 
