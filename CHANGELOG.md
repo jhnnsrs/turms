@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.9.0 (2025-05-15)
+
+### Features
+
+- Added in "coercible types" that allow for the funcs plugin to provide a union typealis for all
+  values that are coercible through the pydantic serialization.
+  ([`7fb38d4`](https://github.com/jhnnsrs/turms/commit/7fb38d4770af69442f33aa8eb5b775f2ffc9f91d))
+
+
 ## v0.8.7 (2025-05-12)
 
 ### Bug Fixes
