@@ -29,7 +29,7 @@ from graphql.utilities.get_operation_root_type import get_operation_root_type
 from graphql.utilities.type_info import get_field_def
 from pydantic import BaseModel, Field
 from pydantic_settings import SettingsConfigDict
-from turms.config import GeneratorConfig
+from turms.config import GeneratorConfig, PythonType
 from turms.plugins.base import Plugin, PluginConfig
 from turms.registry import ClassRegistry
 from turms.utils import (
@@ -88,6 +88,7 @@ class FuncsPluginConfig(PluginConfig):
     extract_documentation: bool = True
     argument_key_is_styled: bool = False
     expand_input_types: List[str] = []
+    coercible_scalars: dict[str, PythonType] = {}
 
 
 def camel_to_snake(name: str) -> str:
@@ -179,17 +180,27 @@ def get_definitions_for_onode(
 def generate_input_annotation(
     type: GraphQLInputType,
     registry: ClassRegistry,
+    plugin_config: FuncsPluginConfig,
     is_optional: bool = True,
 ):
     if isinstance(type, GraphQLScalarType):
+        if type.name in plugin_config.coercible_scalars:
+            registry.register_import(plugin_config.coercible_scalars[type.name])
+            slice = ast.Name(
+                id=plugin_config.coercible_scalars[type.name].split(".")[-1],
+                ctx=ast.Load(),
+            )
+        else:
+            slice = registry.reference_scalar(type.name)
+
         if is_optional:
             registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
-                slice=registry.reference_scalar(type.name),
+                slice=slice,
             )
 
-        return registry.reference_scalar(type.name)
+        return slice
 
     if isinstance(type, GraphQLInputObjectType):
         if is_optional:
@@ -216,7 +227,9 @@ def generate_input_annotation(
         )
 
     if isinstance(type, GraphQLNonNull):
-        return generate_input_annotation(type.of_type, registry, is_optional=False)
+        return generate_input_annotation(
+            type.of_type, registry, plugin_config, is_optional=False
+        )
 
     if isinstance(type, GraphQLList):
         registry.register_import("typing.Iterable")
@@ -234,6 +247,7 @@ def generate_input_annotation(
                     generate_input_annotation(
                         type.of_type,
                         registry,
+                        plugin_config,
                         is_optional=True,
                     )
                 ),
@@ -241,7 +255,9 @@ def generate_input_annotation(
             )
 
         return list_builder(
-            generate_input_annotation(type.of_type, registry, is_optional=True)
+            generate_input_annotation(
+                type.of_type, registry, plugin_config, is_optional=True
+            )
         )
 
     raise NotImplementedError(f"Unknown input type {type}")
@@ -290,7 +306,9 @@ def generate_input_type_descriptions(
 
 
 def generate_input_type_params(
-    input_type: GraphQLInputObjectType, registry: ClassRegistry
+    input_type: GraphQLInputObjectType,
+    plugin_config: FuncsPluginConfig,
+    registry: ClassRegistry,
 ):
     pos_args = []
     kw_args = []
@@ -306,6 +324,7 @@ def generate_input_type_params(
                     annotation=generate_input_annotation(
                         value.type,
                         registry,
+                        plugin_config,
                         is_optional=True,
                     ),
                 )
@@ -317,6 +336,7 @@ def generate_input_type_params(
                     annotation=generate_input_annotation(
                         value.type,
                         registry,
+                        plugin_config,
                         is_optional=True,
                     ),
                 )
@@ -378,7 +398,7 @@ def generate_parameters(
             type = client_schema.type_map[input_type.type.name.value]
 
             expanded_pos_args, expanded_kw_args, expanded_kw_values = (
-                generate_input_type_params(type, registry)
+                generate_input_type_params(type, plugin_config, registry)
             )
 
             pos_args += expanded_pos_args
@@ -715,7 +735,7 @@ def generate_query_doc(
     else:
         description = header + operation_documentation
 
-    description += "\n\nArguments:\n"
+    description += "\n\nArgs:\n"
 
     extra_args = get_extra_args_for_onode(definition, plugin_config)
 

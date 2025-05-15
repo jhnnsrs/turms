@@ -137,7 +137,7 @@ def scan_folder_for_configs(folder_path: str = None) -> List[str]:
     ]
 
 
-def scan_folder_for_single_config(folder_path: str = None) -> str:
+def scan_folder_for_single_config(folder_path: str | None = None) -> str:
     """Scans a folder for one single config file
 
     Args:
