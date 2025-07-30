@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.9.1 (2025-07-30)
+
+### Bug Fixes
+
+- Add more tests
+  ([`fc20d3e`](https://github.com/jhnnsrs/turms/commit/fc20d3eac7fe23433692c0d7c4a63eebab5280f0))
+
+
 ## v0.9.0 (2025-05-15)
 
 ### Features
