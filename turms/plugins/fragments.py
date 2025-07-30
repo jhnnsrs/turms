@@ -246,10 +246,34 @@ def generate_fragment(
             if isinstance(sub_node, InlineFragmentNode):
                 on_type_name = sub_node.type_condition.name.value
 
+                inline_fields = []
+
+                for field in sub_node.selection_set.selections:
+                   
+                    if isinstance(field, FieldNode):
+                        if field.name.value == "__typename":
+                            continue
+                        
+                        sub_type = client_schema.get_type(on_type_name)
+
+                        field_definition = get_field_def(client_schema, sub_type, field)
+
+                        if not field_definition:
+                            raise Exception(
+                                f"Could not find field definition for {on_type_name}.{field.name.value}"
+                            )
+                        inline_fields += type_field_node(
+                            field,
+                            name,
+                            field_definition,
+                            client_schema,
+                            config,
+                            tree,
+                            registry,
+                        )
+
                 inline_fragment_fields.setdefault(on_type_name, []).append(
-                    generate_typename_field(
-                        sub_node.type_condition.name.value, registry, config
-                    )
+                    inline_fields
                 )
 
         mother_class = ast.ClassDef(

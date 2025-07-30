@@ -18,6 +18,8 @@ from turms.utils import (
     non_typename_fields,
     target_from_node,
 )
+from graphql.utilities.type_info import get_field_def
+
 import ast
 from graphql.type.definition import (
     GraphQLEnumType,
@@ -239,10 +241,36 @@ def recurse_annotation(
             if isinstance(sub_node, InlineFragmentNode):
                 on_type_name = sub_node.type_condition.name.value
 
-                inline_fragment_fields.setdefault(on_type_name, []).append(
-                    generate_typename_field(
-                        sub_node.type_condition.name.value, registry, config
+                on_type = client_schema.get_type(on_type_name)
+                if not isinstance(on_type, GraphQLObjectType):
+                    raise ValueError(f"Type {on_type_name} is not an object type")
+
+                inline_fields = []
+
+                for field in sub_node.selection_set.selections:
+                    if not isinstance(field, FieldNode):
+                        continue
+
+                    if field.name.value == "__typename":
+                        continue
+
+                    field_definition = get_field_def(client_schema, on_type, field)
+                    if not field_definition:
+                        raise ValueError(
+                            f"Field {field.name.value} not found in type {on_type_name}"
+                        )
+                    inline_fields += type_field_node(
+                        field,
+                        base_name,
+                        field_definition,
+                        client_schema,
+                        config,
+                        subtree,
+                        registry,
                     )
+
+                inline_fragment_fields.setdefault(on_type_name, []).append(
+                    inline_fields
                 )
 
         # We first genrate the mother class that will provide common fields of this fragment. This will never be reference
