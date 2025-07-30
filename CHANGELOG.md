@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.9.2 (2025-07-30)
+
+### Bug Fixes
+
+- Add suport for deterministic output order
+  ([`957d152`](https://github.com/jhnnsrs/turms/commit/957d1521bee013c08d1ab6d6863f5eda10bd53bc))
+
+Sort document files to produce deterministict output order.
+
+- Add support for topological ordering
+  ([`768ffa3`](https://github.com/jhnnsrs/turms/commit/768ffa39518c2e7056c8319686bd47db4a514ea4))
+
+
 ## v0.9.1 (2025-07-30)
 
 ### Bug Fixes
