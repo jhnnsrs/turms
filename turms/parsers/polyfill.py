@@ -1,8 +1,8 @@
 from turms.parsers.base import Parser, ParserConfig
-from typing import List
+from typing import List, Union
 import ast
 from pydantic_settings import SettingsConfigDict
-from pydantic import Field, field_validator, ConfigDict
+from pydantic import Field, field_validator
 
 
 class PolyfillPluginConfig(ParserConfig):
@@ -12,7 +12,7 @@ class PolyfillPluginConfig(ParserConfig):
     python_version: str = "3.9"
 
     @field_validator("python_version", mode="before")
-    def validate_python_version(cls, value):
+    def validate_python_version(cls, value: Union[str, int, float]) -> str:
         if isinstance(value, (int, float)):
             value = str(value)
 
@@ -25,8 +25,7 @@ class PolyfillPluginConfig(ParserConfig):
 def polyfill_python_seven(
     asts: List[ast.AST], config: PolyfillPluginConfig
 ) -> List[ast.AST]:
-
-    new_nodes = []
+    new_nodes: list[ast.AST] = []
     for node in asts:
         if isinstance(node, ast.ImportFrom):
             if node.module == "typing":
@@ -71,7 +70,6 @@ class PolyfillParser(Parser):
         self,
         asts: List[ast.AST],
     ) -> List[ast.AST]:
-
         if self.config.python_version == "3.7":
             return polyfill_python_seven(asts, self.config)
 

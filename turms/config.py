@@ -5,7 +5,6 @@ from pydantic import (
     Field,
     GetCoreSchemaHandler,
     field_validator,
-    validator,
     ConfigDict,
 )
 from pydantic_core import core_schema
@@ -31,25 +30,25 @@ class ConfigProxy(BaseModel):
 
 
 class ImportableFunctionMixin(Protocol):
-
     @classmethod
     def __get_pydantic_core_schema__(
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        return core_schema.with_info_after_validator_function(
-            cls.validate, handler(callable), field_name=handler.field_name
+        return core_schema.no_info_before_validator_function(
+            cls.validate, handler(callable)
         )
 
     @classmethod
-    def validate(cls, v, *info):
-        if not callable(v):
-            if not isinstance(v, str):
+    def validate(cls, value: Union[str, Callable[[Any], Any]]):
+        if not callable(value):
+            if not isinstance(value, str):  # type: ignore
                 raise TypeError("string required")
-            assert "." in v, "You need to point to a module if its not a builtin type"
-            v = import_string(v)
+            assert "." in value, (
+                "You need to point to a module if its not a builtin type"
+            )
+            value = import_string(value)
 
-        assert callable(v)
-        return v
+        return value
 
 
 class PythonType(str):
@@ -59,27 +58,23 @@ class PythonType(str):
     def __get_pydantic_core_schema__(
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        return core_schema.with_info_after_validator_function(
-            cls.validate, handler(str), field_name=handler.field_name
-        )
+        return core_schema.no_info_after_validator_function(cls.validate, handler(str))
 
     @classmethod
-    def validate(cls, v, *info):
-        if not isinstance(v, str):
-            raise TypeError("string required")
+    def validate(cls, v: str):
         if v not in dir(builtins):
             assert "." in v, "You need to point to a module if its not a builtin type"
         return cls(v)
 
 
 class GraphQLTypes(str, Enum):
-    INPUT: str = "input"
-    FRAGMENT: str = "fragment"
-    OBJECT: str = "object"
+    INPUT = "input"
+    FRAGMENT = "fragment"
+    OBJECT = "object"
     MUTATION = "mutation"
     QUERY = "query"
     SUBSCRIPTION = "subscription"
-    DIRECTIVE: str = "directive"
+    DIRECTIVE = "directive"
 
 
 class LogLevel(str, Enum):
@@ -92,7 +87,11 @@ class LogLevel(str, Enum):
 
 @runtime_checkable
 class LogFunction(Protocol):
-    def __call__(self, message, level: LogLevel = LogLevel.INFO):
+    def __call__(
+        self,
+        message: str,
+        level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO",
+    ) -> None:
         pass
 
 
@@ -107,31 +106,33 @@ class FreezeConfig(BaseSettings):
 
     """
 
-    enabled: bool = Field(False, description="Enabling this, will freeze the schema")
+    enabled: bool = Field(
+        default=False, description="Enabling this, will freeze the schema"
+    )
     """Enabling this, will freeze the schema"""
 
     types: List[GraphQLTypes] = Field(
-        [GraphQLTypes.INPUT, GraphQLTypes.FRAGMENT, GraphQLTypes.OBJECT],
+        default=[GraphQLTypes.INPUT, GraphQLTypes.FRAGMENT, GraphQLTypes.OBJECT],
         description="The types to freeze",
     )
     """The core types (Input, Fragment, Object, Operation) to freeze"""
 
     exclude: Optional[List[str]] = Field(
-        None, description="List of types to exclude from freezing"
+        default=None, description="List of types to exclude from freezing"
     )
     """List of types to exclude from freezing"""
     include: Optional[List[str]] = Field(
-        None, description="List of types to include in freezing"
+        default=None, description="List of types to include in freezing"
     )
     """The types to freeze"""
     exclude_fields: Optional[List[str]] = Field(
-        [], description="List of fields to exclude from freezing"
+        default_factory=list, description="List of fields to exclude from freezing"
     )
     include_fields: Optional[List[str]] = Field(
-        [], description="List of fields to include in freezing"
+        default_factory=list, description="List of fields to include in freezing"
     )
     convert_list_to_tuple: bool = Field(
-        True, description="Convert GraphQL List to tuple (with varying length"
+        default=True, description="Convert GraphQL List to tuple (with varying length"
     )
     """Convert GraphQL List to tuple (with varying length)"""
 
@@ -150,7 +151,9 @@ class OptionsConfig(BaseSettings):
 
     """
 
-    enabled: bool = Field(False, description="Enabling this, will freeze the schema")
+    enabled: bool = Field(
+        default=False, description="Enabling this, will freeze the schema"
+    )
     """Enabling this, will freeze the schema"""
     extra: ExtraOptions = None
     """Extra options for pydantic"""
@@ -167,17 +170,17 @@ class OptionsConfig(BaseSettings):
     """Validate assignment"""
 
     types: List[GraphQLTypes] = Field(
-        [GraphQLTypes.INPUT, GraphQLTypes.FRAGMENT, GraphQLTypes.OBJECT],
+        default=[GraphQLTypes.INPUT, GraphQLTypes.FRAGMENT, GraphQLTypes.OBJECT],
         description="The types to freeze",
     )
     """The core types (Input, Fragment, Object, Operation) to enable this option"""
 
     exclude: Optional[List[str]] = Field(
-        None, description="List of types to exclude from setting this option"
+        default=None, description="List of types to exclude from setting this option"
     )
     """List of types to exclude from setting this option"""
     include: Optional[List[str]] = Field(
-        None, description="List of types to include in setting these options"
+        default=None, description="List of types to include in setting these options"
     )
     """The types to freeze"""
 
@@ -196,7 +199,7 @@ class GeneratorConfig(BaseSettings):
 
     """
 
-    model_config: SettingsConfigDict = SettingsConfigDict(
+    model_config = SettingsConfigDict(
         env_prefix="TURMS_",
         extra="forbid",
     )
@@ -239,10 +242,15 @@ class GeneratorConfig(BaseSettings):
     )
     """Additional config for mapping scalars to python types (e.g. ID: str). Can use dotted paths to import types from other modules."""
     freeze: FreezeConfig = Field(
-        default_factory=FreezeConfig,
+        default_factory=lambda: FreezeConfig(),
         description="Configuration for freezing the generated models",
     )
     """Configuration for freezing the generated models: by default disabled"""
+
+    create_catchall: bool = Field(
+        default=True,
+        description="Create a catchall for interface implemtations. This will allow to use a catchall type to retrieve interface implementations that might exist on the server but are not defined in the schema that is used to generate the models.",
+    )
 
     options: OptionsConfig = Field(
         default_factory=OptionsConfig,
@@ -289,28 +297,34 @@ class GeneratorConfig(BaseSettings):
     )
     "List of stylers to use. Style are used to enforce specific styles on the generaded class or fieldnames. "
 
-    @field_validator("parsers", "plugins", "processors", "stylers")
-    def validate_importable(cls, v):
-        try:
-            for parser in v:
+    @field_validator("parsers", "plugins", "processors", "stylers", mode="after")
+    def validate_importable(cls, v: List[ConfigProxy]) -> List[ConfigProxy]:
+        """Validate that the importable is a valid importable function or class"""
+
+        for parser in v:
+            try:
                 import_string(parser.type)
-        except Exception as e:
-            raise ValueError(f"Invalid import: {parser.type} {e}") from e
+            except Exception as e:
+                raise ValueError(f"Invalid import: {parser.type} {e}") from e
 
         return v
-    
 
-    @field_validator("additional_bases")
-    def validate_additional_bases(cls, v):
+    @field_validator(
+        "additional_bases",
+        mode="after",
+    )
+    def validate_additional_bases(cls, v: Dict[str, List[str]]) -> Dict[str, List[str]]:
+        """Validate that the additional bases are valid importable functions or classes"""
         for key, value_list in v.items():
             for value in value_list:
-                if not isinstance(value, str):
+                if not isinstance(value, str):  # type: ignore
                     raise ValueError("string required")
                 if value not in dir(builtins):
                     if "." not in value:
-                        raise ValueError("You need to point to a module if its not a builtin type")
+                        raise ValueError(
+                            "You need to point to a module if its not a builtin type"
+                        )
         return v
-
 
 
 class Extensions(BaseModel):
@@ -339,7 +353,7 @@ class GraphQLProject(BaseSettings):
     to the generator configuration under extensions.turms
     """
 
-    model_config: SettingsConfigDict = SettingsConfigDict(
+    model_config = SettingsConfigDict(
         env_prefix="TURMS_GRAPHQL_",
         extra="allow",
     )
@@ -358,7 +372,7 @@ class GraphQLConfigMultiple(BaseSettings):
     This is the main configuration for multiple GraphQL projects. It is compliant with
     the graphql-config specification for multiple projec."""
 
-    model_config: SettingsConfigDict = SettingsConfigDict(
+    model_config = SettingsConfigDict(
         extra="allow",
     )
 

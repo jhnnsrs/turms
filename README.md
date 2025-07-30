@@ -27,7 +27,6 @@ Can generate the following types from your graphql SDL schema:
 Sepcific generation supported for:
 
 - [x] Strawberry
-- [ ] Graphene
 
 ### Documents (Client) Generation
 
@@ -60,9 +59,11 @@ turms is a pure development library and will not introduce any dependency on its
 code, so we recommend installing turms as a development dependency.
 
 ```bash
-poetry add -D turms
+uvx turms init
 
 ```
+
+
 
 As of now turms only supports python 3.9 and higher (as we rely on ast unparsing)
 

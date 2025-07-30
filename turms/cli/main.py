@@ -1,6 +1,6 @@
 from enum import Enum
 import os
-from typing import Dict
+from typing import Any, Callable, Dict
 from turms.config import GraphQLProject
 from turms.run import generate, write_code_to_file, write_project, write_schema_to_file
 from rich import get_console
@@ -30,7 +30,7 @@ class TurmsOptions(str, Enum):
     WATCH = "watch"
 
 
-logo = """
+logo = r"""
    __                             
   / /___  ___________ ___  _____
  / __/ / / / ___/ __ `__ \/ ___/
@@ -65,7 +65,7 @@ projects:
 """
 
 
-def generate_projects(projects: Dict[str, GraphQLProject], title="Turms"):
+def generate_projects(projects: Dict[str, GraphQLProject], title: str = "Turms"):
     generation_message = f"Generating the {'.'.join(projects.keys())} projects. This may take a while...\n"
 
     tree = Tree("Generating projects", style="bold green")
@@ -79,7 +79,7 @@ def generate_projects(projects: Dict[str, GraphQLProject], title="Turms"):
         padding=(1, 1),
     )
 
-    raised_exceptions = []
+    raised_exceptions: list[Exception] = []
 
     with Live(panel, screen=False) as live:
         for key, project in projects.items():
@@ -87,7 +87,7 @@ def generate_projects(projects: Dict[str, GraphQLProject], title="Turms"):
             tree.add(project_tree)
             live.update(panel)
 
-            def log(message, level):
+            def log(message: str, level: str = "INFO"):
                 if level == "WARN":
                     project_tree.add(Tree(message, style="yellow"))
 
@@ -104,10 +104,18 @@ def generate_projects(projects: Dict[str, GraphQLProject], title="Turms"):
                 )
 
                 if project.extensions.turms.dump_schema:
-                    write_schema_to_file(schema, project.extensions.turms.out_dir, project.extensions.turms.schema_name)
+                    write_schema_to_file(
+                        schema,
+                        project.extensions.turms.out_dir,
+                        project.extensions.turms.schema_name,
+                    )
 
                 if project.extensions.turms.dump_configuration:
-                    write_project(project, project.extensions.turms.out_dir, project.extensions.turms.configuration_name)
+                    write_project(
+                        project,
+                        project.extensions.turms.out_dir,
+                        project.extensions.turms.configuration_name,
+                    )
 
             except Exception as e:
                 project_tree.style = "red"
@@ -130,11 +138,15 @@ def generate_projects(projects: Dict[str, GraphQLProject], title="Turms"):
         ) from raised_exceptions[0]
 
 
-def with_projects(func):
+def with_projects(
+    func: Callable[[click.Context], None],
+) -> Callable[[click.Context], None]:
     @click.argument("project", default=None, required=False)
     @click.option("--config", default=None)
     @wraps(func)
-    def wrapper(*args, config=None, project=None, **kwargs):
+    def wrapper(
+        *args: Any, config: str | None = None, project: str | None = None, **kwargs: Any
+    ):
         try:
             app_directory = os.getcwd()
             config = config or scan_folder_for_single_config(app_directory)

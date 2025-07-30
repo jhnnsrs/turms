@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from pydantic_settings import SettingsConfigDict
 from turms.config import GeneratorConfig
-from graphql.utilities.build_client_schema import GraphQLSchema
+from graphql import GraphQLSchema, InputObjectTypeDefinitionNode
 from graphql.language.ast import OperationDefinitionNode, OperationType
 from turms.recurse import type_field_node
 from turms.plugins.base import Plugin, PluginConfig
@@ -13,7 +13,6 @@ from graphql.language.ast import (
     OperationDefinitionNode,
     OperationType,
 )
-from graphql.utilities.build_client_schema import GraphQLSchema
 from graphql.utilities.get_operation_root_type import get_operation_root_type
 from graphql.utilities.type_info import get_field_def
 
@@ -23,6 +22,8 @@ from turms.registry import ClassRegistry
 from turms.utils import (
     generate_pydantic_config,
     inspect_operation_for_documentation,
+    merge_bases_sequences,
+    merge_body_sequences,
     parse_documents,
     recurse_type_annotation,
     replace_iteratively,
@@ -65,10 +66,10 @@ def get_query_bases(
         for base in config.object_bases:
             registry.register_import(base)
 
-            return [
-                ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                for base in config.object_bases
-            ]
+        return [
+            ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+            for base in config.object_bases
+        ]
 
 
 def get_mutation_bases(
@@ -88,19 +89,18 @@ def get_mutation_bases(
         for base in config.object_bases:
             registry.register_import(base)
 
-            return [
-                ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                for base in config.object_bases
-            ]
+        return [
+            ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+            for base in config.object_bases
+        ]
 
 
 def generate_arguments_config(
-    operation: OperationDefinitionNode,
+    o: OperationType,
     config: GeneratorConfig,
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
 ):
-
     if config.pydantic_version == "1":
         config_fields = []
 
@@ -120,7 +120,12 @@ def generate_arguments_config(
                     name="Config",
                     bases=[],
                     keywords=[],
-                    body=config_fields,
+                    body=[
+                        ast.Expr(
+                            value=ast.Constant(value=" Arguments config class"),
+                        )
+                    ]
+                    + config_fields,
                     decorator_list=[],
                 )
             ]
@@ -128,7 +133,6 @@ def generate_arguments_config(
             return []
 
     else:
-
         config_keywords = []
 
         if plugin_config.arguments_allow_population_by_field_name is not None:
@@ -161,7 +165,7 @@ def get_arguments_bases(
     config: GeneratorConfig,
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
-):
+) -> List[ast.Name]:
     if plugin_config.arguments_bases:
         for base in plugin_config.arguments_bases:
             registry.register_import(base)
@@ -174,10 +178,10 @@ def get_arguments_bases(
         for base in config.object_bases:
             registry.register_import(base)
 
-            return [
-                ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                for base in config.object_bases
-            ]
+        return [
+            ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+            for base in config.object_bases
+        ]
 
 
 def get_subscription_bases(
@@ -197,71 +201,10 @@ def get_subscription_bases(
         for base in config.object_bases:
             registry.register_import(base)
 
-            return [
-                ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                for base in config.object_bases
-            ]
-
-
-def generate_expanded_types(
-    v: VariableDefinitionNode,
-    client_schema: GraphQLSchema,
-    config: GeneratorConfig,
-    plugin_config: OperationsPluginConfig,
-    registry: ClassRegistry,
-):
-
-    if isinstance(v.type, NonNullTypeNode):
-        type_node = v.type.type
-    else:
-        type_node = v.type
-
-    type_name = type_node.name.value
-    type_definition = client_schema.get_type(type_name)
-
-    if type_definition is None:
-        return []
-
-    if type_definition.ast_node is None:
-        return []
-
-    if type_definition.ast_node.kind != "InputObjectTypeDefinition":
-        return []
-
-    fields = type_definition.ast_node.fields
-
-    fields_body = []
-
-    additional_keywords = []
-
-    for field in fields:
-        field_name = field.name.value
-        field_type = field.type
-
-        is_optional = not isinstance(field_type, NonNullTypeNode)
-        annotation = recurse_type_annotation(field_type, registry)
-
-        if is_optional:
-            assign = ast.AnnAssign(
-                target=ast.Name(field_name, ctx=ast.Store()),
-                annotation=annotation,
-                value=ast.Call(
-                    func=ast.Name(id="Field", ctx=ast.Load()),
-                    args=[],
-                    keywords=[
-                        ast.keyword(arg="alias", value=ast.Constant(value=field_name))
-                    ],
-                ),
-                simple=1,
-            )
-        else:
-            assign = ast.AnnAssign(
-                target=ast.Name(field_name, ctx=ast.Store()),
-                annotation=annotation,
-                simple=1,
-            )
-
-        fields_body += [assign]
+        return [
+            ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+            for base in config.object_bases
+        ]
 
 
 def generate_operation(
@@ -272,18 +215,25 @@ def generate_operation(
     registry: ClassRegistry,
 ):
     tree = []
-    assert o.name.value, "Operation names are required"
+    if o.name is None:
+        raise ValueError(
+            "Operation name is required. Please provide a name for the operation."
+        )
 
     # Generation means creating a class for the operation
     if o.operation == OperationType.MUTATION:
         class_name = registry.generate_mutation(o.name.value)
         extra_bases = get_mutation_bases(config, plugin_config, registry)
-    if o.operation == OperationType.SUBSCRIPTION:
+    elif o.operation == OperationType.SUBSCRIPTION:
         class_name = registry.generate_subscription(o.name.value)
         extra_bases = get_subscription_bases(config, plugin_config, registry)
-    if o.operation == OperationType.QUERY:
+    elif o.operation == OperationType.QUERY:
         class_name = registry.generate_query(o.name.value)
         extra_bases = get_query_bases(config, plugin_config, registry)
+    else:
+        raise ValueError(
+            f"Unsupported operation type: {o.operation}. Supported types are: QUERY, MUTATION, SUBSCRIPTION."
+        )
 
     x = get_operation_root_type(client_schema, o)
     class_body_fields = []
@@ -299,14 +249,21 @@ def generate_operation(
                 value=ast.Constant(value=operation_documentation),
             )
         )
+    else:
+        class_body_fields.append(
+            ast.Expr(
+                value=ast.Constant(value="No documentation found for this operation."),
+            )
+        )
+
+    operation_annotations: list[ast.AnnAssign] = []
 
     for field_node in o.selection_set.selections:
-        field_node: FieldNode = field_node
-        field_definition = get_field_def(client_schema, x, field_node)
-        assert field_definition, "Couldn't find field definition"
+        if isinstance(field_node, FieldNode):
+            field_definition = get_field_def(client_schema, x, field_node)
+            assert field_definition, "Couldn't find field definition"
 
-        class_body_fields += [
-            type_field_node(
+            generated_node = type_field_node(
                 field_node,
                 class_name,
                 field_definition,
@@ -314,8 +271,26 @@ def generate_operation(
                 config,
                 tree,
                 registry,
-            ),
-        ]
+            )
+
+            type_annotation = generated_node[0]
+            if isinstance(type_annotation, ast.AnnAssign):
+                operation_annotations.append(type_annotation)
+            else:
+                raise ValueError(
+                    f"Expected type annotation to be of type ast.AnnAssign, got {type(type_annotation)}"
+                )
+
+            class_body_fields += generated_node
+
+        else:
+            raise ValueError(f"Unsupported selection set node type: {type(field_node)}")
+
+    if len(operation_annotations) == 1:
+        # "Has only one root operation -> Registering as a single operation"
+        registry.register_operation_single(
+            o.name.value, operation_annotations[0].annotation
+        )
 
     query_document = language.print_ast(o)
     merged_document = replace_iteratively(query_document, registry)
@@ -403,21 +378,34 @@ def generate_operation(
 
             arguments_body += [assign]
 
-        arguments_body + generate_arguments_config(
+        arguments_body += generate_arguments_config(
             o.operation, config, plugin_config, registry
         )
 
         class_body_fields += [
             ast.ClassDef(
                 "Arguments",
-                bases=get_arguments_bases(config, plugin_config, registry=registry),
+                bases=merge_bases_sequences(
+                    get_arguments_bases(config, plugin_config, registry=registry)
+                ),
                 decorator_list=[],
                 keywords=[],
-                body=arguments_body or [ast.Pass()],
+                type_params=[],
+                body=merge_body_sequences(
+                    [
+                        ast.Expr(
+                            value=ast.Constant(value=f"Arguments for {o.name.value} "),
+                        )
+                    ],
+                    arguments_body or [ast.Pass()],
+                ),
             )
         ]
 
     meta_body = [
+        ast.Expr(
+            value=ast.Constant(value=f"Meta class for {o.name.value} "),
+        ),
         ast.Assign(
             targets=[ast.Name(id="document", ctx=ast.Store())],
             value=ast.Constant(value=merged_document),
@@ -432,17 +420,27 @@ def generate_operation(
         ]
 
     class_body_fields += [
-        ast.ClassDef("Meta", bases=[], decorator_list=[], keywords=[], body=meta_body)
+        ast.ClassDef(
+            "Meta",
+            bases=[],
+            decorator_list=[],
+            keywords=[],
+            body=meta_body,
+            type_params=[],
+        ),
     ]
 
     tree.append(
         ast.ClassDef(
             class_name,
-            bases=extra_bases,
+            bases=merge_bases_sequences(extra_bases),
             decorator_list=[],
             keywords=[],
-            body=class_body_fields
-            + generate_pydantic_config(o.operation, config, registry),
+            type_params=[],
+            body=merge_body_sequences(
+                class_body_fields,
+                generate_pydantic_config(o.operation, config, registry),
+            ),
         )
     )
 
@@ -472,9 +470,14 @@ class OperationsPlugin(Plugin):
     ) -> List[ast.AST]:
         plugin_tree = []
 
-        documents = parse_documents(
-            client_schema, self.config.operations_glob or config.documents
-        )
+        glob = self.config.operations_glob or config.documents
+
+        if not glob:
+            raise ValueError(
+                "No documents found. Please provide a glob pattern for the documents."
+            )
+
+        documents = parse_documents(client_schema, glob)
 
         definitions = documents.definitions
         operations = [

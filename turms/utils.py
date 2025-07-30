@@ -1,7 +1,7 @@
 import ast
 import glob
 import re
-from typing import List, Optional, Set, Union
+from typing import List, Optional, Sequence, Set, Union
 
 from graphql import (
     BooleanValueNode,
@@ -10,7 +10,9 @@ from graphql import (
     GraphQLEnumType,
     GraphQLInterfaceType,
     GraphQLList,
+    GraphQLNamedOutputType,
     GraphQLNonNull,
+    GraphQLNullableType,
     GraphQLObjectType,
     GraphQLOutputType,
     GraphQLScalarType,
@@ -21,8 +23,10 @@ from graphql import (
     NonNullTypeNode,
     NullValueNode,
     OperationDefinitionNode,
+    SelectionNode,
     SelectionSetNode,
     StringValueNode,
+    TypeNode,
     ValueNode,
     parse,
     print_ast,
@@ -30,7 +34,7 @@ from graphql import (
 )
 from graphql.error.graphql_error import GraphQLError
 from graphql.language.ast import DocumentNode, FieldNode, NameNode
-from graphql.utilities.build_client_schema import GraphQLSchema
+from graphql import GraphQLSchema
 
 from turms.config import GeneratorConfig
 from turms.errors import (
@@ -62,6 +66,28 @@ class NoScalarEquivalentDefined(GenerationError):
     pass
 
 
+def merge_body_sequences(
+    *sequences: Sequence[
+        ast.AnnAssign | ast.Assign | ast.Expr | ast.ClassDef | ast.Pass
+    ],
+) -> list[ast.stmt]:
+    """Merges a list of sequences into a single sequence"""
+    merged: list[ast.stmt] = []
+    for seq in sequences:
+        merged.extend(seq)
+    return merged
+
+
+def merge_bases_sequences(
+    *sequences: Sequence[ast.Name],
+) -> list[ast.expr]:
+    """Merges a list of sequences into a single sequence"""
+    merged = []
+    for seq in sequences:
+        merged.extend(seq)  # type: ignore
+    return merged  # type: ignore
+
+
 def target_from_node(node: FieldNode) -> str:
     """Extacts the field name from a FieldNode. If alias is present, it will be used instead of the name"""
     return (
@@ -69,24 +95,43 @@ def target_from_node(node: FieldNode) -> str:
     )
 
 
-def non_typename_fields(node: FieldNode) -> List[FieldNode]:
+def non_typename_fields(
+    node: FieldNode | FragmentDefinitionNode,
+) -> List[FieldNode | SelectionNode]:
     """Returns all fields in a FieldNode that are not __typename"""
     if not node.selection_set:
         return []
-    return [field for field in node.selection_set.selections if not (isinstance(field, FieldNode) and field.name.value == "__typename")]
+    return [
+        field
+        for field in node.selection_set.selections
+        if not (isinstance(field, FieldNode) and field.name.value == "__typename")
+    ]
 
 
 def inspect_operation_for_documentation(operation: OperationDefinitionNode):
     """Checks for operation level documentatoin"""
 
+    if not operation.loc:
+        raise GenerationError(
+            "Could not find loc for operation. This should not happen"
+        )
+
+    if not operation.selection_set:
+        raise GenerationError(
+            "Could not find selection set for operation. This should not happen"
+        )
+
+    first_operation = operation.selection_set.selections[0]
+    if not first_operation.loc:
+        raise GenerationError(
+            "Could not find loc for first operation. This should not happen"
+        )
+
     definition = operation.loc.source.body.splitlines()[
         operation.loc.source.get_location(operation.loc.start).line
-        - 1 : operation.loc.source.get_location(
-            operation.selection_set.selections[0].loc.start
-        ).line
-        - 1
+        - 1 : operation.loc.source.get_location(first_operation.loc.start).line - 1
     ]
-    doc = []
+    doc: list[str] = []
     for line in definition:
         if line and line != "":
             x = commentline_regex.match(line)
@@ -115,10 +160,10 @@ def generate_typename_field(
     return ast.AnnAssign(
         target=ast.Name(id="typename", ctx=ast.Store()),
         annotation=ast.Subscript(
-                value=ast.Name("Literal", ctx=ast.Load()),
-                slice=ast.Constant(value=typename),
-                ctx=ast.Load(),
-            ),
+            value=ast.Name("Literal", ctx=ast.Load()),
+            slice=ast.Constant(value=typename),
+            ctx=ast.Load(),
+        ),
         value=ast.Call(
             func=ast.Name(id="Field", ctx=ast.Load()),
             args=[],
@@ -127,9 +172,8 @@ def generate_typename_field(
         simple=1,
     )
 
-def generate_generic_typename_field(
-    registry: ClassRegistry, config: GeneratorConfig
-):
+
+def generate_generic_typename_field(registry: ClassRegistry, config: GeneratorConfig):
     """Generates the typename field a specific type, this will be used to determine the type of the object in the response"""
 
     registry.register_import("pydantic.Field")
@@ -158,8 +202,8 @@ def generate_config_dict(
     graphQLType: GraphQLTypes,
     config: GeneratorConfig,
     registy: ClassRegistry,
-    typename: str = None,
-):
+    typename: Optional[str] = None,
+) -> list[ast.Assign]:
     """Generates the config class for a specific type version 2
 
     It will append the config class to the registry, and set the frozen
@@ -171,7 +215,7 @@ def generate_config_dict(
 
     """
 
-    config_keywords = []
+    config_keywords: List[ast.keyword] = []
 
     if config.freeze.enabled:
         if graphQLType in config.freeze.types:
@@ -266,8 +310,8 @@ def generate_config_dict(
 
 
 def generate_config_class_pydantic(
-    graphQLType: GraphQLTypes, config: GeneratorConfig, typename: str = None
-):
+    graphQLType: GraphQLTypes, config: GeneratorConfig, typename: str | None = None
+) -> list[ast.ClassDef]:
     """Generates the config class for a specific type
 
     It will append the config class to the registry, and set the frozen
@@ -279,7 +323,7 @@ def generate_config_class_pydantic(
 
     """
 
-    config_fields = []
+    config_fields: list[ast.stmt] = []
 
     if config.freeze.enabled:
         if graphQLType in config.freeze.types:
@@ -385,6 +429,7 @@ def generate_config_class_pydantic(
                 keywords=[],
                 body=config_fields,
                 decorator_list=[],
+                type_params=[],
             )
         ]
     else:
@@ -395,16 +440,17 @@ def generate_pydantic_config(
     graphQLType: GraphQLTypes,
     config: GeneratorConfig,
     registry: ClassRegistry,
-    typename: str = None,
-):
+    typename: str | None = None,
+) -> Union[List[ast.Assign], List[ast.ClassDef]]:
     if config.pydantic_version == "v2":
         return generate_config_dict(graphQLType, config, registry, typename)
     else:
         return generate_config_class_pydantic(graphQLType, config, typename)
 
 
-
-def add_typename_recursively(selection_set: SelectionSetNode, skip=False) -> None:
+def add_typename_recursively(
+    selection_set: SelectionSetNode | None, skip: bool = False
+) -> None:
     if selection_set is None:
         return
 
@@ -434,16 +480,19 @@ def add_typename_recursively(selection_set: SelectionSetNode, skip=False) -> Non
     # Update the selection set with potentially added __typename fields
     selection_set.selections = tuple(selections)
 
+
 def auto_add_typename_field_to_all_objects(document: DocumentNode) -> DocumentNode:
     for definition in document.definitions:
         if isinstance(definition, (OperationDefinitionNode, FragmentDefinitionNode)):
-            add_typename_recursively(definition.selection_set, skip=isinstance(definition, OperationDefinitionNode))
-    
-    
+            add_typename_recursively(
+                definition.selection_set,
+                skip=isinstance(definition, OperationDefinitionNode),
+            )
+
     return document
 
 
-def parse_documents(client_schema: GraphQLSchema, scan_glob) -> DocumentNode:
+def parse_documents(client_schema: GraphQLSchema, scan_glob: str) -> DocumentNode:
     """ """
     if not scan_glob:
         raise GenerationError("Couldnt find documents glob")
@@ -471,11 +520,8 @@ def parse_documents(client_schema: GraphQLSchema, scan_glob) -> DocumentNode:
         raise InvalidDocuments(
             "Invalid Documents \n" + "\n".join(str(e) for e in errors)
         )
-    
-    
-    nodes = auto_add_typename_field_to_all_objects(nodes)
 
-   
+    nodes = auto_add_typename_field_to_all_objects(nodes)
 
     return nodes
 
@@ -483,13 +529,15 @@ def parse_documents(client_schema: GraphQLSchema, scan_glob) -> DocumentNode:
 fragment_searcher = re.compile(r"\.\.\.(?P<fragment>[a-zA-Z]*)")
 
 
-
 def auto_add_typename_field_to_fragment_str(fragment_str: str) -> str:
     x = parse(fragment_str)
     for fragment in x.definitions:
         if isinstance(fragment, FragmentDefinitionNode):
             selections = list(fragment.selection_set.selections)
-            if not any(isinstance(field, FieldNode) and field.name.value == "__typename" for field in selections):
+            if not any(
+                isinstance(field, FieldNode) and field.name.value == "__typename"
+                for field in selections
+            ):
                 selections.append(
                     FieldNode(
                         name=NameNode(value="__typename"),
@@ -500,30 +548,29 @@ def auto_add_typename_field_to_fragment_str(fragment_str: str) -> str:
                 )
                 fragment.selection_set.selections = tuple(selections)
 
-
-
-
-
     return print_ast(x)
 
 
-
-
-
-
 def replace_iteratively(
-    pattern,
-    registry,
-    taken=[],
-):
-    z = sorted(set(fragment_searcher.findall(pattern)))  # only set is important
+    pattern: str,
+    registry: ClassRegistry,
+    taken: list[str] = [],
+) -> str:
+    """Replaces the fragments in the pattern with their definitions"""
+    z = set(fragment_searcher.findall(pattern))  # only set is important
+
     new_fragments = [new_f for new_f in z if new_f not in taken and new_f != ""]
     if not new_fragments:
         return pattern
     else:
         try:
             level_down_pattern = "\n\n".join(
-                [auto_add_typename_field_to_fragment_str(registry.get_fragment_document(key)) for key in new_fragments]
+                [
+                    auto_add_typename_field_to_fragment_str(
+                        registry.get_fragment_document(key)
+                    )
+                    for key in new_fragments
+                ]
                 + [pattern]
             )
             return replace_iteratively(
@@ -536,8 +583,8 @@ def replace_iteratively(
 
 
 def get_additional_bases_for_type(
-    typename, config: GeneratorConfig, registry: ClassRegistry
-):
+    typename: str, config: GeneratorConfig, registry: ClassRegistry
+) -> List[ast.Name]:
     if typename in config.additional_bases:
         for base in config.additional_bases[typename]:
             registry.register_import(base)
@@ -580,11 +627,11 @@ def interface_is_extended_by_other_interfaces(
 
 
 def recurse_type_annotation(
-    type: NamedTypeNode,
+    type: TypeNode,
     registry: ClassRegistry,
-    optional=True,
+    optional: bool = True,
     overwrite_final: Optional[str] = None,
-):
+) -> ast.expr:
     if isinstance(type, NonNullTypeNode):
         return recurse_type_annotation(
             type.type, registry, optional=False, overwrite_final=overwrite_final
@@ -650,12 +697,15 @@ def recurse_type_annotation(
 
 
 def recurse_outputtype_annotation(
-    type: GraphQLOutputType,
+    type: GraphQLNamedOutputType,
     registry: ClassRegistry,
-    optional=True,
+    optional: bool = True,
     overwrite_final: Optional[str] = None,
 ) -> ast.expr:
     if isinstance(type, GraphQLNonNull):
+        # If the type is non-null, we need to recurse into the inner type
+        type = type.of_type
+
         return recurse_outputtype_annotation(
             type.of_type, registry, optional=False, overwrite_final=overwrite_final
         )
@@ -715,15 +765,17 @@ def recurse_outputtype_annotation(
         else:
             return ast.Name(id=overwrite_final, ctx=ast.Load())
 
-    raise NotImplementedError(f"recurse over {type.__class__.__name__}")  # pragma: no cover
+    raise NotImplementedError(
+        f"recurse over {type.__class__.__name__}"
+    )  # pragma: no cover
 
 
 def recurse_outputtype_label(
     type: GraphQLOutputType,
     registry: ClassRegistry,
-    optional=True,
+    optional: bool = True,
     overwrite_final: Optional[str] = None,
-):
+) -> str:
     if isinstance(type, GraphQLNonNull):  # pragma: no cover
         return recurse_outputtype_label(
             type.of_type, registry, optional=False, overwrite_final=overwrite_final
@@ -776,11 +828,11 @@ def recurse_outputtype_label(
 
 
 def recurse_type_label(
-    type: NamedTypeNode,
+    type: TypeNode,
     registry: ClassRegistry,
-    optional=True,
+    optional: bool = True,
     overwrite_final: Optional[str] = None,
-):
+) -> str:
     if isinstance(type, NonNullTypeNode):
         return recurse_type_label(
             type.type, registry, optional=False, overwrite_final=overwrite_final
@@ -823,10 +875,13 @@ def recurse_type_label(
                             f"Could not find correspoinding type labler for {type.name.value}"
                         )
 
+        label = x.id if isinstance(x, ast.Name) else x.value
         if optional:
-            return "Optional[" + x.id + "]"
+            return "Optional[" + label + "]"
 
-        return x.id
+        return label
+
+    raise NotImplementedError("Not implemented for this type")
 
 
 def parse_value_node(value_node: ValueNode) -> Union[None, str, int, float, bool]:

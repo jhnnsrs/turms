@@ -17,11 +17,6 @@ input X {
 '''
 
 
-expected = '''class X(BaseModel):
-    mandatory: str
-    other_mandatory: str = Field(alias='otherMandatory')
-    optional: Optional[str] = None
-    other_optional: Optional[str] = Field(alias='otherOptional', default=None)'''
 
 
 def test_generates_schema(snapshot):
@@ -44,4 +39,5 @@ def test_generates_schema(snapshot):
     without_imports = [node for node in generated_ast if not isinstance(node, ast.ImportFrom)]
     md = ast.Module(body=without_imports, type_ignores=[])
     generated = ast.unparse(ast.fix_missing_locations(md))
-    assert generated == expected
+    snapshot.snapshot_dir = 'snapshots'  # This line is optional.
+    snapshot.assert_match(generated, 'test_py.txt')

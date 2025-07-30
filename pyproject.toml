@@ -1,13 +1,11 @@
-[tool.poetry]
+[project]
 name = "turms"
-version = "0.8.5"
+version = "0.9.1"
 description = "graphql-codegen powered by pydantic"
-authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
-license = "MIT"
+authors = [{ name = "jhnnsrs", email = "jhnnsrs@gmail.com" }]
+requires-python = ">=3.10"
 readme = "README.md"
-packages = [{ include = "turms" }]
-homepage = "https://jhnnsrs.github.io/turms"
-repository = "https://github.com/jhnnsrs/turms"
+license = "MIT"
 classifiers = [
     "Topic :: Software Development :: Build Tools",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -16,46 +14,56 @@ classifiers = [
     "Topic :: Utilities",
     "Development Status :: 6 - Mature",
 ]
+dependencies = [
+    "rich>=11",
+    "graphql-core>=3.2.0,<4",
+    "pydantic>2",
+    "PyYAML>=5.3.0",
+    "rich-click>=1.6",
+    "pydantic-settings>=2.5.2,<3",
+    "watchfiles>=0.18.1",
+    "requests>=2.32.3",
+]
 
-[tool.poetry.dependencies]
-python = "^3.9"
-rich = ">=11,<14"
-graphql-core = "^3.2.0"
-pydantic = ">2"
-PyYAML = ">=5.3.0"
-black = { version = "^22.1.0", optional = true }
-isort = { version = "^5.10.1", optional = true }
-libcst = { version = "^1.4.0", optional = true }
-rich-click = ">=1.6"
-watchfiles = "^0.18.1"
-pydantic-settings = "^2.5.2"
+[project.optional-dependencies]
+watch = ["watchfiles>=0.18.1"]
+black = ["black>=22.1.0"]
+isort = ["isort>=5.10.1"]
+merge = ["libcst>=1.4.0"]
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^6.2.5"
-pytest-aiohttp = "^0.3.0"
-pytest-cov = "^3.0.0"
-tox = "^3.24.5"
-isort = "^5.10.1"
-black = "^22.1.0"
-pylint = "^2.12.2"
-autoflake = "^1.4"
-strawberry-graphql = "^0.151.0"
-libcst = "^1.4.0"
-requests = "^2.28.1"
-pytest-snapshot = "^0.9.0"
+[project.urls]
+Homepage = "https://jhnnsrs.github.io/turms"
+Repository = "https://github.com/jhnnsrs/turms"
 
-[tool.poetry.extras]
-watch = ["watchdog"]
-black = ["black"]
-isort = ["isort"]
-merge = ["libcst"]
-
-[tool.poetry.scripts]
+[project.scripts]
 turms = "turms.cli.main:cli"
 
+[tool.uv]
+dev-dependencies = [
+    "pytest>=6.2.5,<7",
+    "pytest-aiohttp>=0.3.0,<0.4",
+    "pytest-cov>=3.0.0,<4",
+    "tox>=3.24.5,<4",
+    "isort>=5.10.1,<6",
+    "black>=22.1.0,<23",
+    "pylint>=2.12.2,<3",
+    "autoflake~=1.4",
+    "strawberry-graphql>=0.151.0,<0.152",
+    "libcst>=1.4.0,<2",
+    "requests>=2.28.1,<3",
+    "pytest-snapshot>=0.9.0,<0.10",
+    "python-semantic-release>=9.21.1",
+]
+
+[tool.hatch.build.targets.sdist]
+include = ["turms"]
+
+[tool.hatch.build.targets.wheel]
+include = ["turms"]
+
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [[tool.pydoc-markdown.loaders]]
 type = "python"
@@ -64,3 +72,10 @@ search_path = ["turms"]
 [tool.pydoc-markdown.renderer]
 type = "docusaurus"
 docs_base_path = "website/docs"
+
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+upload_to_pypi = true
+branch = "main"
+build_command = "uv build"

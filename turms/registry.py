@@ -1,8 +1,10 @@
 import ast
 from keyword import iskeyword
-from typing import Dict, List
+from typing import Callable, Dict, List, Set, Type
 
-from turms.config import GeneratorConfig, LogFunction
+from graphql import DocumentNode, GraphQLNamedType
+
+from turms.config import GeneratorConfig, LogFunction, PythonType
 from turms.errors import (
     NoEnumFound,
     NoInputTypeFound,
@@ -11,7 +13,7 @@ from turms.errors import (
 )
 from turms.stylers.base import Styler
 
-SCALAR_DEFAULTS = {
+SCALAR_DEFAULTS: Dict[str, str] = {
     "ID": "str",
     "String": "str",
     "Int": "int",
@@ -81,35 +83,53 @@ class ClassRegistry(object):
     def __init__(
         self, config: GeneratorConfig, stylers: List[Styler], log: LogFunction
     ):
-        self.stylers = stylers
-        self._imports = set()
-        self._builtins = set()
-        self.config = config
+        self.stylers: List[Styler] = stylers
+        self._imports: Set[str] = set()
+        self._builtins: Set[str] = set()
+        self.config: GeneratorConfig = config
 
-        self.scalar_map = {**SCALAR_DEFAULTS, **config.scalar_definitions}
+        self.scalar_map: Dict[str, str] = {
+            **SCALAR_DEFAULTS,
+            **config.scalar_definitions,
+        }
+        # map of fragment typename to the strinigify graphql document
+        self.fragment_document_map: Dict[str, str] = {}
 
-        self.fragment_document_map = {}
+        self.enum_class_map: Dict[str, str] = {}
+        self.inputtype_class_map: Dict[str, str] = {}
+        self.object_class_map: Dict[str, str] = {}
+        self.interface_reference_map: Dict[str, str] = {}
+        self.interface_baseclass_map: Dict[str, str] = {}
 
-        self.enum_class_map = {}
-        self.inputtype_class_map = {}
-        self.object_class_map = {}
-        self.interface_reference_map = {}
-        self.interface_baseclass_map = {}
+        self.operation_class_map: Dict[str, str] = {}
+        self.fragment_class_map: Dict[str, str] = {}
+        self.query_class_map: Dict[str, str] = {}
+        self.subscription_class_map: Dict[str, str] = {}
+        self.mutation_class_map: Dict[str, str] = {}
 
-        self.operation_class_map = {}
-        self.fragment_class_map = {}
-        self.query_class_map = {}
-        self.subscription_class_map = {}
-        self.mutation_class_map = {}
+        self.registered_interfaces_fragments: Dict[str, ast.AST] = {}
+        self.registered_union_fragments: Dict[str, str] = {}
+        self.forward_references: Set[str] = set()
+        self.fragment_type_map: Dict[str, GraphQLNamedType] = {}
 
-        self.registered_interfaces_fragments = {}
-        self.registered_union_fragments = {}
-        self.forward_references = set()
-        self.fragment_type_map = {}
+        # Maps for the interface fragments and union fragments
+        self.interfacefragments_impl_map: Dict[str, Dict[str, str]] = {}
+        self.unionfragment_members_map: Dict[str, Dict[str, str]] = {}
 
-        self.interfacefragments_impl_map = {}
-        self.unionfragment_members_map = {}
+        self.operation_single_operation_map: Dict[
+            str, ast.AST
+        ] = {}  # This is used to store the operation name and the root operation class name if single
         self.log = log
+
+    def register_operation_single(self, operation_name: str, annotation_ast: ast.AST):
+        self.operation_single_operation_map[operation_name] = annotation_ast
+
+    def get_operation_single_or_none(self, operation_name: str):
+        return (
+            self.operation_single_operation_map[operation_name]
+            if operation_name in self.operation_single_operation_map
+            else None
+        )
 
     def style_inputtype_class(self, typename: str):
         for styler in self.stylers:
@@ -119,19 +139,19 @@ class ClassRegistry(object):
         return typename
 
     def generate_inputtype(self, typename: str):
-        assert (
-            typename not in self.inputtype_class_map
-        ), "Type was already registered, cannot register annew"
+        assert typename not in self.inputtype_class_map, (
+            "Type was already registered, cannot register annew"
+        )
         classname = self.style_inputtype_class(typename)
         self.inputtype_class_map[typename] = classname
         return classname
 
-    def get_inputtype_class(self, typename) -> str:
+    def get_inputtype_class(self, typename: str) -> str:
         return self.inputtype_class_map[typename]
 
     def reference_inputtype(
-        self, typename: str, parent: str, allow_forward=True
-    ) -> ast.AST:
+        self, typename: str, parent: str, allow_forward: bool = True
+    ) -> ast.Name | ast.Constant:
         classname = self.style_inputtype_class(typename)
         if typename not in self.inputtype_class_map or parent == classname:
             if not allow_forward:
@@ -139,7 +159,7 @@ class ClassRegistry(object):
                     f"Input type {typename} is not yet defined but referenced by {parent}. And we dont allow forward references"
                 )
             self.forward_references.add(parent)
-            return ast.Constant(value=classname, ctx=ast.Load())
+            return ast.Constant(value=classname)
         return ast.Name(id=self.inputtype_class_map[typename], ctx=ast.Load())
 
     def style_enum_class(self, typename: str):
@@ -150,22 +170,24 @@ class ClassRegistry(object):
         return typename
 
     def generate_enum(self, typename: str):
-        assert (
-            typename not in self.enum_class_map
-        ), "Type was already registered, cannot register annew"
+        assert typename not in self.enum_class_map, (
+            "Type was already registered, cannot register annew"
+        )
         classname = self.style_enum_class(typename)
         self.enum_class_map[typename] = classname
         return classname
 
-    def get_enum_class(self, typename) -> str:
+    def get_enum_class(self, typename: str) -> str:
         return self.enum_class_map[typename]
 
-    def reference_enum(self, typename: str, parent: str, allow_forward=True) -> ast.AST:
+    def reference_enum(
+        self, typename: str, parent: str, allow_forward: bool = True
+    ) -> ast.Constant | ast.Name:
         if typename in built_in_map:
             # Builtin enums
             self._builtins.add(typename)
             self.forward_references.add(parent)
-            return ast.Constant(value=typename, ctx=ast.Load())
+            return ast.Constant(value=typename)
 
         classname = self.style_enum_class(typename)
         if typename not in self.enum_class_map or parent == classname:
@@ -174,7 +196,7 @@ class ClassRegistry(object):
                     f"Input type {typename} is not yet defined but referenced by {parent}. And we dont allow forward references"
                 )
             self.forward_references.add(parent)
-            return ast.Constant(value=classname, ctx=ast.Load())
+            return ast.Constant(value=classname)
         return ast.Name(id=classname, ctx=ast.Load())
 
     def style_objecttype_class(self, typename: str):
@@ -185,15 +207,15 @@ class ClassRegistry(object):
         return typename
 
     def generate_objecttype(self, typename: str):
-        assert (
-            typename not in self.object_class_map
-        ), "Type was already registered, cannot register annew"
+        assert typename not in self.object_class_map, (
+            "Type was already registered, cannot register annew"
+        )
         classname = self.style_objecttype_class(typename)
         self.object_class_map[typename] = classname
         return classname
 
     def reference_object(
-        self, typename: str, parent: str, allow_forward=True
+        self, typename: str, parent: str, allow_forward: bool = True
     ) -> ast.AST:
         return self._reference_generic(
             typename,
@@ -208,19 +230,19 @@ class ClassRegistry(object):
         self,
         typename: str,
         parent: str,
-        styler,
-        class_map: Dict,
+        style_func: Callable[[str], str],
+        class_map: Dict[str, str],
         error_class: str,
-        allow_forward=True,
-    ) -> ast.AST:
-        classname = styler(typename)
+        allow_forward: bool = True,
+    ) -> ast.Name | ast.Constant:
+        classname = style_func(typename)
         if typename not in class_map or parent == classname:
             if not allow_forward:
                 raise RegistryError(
                     f"""{error_class} type {typename} is not yet defined but referenced by {parent}. And we dont allow forward references"""
                 )
             self.forward_references.add(parent)
-            return ast.Constant(value=classname, ctx=ast.Load())
+            return ast.Constant(value=classname)
         return ast.Name(id=classname, ctx=ast.Load())
 
     def style_interface_class(self, typename: str):
@@ -231,9 +253,9 @@ class ClassRegistry(object):
         return typename
 
     def generate_interface(self, typename: str, with_base: bool = True):
-        assert (
-            typename not in self.interface_baseclass_map
-        ), "Type was already registered, cannot register annew"
+        assert typename not in self.interface_baseclass_map, (
+            "Type was already registered, cannot register annew"
+        )
         classname = self.style_interface_class(typename)
         if with_base:
             self.interface_baseclass_map[typename] = classname + "Base"
@@ -242,7 +264,7 @@ class ClassRegistry(object):
         self.interface_reference_map[typename] = classname
         return self.interface_baseclass_map[typename]
 
-    def inherit_interface(self, typename: str, allow_forward=True) -> ast.AST:
+    def inherit_interface(self, typename: str, allow_forward: bool = True) -> str:
         if typename not in self.interface_baseclass_map:
             raise RegistryError(
                 f"Interface type {typename} is not yet defined but referenced. Please define it first."
@@ -250,12 +272,12 @@ class ClassRegistry(object):
         return self.interface_baseclass_map[typename]
 
     def reference_interface(
-        self, typename: str, parent: str, allow_forward=True
+        self, typename: str, parent: str, allow_forward: bool = True
     ) -> ast.AST:
         # Interface need always be udpated later
         classname = self.style_interface_class(typename)
         self.forward_references.add(parent)
-        return ast.Constant(value=classname, ctx=ast.Load())
+        return ast.Constant(value=classname)
 
     def style_fragment_class(self, typename: str):
         for styler in self.stylers:
@@ -264,43 +286,40 @@ class ClassRegistry(object):
             typename += "_"
         return typename
 
-    def generate_fragment(self, fragmentname: str, is_interface=False):
-        assert (
-            fragmentname not in self.fragment_class_map
-        ), f"Fragment {fragmentname} was already registered, cannot register annew"
+    def generate_fragment(self, fragmentname: str, is_interface: bool = False):
+        assert fragmentname not in self.fragment_class_map, (
+            f"Fragment {fragmentname} was already registered, cannot register annew"
+        )
         classname = self.style_fragment_class(fragmentname)
         real_classname = classname if not is_interface else classname
         self.fragment_class_map[fragmentname] = real_classname
         return real_classname
 
-    def register_fragment_type(self, fragmentname: str, typename: str):
+    def register_fragment_type(self, fragmentname: str, typename: GraphQLNamedType):
         self.fragment_type_map[fragmentname] = typename
 
-
-    def register_interface_fragment_implementations(self, fragmentname: str, implementationMap: Dict[str, str]):
+    def register_interface_fragment_implementations(
+        self, fragmentname: str, implementationMap: Dict[str, str]
+    ):
         self.interfacefragments_impl_map[fragmentname] = implementationMap
-
 
     def get_interface_fragment_implementations(self, fragmentname: str):
         return self.interfacefragments_impl_map[fragmentname]
 
-
-    def register_union_fragment_members(self, fragmentname: str, membersMap: Dict[str, str]):
+    def register_union_fragment_members(
+        self, fragmentname: str, membersMap: Dict[str, str]
+    ):
         self.unionfragment_members_map[fragmentname] = membersMap
-
 
     def get_union_fragment_members(self, fragmentname: str):
         return self.unionfragment_members_map[fragmentname]
 
-
     def get_fragment_type(self, fragmentname: str):
         return self.fragment_type_map[fragmentname]
 
-
-
     def reference_fragment(
-        self, typename: str, parent: str, allow_forward=True
-    ) -> ast.AST:
+        self, typename: str, parent: str, allow_forward: bool = True
+    ) -> ast.Name | ast.Constant:
         return self._reference_generic(
             typename,
             parent,
@@ -309,18 +328,19 @@ class ClassRegistry(object):
             "Fragment",
             allow_forward,
         )
-    
+
     def is_interface_fragment(self, typename: str):
         return typename in self.registered_interfaces_fragments
-    
 
-    def reference_interface_fragment(self, typename: str, parent: str, allow_forward=True) -> ast.AST:
+    def reference_interface_fragment(
+        self, typename: str, parent: str, allow_forward: bool = True
+    ) -> ast.AST:
         return self.registered_interfaces_fragments[typename]
-    
+
     def register_interface_fragment(self, typename: str, ast: ast.AST):
         self.registered_interfaces_fragments[typename] = ast
 
-    def inherit_fragment(self, typename: str, allow_forward=True) -> ast.AST:
+    def inherit_fragment(self, typename: str, allow_forward: bool = True) -> str:
         if typename not in self.fragment_class_map:
             raise RegistryError(
                 f"Fragment {typename} is not yet defined but referenced by. Please change the order in your fragments."
@@ -353,15 +373,15 @@ class ClassRegistry(object):
         return typename
 
     def generate_query(self, typename: str):
-        assert (
-            typename not in self.query_class_map
-        ), f"Type {typename} was already registered, cannot register annew"
+        assert typename not in self.query_class_map, (
+            f"Type {typename} was already registered, cannot register annew"
+        )
         classname = self.style_query_class(typename)
         self.query_class_map[typename] = classname
         return classname
 
     def reference_query(
-        self, typename: str, parent: str, allow_forward=True
+        self, typename: str, parent: str, allow_forward: bool = True
     ) -> ast.AST:
         return self._reference_generic(
             typename,
@@ -380,15 +400,15 @@ class ClassRegistry(object):
         return typename
 
     def generate_mutation(self, typename: str):
-        assert (
-            typename not in self.mutation_class_map
-        ), f"Type {typename} was already registered, cannot register annew"
+        assert typename not in self.mutation_class_map, (
+            f"Type {typename} was already registered, cannot register annew"
+        )
         classname = self.style_mutation_class(typename)
         self.mutation_class_map[typename] = classname
         return classname
 
     def reference_mutation(
-        self, typename: str, parent: str, allow_forward=True
+        self, typename: str, parent: str, allow_forward: bool = True
     ) -> ast.AST:
         return self._reference_generic(
             typename,
@@ -407,15 +427,15 @@ class ClassRegistry(object):
         return typename
 
     def generate_subscription(self, typename: str):
-        assert (
-            typename not in self.subscription_class_map
-        ), f"Type {typename} was already registered, cannot register annew"
+        assert typename not in self.subscription_class_map, (
+            f"Type {typename} was already registered, cannot register annew"
+        )
         classname = self.style_subscription_class(typename)
         self.subscription_class_map[typename] = classname
         return classname
 
     def reference_subscription(
-        self, typename: str, parent: str, allow_forward=True
+        self, typename: str, parent: str, allow_forward: bool = True
     ) -> ast.AST:
         return self._reference_generic(
             typename,
@@ -426,17 +446,18 @@ class ClassRegistry(object):
             allow_forward,
         )
 
-    def register_import(self, name):
+    def register_import(self, name: str) -> None:
         if name in ("bool", "str", "int", "float", "dict", "list", "tuple"):
             return
 
         self._imports.add(name)
 
-    def generate_imports(self):
-        imports = []
+    def generate_imports(self) -> List[ast.AST]:
+        """Generate the imports for the generated code. This is used to generate the"""
+        imports: List[ast.AST] = []
 
-        lone_top_imports = set()
-        top_level = {}
+        lone_top_imports: Set[str] = set()
+        top_level: Dict[str, Set[str]] = {}
         for name in self._imports:
             if "." not in name:
                 lone_top_imports.add(name)
@@ -459,16 +480,17 @@ class ClassRegistry(object):
 
         return imports
 
-    def generate_builtins(self):
-        builtins = []
+    def generate_builtins(self) -> List[ast.AST]:
+        """Generate the builtins for the generated code. This is used to generate the"""
+        builtins: list[ast.AST] = []
 
         for built_in in self._builtins:
             builtins.append(built_in_map[built_in])
 
         return builtins
 
-    def generate_forward_refs(self):
-        tree = []
+    def generate_forward_refs(self) -> List[ast.AST]:
+        tree: list[ast.AST] = []
 
         for reference in sorted(self.forward_references):
             tree.append(
@@ -494,11 +516,13 @@ class ClassRegistry(object):
 
         return tree
 
-    def register_fragment_document(self, typename: str, cls: str):
-        assert cls not in self.fragment_document_map, f"{cls} already registered"
-        self.fragment_document_map[typename] = cls
+    def register_fragment_document(self, typename: str, document: str) -> None:
+        assert typename not in self.fragment_document_map, (
+            f"{typename} already registered"
+        )
+        self.fragment_document_map[typename] = document
 
-    def get_fragment_document(self, typename: str):
+    def get_fragment_document(self, typename: str) -> str:
         return self.fragment_document_map[typename]
 
     def register_scalar(self, scalar_type: str, python_type: str):
@@ -519,5 +543,5 @@ class ClassRegistry(object):
             f"No python equivalent found for {scalar_type}. Please define in scalar_definitions"
         )
 
-    def warn(self, message):
+    def warn(self, message: str) -> None:
         self.log(message, level="WARN")

@@ -1,10 +1,10 @@
 from watchfiles.filters import BaseFilter
-from watchfiles import watch
+from watchfiles import Change, watch
 import os
 
 
 class GraphQLFilter(BaseFilter):  # pragma: no cover
-    def __call__(self, change, path: str) -> bool:
+    def __call__(self, change: Change, path: str) -> bool:
         x = super().__call__(change, path)
         if not x:
             return False
