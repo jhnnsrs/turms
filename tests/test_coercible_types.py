@@ -124,8 +124,8 @@ def test_coercible_types_optional_and_non_optional(beast_schema):
             FuncsPlugin(
                 config=FuncsPluginConfig(
                     coercible_scalars={
-                        "ID": "typing.Union[str, int]",  # Test complex type annotation
-                        "String": "typing.Optional[pathlib.Path]",  # Test nested Optional
+                        "ID": "str",  # Test complex type annotation
+                        "String": "pathlib.Path",  # Test nested Optional
                     },
                     definitions=[
                         FunctionDefinition(

@@ -1424,7 +1424,7 @@ wheels = [
 
 [[package]]
 name = "turms"
-version = "0.9.0"
+version = "0.9.1"
 source = { editable = "." }
 dependencies = [
     { name = "graphql-core" },

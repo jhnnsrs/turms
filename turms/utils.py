@@ -498,6 +498,7 @@ def parse_documents(client_schema: GraphQLSchema, scan_glob: str) -> DocumentNod
         raise GenerationError("Couldnt find documents glob")
 
     x = glob.glob(scan_glob, recursive=True)
+    x.sort()  # Ensure deterministic order
 
     errors: List[GraphQLError] = []
 
@@ -557,6 +558,7 @@ def replace_iteratively(
 ) -> str:
     """Replaces the fragments in the pattern with their definitions"""
     z = set(fragment_searcher.findall(pattern))  # only set is important
+
     new_fragments = [new_f for new_f in z if new_f not in taken and new_f != ""]
     if not new_fragments:
         return pattern

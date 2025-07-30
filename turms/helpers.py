@@ -1,13 +1,14 @@
+import glob
 import json
 from importlib import import_module
 from typing import Any, Dict, Optional, Tuple
-import glob
-from pydantic import AnyHttpUrl
-from turms.errors import GenerationError
 
 from graphql import (
     get_introspection_query,
 )
+from pydantic import AnyHttpUrl
+
+from turms.errors import GenerationError
 
 IntrospectionResult = Dict[str, Any]
 DSLString = str
@@ -127,6 +128,7 @@ def load_dsl_from_glob(
 ) -> DSLString:
     """Build a GraphQL schema from a glob string"""
     schema_glob = glob.glob(glob_string, recursive=True)
+    schema_glob.sort()  # Ensure deterministic order
     if len(schema_glob) == 0:
         raise GenerationError(f"No files found for glob string {glob_string}")
 
@@ -141,6 +143,7 @@ def load_introspection_from_glob(
     glob_string: str,
 ):
     schema_glob = glob.glob(glob_string, recursive=True)
+    schema_glob.sort()  # Ensure deterministic order
     if len(schema_glob) == 0:
         raise GenerationError(f"No files found for glob string {glob_string}")
 
