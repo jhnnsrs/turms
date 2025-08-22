@@ -477,7 +477,7 @@ class OperationsPlugin(Plugin):
                 "No documents found. Please provide a glob pattern for the documents."
             )
 
-        documents = parse_documents(client_schema, glob)
+        documents = parse_documents(client_schema, glob, config)
 
         definitions = documents.definitions
         operations = [

@@ -1,7 +1,7 @@
 import ast
 import logging
 from collections import defaultdict, deque
-from typing import DefaultDict, Dict, List, Optional, Sequence, Set
+from typing import DefaultDict, Dict, List, Literal, Optional, Sequence, Set
 
 from graphql import (
     DocumentNode,
@@ -16,10 +16,10 @@ from graphql import (
     language,
     GraphQLSchema,
 )
+
 from graphql.utilities.type_info import get_field_def
 from pydantic import Field
 from pydantic_settings import SettingsConfigDict
-
 from turms.config import GeneratorConfig, GraphQLTypes
 from turms.plugins.base import Plugin, PluginConfig
 from turms.recurse import type_field_node
@@ -32,6 +32,7 @@ from turms.utils import (
     get_interface_bases,
     merge_bases_sequences,
     merge_body_sequences,
+    replace_iteratively,
     non_typename_fields,
     parse_documents,
 )
@@ -129,32 +130,44 @@ class FragmentsPluginConfig(PluginConfig):
     model_config = SettingsConfigDict(env_prefix="TURMS_PLUGINS_FRAGMENTS_")
     type: str = "turms.plugins.fragments.FragmentsPlugin"
     fragment_bases: List[str] = []
+    object_bases: List[str] = []
     fragments_glob: Optional[str] = None
     add_documentation: bool = True
+    generate_meta_class: bool = True
 
 
 def get_fragment_bases(
+    kind: Literal["OBJECT"] | Literal["UNION"] | Literal["INTERFACE"],
     config: GeneratorConfig,
     pluginConfig: FragmentsPluginConfig,
     registry: ClassRegistry,
 ):
+    bases: list[ast.Name] = []
     if pluginConfig.fragment_bases:
         for base in pluginConfig.fragment_bases:
             registry.register_import(base)
 
-        return [
+        bases += [
             ast.Name(id=base.split(".")[-1], ctx=ast.Load())
             for base in pluginConfig.fragment_bases
         ]
 
-    else:
-        for base in config.object_bases:
-            registry.register_import(base)
+    if kind == "OBJECT":
+        if pluginConfig.object_bases:
+            for base in pluginConfig.object_bases:
+                registry.register_import(base)
 
-        return [
-            ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-            for base in config.object_bases
-        ]
+            bases += [
+                ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+                for base in pluginConfig.object_bases
+            ]
+
+    for base in config.object_bases:
+        registry.register_import(base)
+
+    return bases + [
+        ast.Name(id=base.split(".")[-1], ctx=ast.Load()) for base in config.object_bases
+    ]
 
 
 def generate_fragment(
@@ -249,11 +262,10 @@ def generate_fragment(
                 inline_fields = []
 
                 for field in sub_node.selection_set.selections:
-                   
                     if isinstance(field, FieldNode):
                         if field.name.value == "__typename":
                             continue
-                        
+
                         sub_type = client_schema.get_type(on_type_name)
 
                         field_definition = get_field_def(client_schema, sub_type, field)
@@ -422,12 +434,46 @@ def generate_fragment(
                     registry,
                 )
 
+        if plugin_config.generate_meta_class:
+            query_document = language.print_ast(f)
+            merged_document = replace_iteratively(query_document, registry)
+
+            meta_body = [
+                ast.ClassDef(
+                    "Meta",
+                    bases=[],
+                    decorator_list=[],
+                    keywords=[],
+                    body=[
+                        ast.Expr(
+                            value=ast.Constant(value=f"Meta class for {f.name.value}"),
+                        ),
+                        ast.Assign(
+                            targets=[ast.Name(id="document", ctx=ast.Store())],
+                            value=ast.Constant(value=merged_document),
+                        ),
+                        ast.Assign(
+                            targets=[ast.Name(id="name", ctx=ast.Store())],
+                            value=ast.Constant(value=f.name.value),
+                        ),
+                        ast.Assign(
+                            targets=[ast.Name(id="type", ctx=ast.Store())],
+                            value=ast.Constant(value=type.name),
+                        ),
+                    ],
+                    type_params=[],
+                )
+            ]
+
+        else:
+            meta_body = []
+
         tree.append(
             ast.ClassDef(
                 name,
                 bases=merge_bases_sequences(
                     additional_bases,
-                    get_fragment_bases(config, plugin_config, registry),
+                    get_fragment_bases("OBJECT", config, plugin_config, registry),
                 ),
                 decorator_list=[],
                 keywords=[],
@@ -435,6 +481,7 @@ def generate_fragment(
                 body=merge_body_sequences(
                     fields,
                     generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry),
+                    meta_body,
                 ),
             )
         )
@@ -526,7 +573,8 @@ def generate_fragment(
             implementing_class = ast.ClassDef(
                 class_name,
                 bases=merge_bases_sequences(
-                    ast_base_nodes, get_fragment_bases(config, plugin_config, registry)
+                    ast_base_nodes,
+                    get_fragment_bases("UNION", config, plugin_config, registry),
                 ),
                 decorator_list=[],
                 keywords=[],
@@ -616,7 +664,7 @@ class FragmentsPlugin(Plugin):
             )
             return []
 
-        documents = parse_documents(client_schema, glob)
+        documents = parse_documents(client_schema, glob, config)
 
         # Find dependencies and sort fragments topologically
         fragment_dependencies = build_recursive_dependency_graph(documents)

@@ -43,7 +43,7 @@ def generate_enums(
 
     if plugin_config.skip_unreferenced and config.documents:
         ref_registry = create_reference_registry_from_documents(
-            client_schema, parse_documents(client_schema, config.documents)
+            client_schema, parse_documents(client_schema, config.documents, config)
         )
     else:
         ref_registry = None

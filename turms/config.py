@@ -1,4 +1,5 @@
 import builtins
+from graphql import ASTValidationRule
 from pydantic import (
     AnyHttpUrl,
     BaseModel,
@@ -22,6 +23,7 @@ from typing import (
 )
 from turms.helpers import import_string
 from enum import Enum
+from .rules import specified_rules_map
 
 
 class ConfigProxy(BaseModel):
@@ -275,6 +277,12 @@ class GeneratorConfig(BaseSettings):
     force_plugin_order: bool = True
     "Should the plugins be forced to run in the order they are defined"
 
+    omited_document_rules: List[str] = Field(
+        default_factory=list,
+        description="List of rules to omit from the document validation. This is useful if you want to skip certain rules that are not relevant for your use case.",
+    )
+    "List of rules to omit from the document validation."
+
     parsers: List[ConfigProxy] = Field(
         default_factory=list,
         description="List of parsers to use. Parsers are used to parse the generated AST and translate it before it is converted to python code",
@@ -309,6 +317,16 @@ class GeneratorConfig(BaseSettings):
 
         return v
 
+    @field_validator("omited_document_rules", mode="after")
+    def validate_omited_document_rules(cls, v: List[str]) -> List[str]:
+        """Validate that the omited document rules are valid"""
+        for rule in v:
+            if rule not in specified_rules_map:
+                raise ValueError(
+                    f"Invalid rule: {rule}. Available rules: {specified_rules_map.keys()}"
+                )
+        return v
+
     @field_validator(
         "additional_bases",
         mode="after",
@@ -325,6 +343,15 @@ class GeneratorConfig(BaseSettings):
                             "You need to point to a module if its not a builtin type"
                         )
         return v
+
+    def get_document_rules(self) -> List[ASTValidationRule]:
+        """Get the schema rules to use for validation"""
+        rules = []
+        for key, rule in specified_rules_map.items():
+            if key in self.omited_document_rules:
+                continue
+            rules.append(rule)
+        return rules
 
 
 class Extensions(BaseModel):

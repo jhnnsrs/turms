@@ -492,7 +492,9 @@ def auto_add_typename_field_to_all_objects(document: DocumentNode) -> DocumentNo
     return document
 
 
-def parse_documents(client_schema: GraphQLSchema, scan_glob: str) -> DocumentNode:
+def parse_documents(
+    client_schema: GraphQLSchema, scan_glob: str, config: GeneratorConfig
+) -> DocumentNode:
     """ """
     if not scan_glob:
         raise GenerationError("Couldnt find documents glob")
@@ -515,7 +517,7 @@ def parse_documents(client_schema: GraphQLSchema, scan_glob: str) -> DocumentNod
 
     nodes = parse(dsl)
 
-    errors = validate(client_schema, nodes)
+    errors = validate(client_schema, nodes, rules=config.get_document_rules())
     if len(errors) > 0:
         raise InvalidDocuments(
             "Invalid Documents \n" + "\n".join(str(e) for e in errors)

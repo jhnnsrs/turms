@@ -1206,7 +1206,7 @@ class FuncsPlugin(Plugin):
         plugin_tree = []
 
         documents = parse_documents(
-            client_schema, self.config.funcs_glob or config.documents
+            client_schema, self.config.funcs_glob or config.documents, config
         )
 
         operations = [
