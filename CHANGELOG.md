@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.10.0 (2025-08-22)
+
+### Features
+
+- Add abbility to omit graphql validation rules if unessaary
+  ([`78dffa7`](https://github.com/jhnnsrs/turms/commit/78dffa780975da4b5c145a8bb2407f5d4d2ee4dd))
+
+
 ## v0.9.2 (2025-07-30)
 
 ### Bug Fixes
