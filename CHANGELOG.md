@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.10.1 (2025-10-29)
+
+### Bug Fixes
+
+- Ensure deterministic output by sorting
+  ([`1035bbb`](https://github.com/jhnnsrs/turms/commit/1035bbb785ea45f9978b2464b9b627872efd7743))
+
+
 ## v0.10.0 (2025-08-22)
 
 ### Features
