@@ -562,6 +562,8 @@ def replace_iteratively(
     z = set(fragment_searcher.findall(pattern))  # only set is important
 
     new_fragments = [new_f for new_f in z if new_f not in taken and new_f != ""]
+    new_fragments.sort()
+
     if not new_fragments:
         return pattern
     else:
