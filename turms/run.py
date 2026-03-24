@@ -353,8 +353,11 @@ def build_schema_from_schema_type(
     if is_url(schema):
         try:
             dsl_string = load_dsl_from_url(schema)
-            return build_ast_schema(parse(dsl_string))
+            return build_ast_schema(
+                parse(dsl_string), assume_valid_sdl=True, assume_valid=True
+            )
         except Exception as e:
+            raise e
             if allow_introspection:
                 intropection = load_introspection_from_url(schema)
                 return build_client_schema(intropection)
@@ -363,7 +366,9 @@ def build_schema_from_schema_type(
     if isinstance(schema, str):
         try:
             dsl_string = load_dsl_from_glob(schema)
-            return build_ast_schema(parse(dsl_string))
+            return build_ast_schema(
+                parse(dsl_string), assume_valid_sdl=True, assume_valid=True
+            )
         except Exception as e:
             if allow_introspection:
                 intropection = load_introspection_from_glob(schema)
