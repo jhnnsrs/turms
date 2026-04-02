@@ -120,6 +120,13 @@ def forward_reference_to_interface_schema():
 
 
 @pytest.fixture(scope="session")
+def oneof_schema():
+    return build_schema_from_schema_type(
+        build_relative_glob("/schemas/oneof.graphql")
+    )
+
+
+@pytest.fixture(scope="session")
 def parsable_configs():
     return scan_folder_for_configs(build_relative_glob("/configs/parsable"))
 
