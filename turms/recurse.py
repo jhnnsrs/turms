@@ -90,11 +90,8 @@ def recurse_annotation(
                 inline_fragment_name = (
                     f"{parent}{sub_node.type_condition.name.value}InlineFragment"
                 )
-                this_inline_fragment_fields: list[ast.AnnAssign | ast.Expr] = [
-                    generate_typename_field(
-                        sub_node.type_condition.name.value, registry, config
-                    )
-                ]
+                spread_fragment_bases: list[ast.Name] = []
+                inline_field_nodes: list[ast.AnnAssign | ast.Expr] = []
 
                 if not sub_node.selection_set:
                     raise NotImplementedError(
@@ -102,6 +99,19 @@ def recurse_annotation(
                     )
 
                 for sub_sub_node in sub_node.selection_set.selections:
+                    if isinstance(sub_sub_node, FragmentSpreadNode):
+                        if registry.is_interface_fragment(sub_sub_node.name.value):
+                            raise Exception(
+                                "Interface Fragments with additional subfields are not yet implemented"
+                            )
+                        spread_fragment_bases.append(
+                            ast.Name(
+                                id=registry.inherit_fragment(sub_sub_node.name.value),
+                                ctx=ast.Load(),
+                            )
+                        )
+                        continue
+
                     if isinstance(sub_sub_node, FieldNode):
                         sub_sub_node_type = client_schema.get_type(
                             sub_node.type_condition.name.value
@@ -116,7 +126,7 @@ def recurse_annotation(
                             )
 
                         field_type = sub_sub_node_type.fields[sub_sub_node.name.value]
-                        this_inline_fragment_fields += type_field_node(
+                        inline_field_nodes += type_field_node(
                             sub_sub_node,
                             inline_fragment_name,
                             field_type,
@@ -126,14 +136,36 @@ def recurse_annotation(
                             registry,
                         )
 
-                additional_bases = get_additional_bases_for_type(
-                    sub_node.type_condition.name.value, config, registry
-                )
+                if spread_fragment_bases:
+                    this_inline_fragment_fields = inline_field_nodes
+                else:
+                    this_inline_fragment_fields = [
+                        generate_typename_field(
+                            sub_node.type_condition.name.value, registry, config
+                        ),
+                        *inline_field_nodes,
+                    ]
+
+                if spread_fragment_bases:
+                    additional_bases = spread_fragment_bases
+                else:
+                    additional_bases = get_additional_bases_for_type(
+                        sub_node.type_condition.name.value, config, registry
+                    )
 
                 config_bases = [
                     ast.Name(id=base.split(".")[-1], ctx=ast.Load())
                     for base in config.object_bases
                 ]
+
+                merged_body = merge_body_sequences(
+                    this_inline_fragment_fields,
+                    generate_pydantic_config(
+                        GraphQLTypes.FRAGMENT, config, registry
+                    ),
+                )
+                if not merged_body:
+                    merged_body = [ast.Pass()]
 
                 cls = ast.ClassDef(
                     inline_fragment_name,
@@ -141,12 +173,7 @@ def recurse_annotation(
                     decorator_list=[],
                     keywords=[],
                     type_params=[],
-                    body=merge_body_sequences(
-                        this_inline_fragment_fields,
-                        generate_pydantic_config(
-                            GraphQLTypes.FRAGMENT, config, registry
-                        ),
-                    ),
+                    body=merged_body,
                 )
 
                 subtree.append(cls)
