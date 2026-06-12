@@ -76,5 +76,21 @@ def test_fields_in_inline_fragment_on_union(union_schema):
         """,
     )
 
-    
+
+def test_union_inline_fragment_fragment_spread_in_operation(union_schema):
+    """Union member inline in an operation must inherit fields from nested fragment spreads."""
+    config = GeneratorConfig(
+        documents=build_relative_glob("/documents/unions/*.graphql"),
+    )
+    generated_ast = generate_ast(
+        config,
+        union_schema,
+        stylers=[CapitalizeStyler(), SnakeCaseStyler()],
+        plugins=[EnumsPlugin(), InputsPlugin(), FragmentsPlugin(), OperationsPlugin()],
+    )
+
+    unit_test_with(
+        generated_ast,
+        "assert InlineSpreadOnUnion(hallo={'__typename': 'Bar', 'nana': 42}).hallo.nana == 42",
+    )
 

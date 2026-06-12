@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.10.2 (2026-04-13)
+
+### Bug Fixes
+
+- Fi support for spread in union
+  ([`84b70a8`](https://github.com/jhnnsrs/turms/commit/84b70a8a9c22cffb976c2143d27d518ac293d462))
+
+
 ## v0.10.1 (2025-10-29)
 
 ### Bug Fixes

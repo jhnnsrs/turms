@@ -1,0 +1,12 @@
+# Operation-level union inline whose only selection is a fragment spread (recurse.py path).
+query InlineSpreadOnUnion {
+  hallo {
+    ... on Bar {
+      ...BarOnlyFieldsFragment
+    }
+  }
+}
+
+fragment BarOnlyFieldsFragment on Bar {
+  nana
+}
