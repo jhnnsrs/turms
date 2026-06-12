@@ -1,0 +1,14 @@
+query FindUser($input: FindUserInput!) {
+  findUser(input: $input) {
+    id
+    email
+    username
+  }
+}
+
+query SearchContent($filter: SearchFilter!) {
+  searchContent(filter: $filter) {
+    id
+    title
+  }
+}

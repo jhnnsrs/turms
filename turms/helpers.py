@@ -69,8 +69,8 @@ def load_introspection_from_url(
     try:
         req = requests.post(url, data=jdata, headers=default_headers)  # type: ignore
         x = req.json()
-    except Exception:
-        raise GenerationError(f"Failed to fetch schema from {url}")
+    except Exception as e:
+        raise GenerationError(f"Failed to fetch schema from {url}") from e
     if "errors" in x:  # pragma: no cover
         raise GenerationError(
             f"Failed to fetch schema from {url} Graphql error: {x['errors']}"

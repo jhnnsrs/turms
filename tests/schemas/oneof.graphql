@@ -1,0 +1,31 @@
+# @oneOf is built-in in graphql-core 3.3+ but must be declared for 3.2 compatibility
+directive @oneOf on INPUT_OBJECT
+
+type Query {
+  findUser(input: FindUserInput!): User
+  searchContent(filter: SearchFilter!): [Content]
+}
+
+type User {
+  id: ID!
+  email: String!
+  username: String!
+}
+
+type Content {
+  id: ID!
+  title: String!
+}
+
+"""Find a user by exactly one identifier"""
+input FindUserInput @oneOf {
+  id: ID
+  email: String
+  username: String
+}
+
+"""Search content by exactly one filter"""
+input SearchFilter @oneOf {
+  title: String
+  authorId: ID
+}
