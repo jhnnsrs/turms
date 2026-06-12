@@ -357,7 +357,6 @@ def build_schema_from_schema_type(
                 parse(dsl_string), assume_valid_sdl=True, assume_valid=True
             )
         except Exception as e:
-            raise e
             if allow_introspection:
                 intropection = load_introspection_from_url(schema)
                 return build_client_schema(intropection)

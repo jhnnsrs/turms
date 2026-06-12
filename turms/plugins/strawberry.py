@@ -398,7 +398,13 @@ class StrawberryPluginConfig(PluginConfig):
     type: str = "turms.plugins.strawberry.Strawberry"
     generate_directives: bool = True
     generate_scalars: bool = True
-    builtin_directives: List[str] = ["include", "skip", "deprecated", "specifiedBy"]
+    builtin_directives: List[str] = [
+        "include",
+        "skip",
+        "deprecated",
+        "specifiedBy",
+        "oneOf",
+    ]
     builtin_scalars: List[str] = ["String", "Boolean", "DateTime", "Int", "Float", "ID"]
     generate_enums: bool = True
     generate_types: bool = True
@@ -764,11 +770,15 @@ def generate_inputs(
         if plugin_config.skip_underscore and key.startswith("_"):  # pragma: no cover
             continue
 
-        directive_keywords = generate_directive_keywords(type.ast_node, plugin_config)
-        if directive_keywords:
+        decorator_keywords = generate_directive_keywords(type.ast_node, plugin_config)
+        if getattr(type, "is_one_of", False):
+            decorator_keywords.append(
+                ast.keyword(arg="one_of", value=ast.Constant(value=True))
+            )
+        if decorator_keywords:
             decorator = ast.Call(
                 func=ast.Name(id="strawberry.input", ctx=ast.Load()),
-                keywords=directive_keywords,
+                keywords=decorator_keywords,
                 args=[],
             )
         else:
