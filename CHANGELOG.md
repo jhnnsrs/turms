@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.12.0 (2026-06-12)
+
+### Bug Fixes
+
+- New teadme and autodetect env
+  ([`15d52f7`](https://github.com/jhnnsrs/turms/commit/15d52f7aa987c46c5c44e5745acc5ef2b4e4c3db))
+
+### Features
+
+- Add template plus documentation section
+  ([`f663e25`](https://github.com/jhnnsrs/turms/commit/f663e25e41d4b3b4903fd427b5e9d326189e50fb))
+
+
 ## v0.11.0 (2026-06-12)
 
 
