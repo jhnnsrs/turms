@@ -6,101 +6,249 @@ sidebar_label: "Config"
 # Config
 
 Turms relies on and complies with [graphql-config](https://www.graphql-config.com/docs/user/user-introduction) and searches
-your current working dir for the graphql-config file, it currently supports the following formats:
+your current working dir for the graphql-config file. It currently supports the following formats:
 
-- [x] graphql.config.yaml
-- [x] .graphqlrc.yaml
-- [x] graphql.config.yml
-- [x] .graphqlrc.yml
-- [x] graphql.config.toml
-- [x] .graphqlrc.toml
-- [x] graphql.config.json
-- [x] .graphqlrc.json
+- graphql.config.yaml / .graphqlrc.yaml
+- graphql.config.yml / .graphqlrc.yml
+- graphql.config.toml / .graphqlrc.toml
+- graphql.config.json / .graphqlrc.json
+
+A typical configuration looks like this:
 
 ```yaml
 projects:
   default:
-    schema: http://api.spacex.land/graphql/
+    schema: https://countries.trevorblades.com/
     documents: graphql/**.graphql
     extensions:
-      turms: # path for configuration for turms
-        out_dir: examples/api
+      turms: # configuration for turms
+        out_dir: api
         stylers:
-          - type: turms.stylers.capitalize.Capitalizer
-          - type: turms.stylers.snake.SnakeNodeName
+          - type: turms.stylers.default.DefaultStyler
         plugins:
           - type: turms.plugins.enums.EnumsPlugin
           - type: turms.plugins.inputs.InputsPlugin
           - type: turms.plugins.fragments.FragmentsPlugin
-          - type: turms.plugins.operation.OperationsPlugin
-          - type: turms.plugins.funcs.OperationsFuncPlugin
+          - type: turms.plugins.operations.OperationsPlugin
         processors:
-          - type: turms.processor.black.BlackProcessor
-          - type: turms.processor.isort.IsortProcessor
+          - type: turms.processors.black.BlackProcessor
+          - type: turms.processors.isort.IsortProcessor
         scalar_definitions:
           uuid: str
           timestamptz: str
           Date: str
 ```
 
-We recommend this layout to ensure support for multiple graphql projects, but you can also opt in
-for a single project configuration.
+We recommend the `projects` layout to ensure support for multiple graphql projects, but a single
+project configuration (the project keys at top level) is also supported.
 
-### Turms Config
+## Schema sources
 
-Turms config consists about basic settings like scalar_definitions, output paths but provides sections
-for the configuration of plugins, processors and styles (see doc) The general structure follow this pattern:
+The `schema` key accepts:
 
-```yaml
-projects:
-  default:
-    schema: http://api.spacex.land/graphql/
-    documents: "graphql/**.graphql"
-    extensions:
-      turms: # Turms section
-      stylers: # styler section (every item is a styler, that applies its style in sucession)
-        - type: turms.stylers.capitalize.Capitalizer # the path to the styler class (as in python modules)
-      plugins: # plugin section (every item is a plugin, that generates its part of the AST tree)
-        - type: "turms.plugins.enums.EnumsPlugin" # the module path
-          skip_underscore: True # a configuration item of this specific plugin (enum)
-        - type: "turms.plugins.fragments.FragmentPlugin" # the module path
-          fragment_bases: # a configuration item of this specific plugin (fragment)
-            - pydantic.BaseModel
-      stylers: # styler section (every item is a styler, that applies its style in sucession)
-        - type: turms.stylers.capitalize.Capitalizer # the path to the styler class (as in python modules)
-```
+- **An introspection URL**: `schema: https://countries.trevorblades.com/`
+- **An introspection URL with headers**:
+  ```yaml
+  schema:
+    https://api.example.org/graphql:
+      headers:
+        Authorization: Bearer xxxx
+  ```
+- **A local SDL file or glob**: `schema: schema/*.graphql`
+- **A list** of any of the above (schemas get merged)
 
-## Central Config
+## The turms section
 
-As pydantic lovers, configuration is handled by pydantic models, here is an example
-of the configuration
+Everything turms-specific lives under `extensions.turms` of a project. Configuration is
+validated by pydantic — unknown keys are rejected, so typos fail loudly.
 
-```yaml file="turms section"
-projects:
-  default:
-    schema: # A url for intrsopection, or glob if loading locally
-    documents: # A glob of documents for the generation of queries, subs, fragments
-    extensions:
-      turms:
-        out_dir: # str = "api" the root of the generated schema
-        generated_name:  #str = "schema.py"
-        object_bases: #List[str] = ["pydantic.BaseModel"] The base class for objects
-        interface_bases: # Optional[List[str]] = None (A different base clas for interfaces. Defaults to object_bases
-        always_resolve_interfaces: # bool = True (if to false, the abstract base for interfaces is part of the union)
-        scalar_definitions = #{} A map of grpahql scalars and their python equivalent
-        freeze: bool = False # SHould we generate frozen (fake immutability) classes
-        additional_bases = {} # A map of graphql (input)type and additional bases (see traits)
+### General options
 
-```
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `out_dir` | `str` | `"api"` | The output directory for the generated file |
+| `generated_name` | `str` | `"schema.py"` | The name of the generated file within `out_dir` |
+| `documents` | `str` | – | Glob of documents to parse; overrides the project-level `documents` |
+| `domain` | `str` | – | Domain of the GraphQL API (set as a config variable) |
+| `verbose` | `bool` | `false` | Enable verbose logging |
+| `exit_on_error` | `bool` | `true` | Exit with code 1 if a project fails to generate |
+| `allow_introspection` | `bool` | `true` | Allow introspection queries when fetching remote schemas |
+| `dump_schema` | `bool` | `false` | Also write the resolved schema into `out_dir` |
+| `schema_name` | `str` | `"schema.graphql"` | File name used by `dump_schema` |
+| `dump_configuration` | `bool` | `false` | Also write the resolved project configuration into `out_dir` |
+| `configuration_name` | `str` | `"project.json"` | File name used by `dump_configuration` |
 
-You can (and actually have to) define python equivalents for graphql scalars that are not
-part of the standard library (str, int, bool, float). You can easily do this by providing
-scalar definitions:
+### Code generation options
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `pydantic_version` | `"v1"` \| `"v2"` | `"v2"` | Which pydantic major version the generated code targets |
+| `object_bases` | `List[str]` | `["pydantic.BaseModel"]` | Base class(es) for generated models |
+| `interface_bases` | `List[str]` | – | Separate base classes for interfaces (defaults to `object_bases`) |
+| `always_resolve_interfaces` | `bool` | `true` | Resolve interfaces to unions of concrete types |
+| `create_catchall` | `bool` | `true` | Add a catch-all type for interface implementations unknown to the local schema |
+| `exclude_typenames` | `bool` | `false` | Do not generate `__typename` literal fields |
+| `skip_forwards` | `bool` | `false` | Skip generating forward-reference updates (`model_rebuild`) |
+| `scalar_definitions` | `Dict[str, str]` | `{}` | Map of GraphQL scalar → python type (builtin or dotted import path) |
+| `additional_bases` | `Dict[str, List[str]]` | `{}` | Extra base classes per GraphQL type name (dotted import paths) |
+| `additional_config` | `Dict[str, Dict]` | `{}` | Extra pydantic config attributes per GraphQL type name |
+| `force_plugin_order` | `bool` | `true` | Run plugins strictly in their configured order |
+| `omited_document_rules` | `List[str]` | `[]` | GraphQL document validation rules to skip |
+
+### Scalar definitions
+
+Every scalar in your schema that is not a GraphQL builtin (`String`, `Int`, `Float`, `Boolean`, `ID`)
+**must** be mapped to a python type, otherwise generation fails with `NoScalarFound`:
 
 ```yaml
 scalar_definitions:
-  $GRAPHQL_TYPE: path.to.your.scalar
+  uuid: str
   DateTime: datetime.datetime
+  JSON: typing.Any
+  Slug: path.to.your.SlugType
 ```
 
-The scalar can adhere to the pydantic Field specification to provide validators.
+Builtin names (`str`, `int`, ...) are used directly; anything containing a dot is imported. Custom
+types can implement pydantic validators to participate in validation.
+
+### Freezing models (`freeze`)
+
+Generate faux-immutable, hashable models — handy for caching and use as dict keys:
+
+```yaml
+freeze:
+  enabled: true
+  types: [input, fragment, object] # which kinds to freeze (default)
+  exclude: [BigDataFragment] # type names to skip
+  include: [] # or explicitly include
+  convert_list_to_tuple: true # GraphQL lists become tuples (hashable)
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `enabled` | `false` | Enable freezing |
+| `types` | `[input, fragment, object]` | Which GraphQL kinds to freeze |
+| `include` / `exclude` | – | Explicit type-name allow/deny lists |
+| `include_fields` / `exclude_fields` | `[]` | Field-level allow/deny lists |
+| `convert_list_to_tuple` | `true` | Convert `List[...]` annotations to `Tuple[..., ...]` |
+
+### Pydantic options (`options`)
+
+Set pydantic model configuration on the generated classes, per GraphQL kind:
+
+```yaml
+options:
+  enabled: true
+  extra: forbid # ignore | allow | forbid
+  use_enum_values: true
+  validate_assignment: true
+  allow_population_by_field_name: true
+  types: [input, fragment, object]
+```
+
+`include` / `exclude` lists by type name are supported here as well. `allow_mutation` and `orm_mode`
+are available for pydantic v1 targets.
+
+## Component sections
+
+Each of the four pipeline stages is configured as a list of importable classes. Every entry needs a
+`type` (the dotted python path of the class); all remaining keys are passed to that component's own
+config:
+
+```yaml
+extensions:
+  turms:
+    plugins:
+      - type: turms.plugins.enums.EnumsPlugin
+        skip_underscore: true # plugin-specific option
+      - type: turms.plugins.fragments.FragmentsPlugin
+        fragment_bases:
+          - pydantic.BaseModel
+    stylers:
+      - type: turms.stylers.default.DefaultStyler
+    parsers:
+      - type: turms.parsers.polyfill.PolyfillPlugin
+        python_version: "3.9"
+    processors:
+      - type: turms.processors.ruff.RuffProcessor
+        fix: true
+```
+
+Because components are resolved by import path, **your own classes work the same way** — point
+`type` at any importable subclass of `Plugin`, `Styler`, `Parser`, or `Processor`.
+
+### Plugins
+
+| Plugin | Key options (default) |
+| --- | --- |
+| `turms.plugins.enums.EnumsPlugin` | `skip_underscore` (false), `skip_double_underscore` (true), `skip_unreferenced` (true), `prepend`/`append` ("") |
+| `turms.plugins.inputs.InputsPlugin` | `inputtype_bases` (["pydantic.BaseModel"]), `allow_population_by_field_name` (true), `skip_underscore` (true), `skip_unreferenced` (true) |
+| `turms.plugins.objects.ObjectsPlugin` | `types_bases` (["pydantic.BaseModel"]), `skip_underscore` (false), `skip_double_underscore` (true) |
+| `turms.plugins.fragments.FragmentsPlugin` | `fragment_bases` ([]), `fragments_glob`, `add_documentation` (true), `generate_meta_class` (true) |
+| `turms.plugins.operations.OperationsPlugin` | `query_bases`/`mutation_bases`/`subscription_bases` ([]), `operations_glob`, `create_arguments` (true), `extract_documentation` (true), `arguments_allow_population_by_field_name` (false) |
+| `turms.plugins.funcs.FuncsPlugin` | `definitions` ([]), `global_args`/`global_kwargs` ([]), `prepend_sync` (""), `prepend_async` ("a"), `collapse_lonely` (true), `expand_input_types` ([]), `argument_key_is_styled` (false) |
+| `turms.plugins.strawberry.StrawberryPlugin` | `generate_directives` (true), `generate_scalars` (true), `builtin_directives`, `builtin_scalars` |
+
+The funcs plugin's `definitions` describe how each operation type is turned into a function:
+
+```yaml
+- type: turms.plugins.funcs.FuncsPlugin
+  global_kwargs:
+    - type: rath.Rath
+      key: rath
+      description: "The client to use"
+  definitions:
+    - type: query # query | mutation | subscription
+      is_async: true
+      use: your_library.proxies.aexecute # the executor proxy to call
+    - type: query
+      is_async: false
+      use: your_library.proxies.execute
+```
+
+### Stylers
+
+| Styler | Effect |
+| --- | --- |
+| `turms.stylers.default.DefaultStyler` | Capitalized class names + snake_case fields (recommended) |
+| `turms.stylers.capitalize.CapitalizeStyler` | Capitalizes the first letter of class names |
+| `turms.stylers.snake_case.SnakeCaseStyler` | camelCase → snake_case for fields and arguments (adds pydantic aliases) |
+| `turms.stylers.appender.AppenderStyler` | Appends suffixes per kind: `append_fragment` ("Fragment"), `append_query` ("Query"), `append_mutation` ("Mutation"), `append_subscription` ("Subscription"), `append_enum`/`append_input` ("") |
+
+### Parsers
+
+| Parser | Key options (default) |
+| --- | --- |
+| `turms.parsers.polyfill.PolyfillPlugin` | `python_version` ("3.9") — rewrites typing constructs for older python targets |
+
+### Processors
+
+| Processor | Key options (default) |
+| --- | --- |
+| `turms.processors.black.BlackProcessor` | – (requires `pip install black`) |
+| `turms.processors.isort.IsortProcessor` | – (requires `pip install isort`) |
+| `turms.processors.ruff.RuffProcessor` | `format` (true), `fix` (false) (requires `pip install ruff`) |
+| `turms.processors.command.CommandProcessor` | `command` — pipe the code through any stdin/stdout command, e.g. `"uvx ruff format -"` |
+| `turms.processors.merge.MergeProcessor` | Merges regenerated code with the existing file, keeping hand-written bodies (requires `pip install libcst`) |
+| `turms.processors.disclaimer.DisclaimerProcessor` | `disclaimer` — text prepended to the generated file |
+
+## Environment variables
+
+All turms settings are pydantic settings and can be supplied via environment variables with the
+`TURMS_` prefix, e.g.:
+
+```bash
+TURMS_OUT_DIR=generated TURMS_VERBOSE=1 turms gen
+```
+
+## CLI
+
+| Command | Description |
+| --- | --- |
+| `turms init` | Create a starter `graphql.config.yaml` in the current directory |
+| `turms gen [PROJECT]` | Generate all projects, or only the named one. `--config path` selects a config file |
+| `turms watch [PROJECT]` | Watch the documents glob and regenerate on change (requires the `watch` extra) |
+| `turms download` | Download each project's schema as SDL. `--out` sets the file suffix, `--dir` the directory |
+
+Note that `turms gen` must run from the directory containing the config file (or use `--config`),
+and relative paths (documents, `out_dir`) resolve from the current working directory.

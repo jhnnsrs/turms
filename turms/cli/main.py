@@ -1,4 +1,5 @@
 from enum import Enum
+import importlib.util
 import os
 from typing import Any, Callable, Dict
 from turms.config import GraphQLProject
@@ -44,7 +45,24 @@ https://github.com/jhnnsrs/turms
 """
 
 
-default_settings = """
+optional_processors = {
+    "black": "turms.processors.black.BlackProcessor",
+    "isort": "turms.processors.isort.IsortProcessor",
+}
+
+
+def build_default_settings() -> str:
+    """Build the default config, including a processor only if the tool it
+    wraps (black, isort) is installed in the current environment."""
+    processor_lines = "".join(
+        f"          - type: {processor}\n"
+        for module, processor in optional_processors.items()
+        if importlib.util.find_spec(module) is not None
+    )
+    processors_section = (
+        f"        processors:\n{processor_lines}" if processor_lines else ""
+    )
+    return f"""
 projects:
   default:
     schema: https://countries.trevorblades.com/
@@ -58,9 +76,7 @@ projects:
           - type: turms.plugins.fragments.FragmentsPlugin
           - type: turms.plugins.operations.OperationsPlugin
           - type: turms.plugins.funcs.FuncsPlugin
-        processors:
-          - type: turms.processors.black.BlackProcessor
-        scalar_definitions:
+{processors_section}        scalar_definitions:
           uuid: str
 """
 
@@ -263,7 +279,7 @@ def init(config):
 
     get_console().print(f"Creating demo graphql.config.yaml in {app_directory}")
     with open(os.path.join(app_directory, "graphql.config.yaml"), "w") as f:
-        f.write(default_settings)
+        f.write(build_default_settings())
 
 
 @cli.command()
