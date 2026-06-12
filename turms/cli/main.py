@@ -1,6 +1,9 @@
 from enum import Enum
+import importlib.util
 import os
 from typing import Any, Callable, Dict
+
+import yaml
 from turms.config import GraphQLProject
 from turms.run import generate, write_code_to_file, write_project, write_schema_to_file
 from rich import get_console
@@ -44,25 +47,154 @@ https://github.com/jhnnsrs/turms
 """
 
 
-default_settings = """
-projects:
-  default:
-    schema: https://countries.trevorblades.com/
-    documents: graphql/**.graphql
-    extensions:
-      turms:
-        out_dir: examples/api
-        plugins:
-          - type: turms.plugins.enums.EnumsPlugin
-          - type: turms.plugins.inputs.InputsPlugin
-          - type: turms.plugins.fragments.FragmentsPlugin
-          - type: turms.plugins.operations.OperationsPlugin
-          - type: turms.plugins.funcs.FuncsPlugin
-        processors:
-          - type: turms.processors.black.BlackProcessor
-        scalar_definitions:
-          uuid: str
-"""
+optional_processors = {
+    "black": "turms.processors.black.BlackProcessor",
+    "isort": "turms.processors.isort.IsortProcessor",
+}
+
+DEFAULT_STYLERS = [
+    {"type": "turms.stylers.capitalize.CapitalizeStyler"},
+    {"type": "turms.stylers.snake_case.SnakeCaseStyler"},
+]
+
+DOCUMENT_PLUGINS = [
+    {"type": "turms.plugins.enums.EnumsPlugin"},
+    {"type": "turms.plugins.inputs.InputsPlugin"},
+    {"type": "turms.plugins.fragments.FragmentsPlugin"},
+    {"type": "turms.plugins.operations.OperationsPlugin"},
+]
+
+
+def detected_formatter_processors() -> list[dict]:
+    """Processors for the formatters (black, isort) that are installed in the
+    current environment."""
+    return [
+        {"type": processor}
+        for module, processor in optional_processors.items()
+        if importlib.util.find_spec(module) is not None
+    ]
+
+
+def _project(turms: dict, schema: str, documents: str | None) -> dict:
+    project: dict = {"schema": schema}
+    if documents:
+        project["documents"] = documents
+    project["extensions"] = {"turms": turms}
+    return {"projects": {"default": project}}
+
+
+def build_documents_template() -> dict:
+    """Pydantic models (enums, inputs, fragments, operations) from documents."""
+    turms: dict = {
+        "out_dir": "api",
+        "stylers": DEFAULT_STYLERS,
+        "plugins": DOCUMENT_PLUGINS,
+    }
+    processors = detected_formatter_processors()
+    if processors:
+        turms["processors"] = processors
+    turms["scalar_definitions"] = {"uuid": "str"}
+    return _project(turms, "https://countries.trevorblades.com/", "graphql/**.graphql")
+
+
+def build_rath_template() -> dict:
+    """Documents template plus typed call functions for the rath client."""
+    settings = build_documents_template()
+    turms = settings["projects"]["default"]["extensions"]["turms"]
+    turms["plugins"] = DOCUMENT_PLUGINS + [
+        {
+            "type": "turms.plugins.funcs.FuncsPlugin",
+            "global_kwargs": [
+                {
+                    "type": "rath.Rath",
+                    "key": "rath",
+                    "description": "The client we want to use (defaults to the currently active client)",
+                }
+            ],
+            "definitions": [
+                {"type": "query", "is_async": True, "use": "api.proxies.aexecute"},
+                {"type": "mutation", "is_async": True, "use": "api.proxies.aexecute"},
+                {
+                    "type": "subscription",
+                    "is_async": True,
+                    "use": "api.proxies.asubscribe",
+                },
+                {"type": "query", "use": "api.proxies.execute"},
+                {"type": "mutation", "use": "api.proxies.execute"},
+                {"type": "subscription", "use": "api.proxies.subscribe"},
+            ],
+        }
+    ]
+    return settings
+
+
+def build_gql_template() -> dict:
+    """Documents template plus typed call functions for the gql client."""
+    settings = build_documents_template()
+    turms = settings["projects"]["default"]["extensions"]["turms"]
+    turms["plugins"] = DOCUMENT_PLUGINS + [
+        {
+            "type": "turms.plugins.funcs.FuncsPlugin",
+            "global_args": [
+                {
+                    "type": "gql.Client",
+                    "key": "client",
+                    "description": "The client we want to use to execute the operation",
+                }
+            ],
+            "definitions": [
+                {"type": "query", "use": "api.proxies.execute"},
+                {"type": "mutation", "use": "api.proxies.execute"},
+                {"type": "subscription", "use": "api.proxies.subscribe"},
+            ],
+        }
+    ]
+    return settings
+
+
+def build_strawberry_template() -> dict:
+    """Server-side strawberry schema scaffold from a local SDL file."""
+    processors = [{"type": "turms.processors.disclaimer.DisclaimerProcessor"}]
+    processors += detected_formatter_processors()
+    if importlib.util.find_spec("libcst") is not None:
+        processors.append({"type": "turms.processors.merge.MergeProcessor"})
+    turms = {
+        "out_dir": "api",
+        "skip_forwards": True,
+        "stylers": DEFAULT_STYLERS,
+        "plugins": [{"type": "turms.plugins.strawberry.StrawberryPlugin"}],
+        "processors": processors,
+        "scalar_definitions": {"uuid": "str"},
+    }
+    return _project(turms, "schema.graphql", None)
+
+
+TEMPLATES: Dict[str, dict] = {
+    "documents": {
+        "build": build_documents_template,
+        "hint": "Write your operations in [b]graphql/*.graphql[/b] and run [b]turms gen[/b].",
+    },
+    "rath": {
+        "build": build_rath_template,
+        "hint": "This template generates typed call functions for [b]rath[/b]: install rath and create an [b]api/proxies.py[/b] with execute/aexecute/subscribe/asubscribe (see examples/rath-usage).",
+    },
+    "gql": {
+        "build": build_gql_template,
+        "hint": "This template generates typed call functions for [b]gql[/b]: install gql and create an [b]api/proxies.py[/b] with execute/subscribe (see examples/gql-usage).",
+    },
+    "strawberry": {
+        "build": build_strawberry_template,
+        "hint": "Point [b]schema:[/b] at your SDL file (schema.graphql) and run [b]turms gen[/b] to scaffold a strawberry server.",
+    },
+}
+
+
+def build_default_settings(template: str = "documents") -> str:
+    """Render the named template (documents, rath, gql, strawberry) to YAML,
+    adapted to the tools installed in the current environment."""
+    return yaml.dump(
+        TEMPLATES[template]["build"](), sort_keys=False, default_flow_style=False
+    )
 
 
 def generate_projects(projects: Dict[str, GraphQLProject], title: str = "Turms"):
@@ -246,14 +378,22 @@ def cli(ctx):
 
 @cli.command()
 @click.option("--config", default="graphql.config.yaml", help="The config file to use")
-def init(config):
+@click.option(
+    "--template",
+    type=click.Choice(list(TEMPLATES)),
+    default="documents",
+    show_default=True,
+    help="The starter template to scaffold: pydantic models from documents, "
+    "documents plus call functions for rath or gql, or a strawberry server schema",
+)
+def init(config, template):
     """Initialize a new graphql project"""
     welcome_panel = Panel(logo + welcome, title="turms", border_style="bold green")
 
     get_console().print(welcome_panel)
 
     app_directory = os.getcwd()
-    if os.path.exists(os.path.join(app_directory, "graphql.config.yaml")):
+    if os.path.exists(os.path.join(app_directory, config)):
         if not click.confirm(
             f"Config file already exists in {app_directory}. Do you want to overwrite it?",
             default=False,
@@ -261,9 +401,13 @@ def init(config):
             get_console().print("Aborting")
             return
 
-    get_console().print(f"Creating demo graphql.config.yaml in {app_directory}")
-    with open(os.path.join(app_directory, "graphql.config.yaml"), "w") as f:
-        f.write(default_settings)
+    get_console().print(
+        f"Creating {config} in {app_directory} (template: {template})"
+    )
+    with open(os.path.join(app_directory, config), "w") as f:
+        f.write(build_default_settings(template))
+
+    get_console().print(TEMPLATES[template]["hint"])
 
 
 @cli.command()

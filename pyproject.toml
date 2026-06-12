@@ -26,7 +26,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-watch = ["watchfiles>=0.18.1"]
 black = ["black>=22.1.0"]
 isort = ["isort>=5.10.1"]
 ruff = ["ruff>=0.1.0"]
