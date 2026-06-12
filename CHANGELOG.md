@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v0.11.0 (2026-06-12)
+
+
 ## v0.10.3 (2026-06-12)
+
+### Features
+
+- Add ruff
+  ([`d587bd0`](https://github.com/jhnnsrs/turms/commit/d587bd09b18a1debe996cf43c5c12adff84da870))
 
 
 ## v0.10.2 (2026-04-13)
