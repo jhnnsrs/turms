@@ -4,22 +4,61 @@ sidebar_label: "Traits"
 title: "Traits"
 ---
 
-Traits are just mixins. If you want to specify extra logic that should be added to a specific type in your schema you can do so by specifing "additional_bases" in the configuration setting:
+Traits are just mixins. Generated code shouldn't be edited — but it can be **extended**. If you
+want to attach extra logic to a specific type in your schema, list your own classes under
+`additional_bases` and turms will inject them as base classes of every generated model for that
+GraphQL type:
 
 ```yaml
-project:
+projects:
   default:
     schema: ...
     extensions:
       turms:
         additional_bases:
-          $YOUR_GRAHQL_TYPE:
-            - path.to.additional.Base1
-            - path.to.additional.Base2
+          Country:
+            - myapp.traits.CountryTrait
 ```
+
+```python
+# myapp/traits.py
+from pydantic import BaseModel, field_validator
+
+
+class CountryTrait(BaseModel):
+    @field_validator("code", check_fields=False)
+    @classmethod
+    def code_must_be_upper(cls, v: str) -> str:
+        if not v.isupper():
+            raise ValueError("country codes are uppercase")
+        return v
+
+    @property
+    def flag_url(self) -> str:
+        return f"https://flagcdn.com/{self.code.lower()}.svg"
+```
+
+The trait is applied **everywhere the GraphQL type appears** — object types, fragments, and even
+the deeply nested classes generated inside operation results:
+
+```python
+class GetCountriesCountries(CountryTrait, BaseModel):
+    code: str
+    name: str
+```
+
+Traits are prepended to the base list, so their method resolution order beats the generated
+defaults.
 
 ## Why use traits?
 
-- Addin-Logic: With the traits approach you can easily add type specficig logic to your graphql types, e.g adding fields that require some sort of computation, or add additional methods. This means that even in complex nested documents you will be able to have access to the model specific logic.
+- **Validators**: enforce domain invariants the moment data arrives from the API. Use
+  `field_validator(..., check_fields=False)` (the field is declared on the generated subclass,
+  not the mixin) or `model_validator` for cross-field rules.
 
-- Instance Checks: As traits are added baseclasses, you will be able to check them through `isinstance(t, MixinName)`
+- **Add-in logic**: add computed properties and methods that travel with the data — conversion
+  helpers (`.to_numpy()`, `.as_tuple()`), URLs, business logic. Even in complex nested documents
+  every selection of that type carries the logic.
+
+- **Instance checks**: since traits become real base classes, `isinstance(obj, CountryTrait)`
+  works across all generated variants of the type, however deeply nested the selection was.

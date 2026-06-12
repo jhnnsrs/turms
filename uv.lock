@@ -1489,9 +1489,6 @@ merge = [
 ruff = [
     { name = "ruff" },
 ]
-watch = [
-    { name = "watchfiles" },
-]
 
 [package.dev-dependencies]
 dev = [
@@ -1524,9 +1521,8 @@ requires-dist = [
     { name = "rich-click", specifier = ">=1.6" },
     { name = "ruff", marker = "extra == 'ruff'", specifier = ">=0.1.0" },
     { name = "watchfiles", specifier = ">=0.18.1" },
-    { name = "watchfiles", marker = "extra == 'watch'", specifier = ">=0.18.1" },
 ]
-provides-extras = ["watch", "black", "isort", "ruff", "merge"]
+provides-extras = ["black", "isort", "ruff", "merge"]
 
 [package.metadata.requires-dev]
 dev = [

@@ -26,7 +26,9 @@ uvx turms gen
 
 `turms init` adapts the scaffolded config to your environment: formatter processors (black,
 isort) are only included when those tools are actually installed, so the generated config
-works out of the box.
+works out of the box. Use `--template` to pick a different starter — `documents` (default,
+pydantic models from your operations), `rath` or `gql` (documents plus typed call functions
+for that client), or `strawberry` (server-side schema from a local SDL file).
 
 Alternatively, add turms as a development dependency so your whole team uses the same pinned
 version:

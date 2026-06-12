@@ -105,11 +105,57 @@ scalar_definitions:
   uuid: str
   DateTime: datetime.datetime
   JSON: typing.Any
-  Slug: path.to.your.SlugType
+  Slug: myapp.scalars.Slug
 ```
 
-Builtin names (`str`, `int`, ...) are used directly; anything containing a dot is imported. Custom
-types can implement pydantic validators to participate in validation.
+Builtin names (`str`, `int`, ...) are used directly; anything containing a dot is imported.
+
+The mapping is more than a type annotation: because the generated models are pydantic models, the
+type you choose drives **parsing and validation**. Map `DateTime` to `str` and you get raw strings;
+map it to `datetime.datetime` and every response is parsed into real datetime objects on arrival —
+and serialized back correctly when you send inputs. Useful patterns:
+
+- **Stdlib types with parsing**: `datetime.datetime`, `datetime.date`, `uuid.UUID`,
+  `decimal.Decimal`, `pathlib.Path` — pydantic validates and converts the wire format for you.
+- **Pass-through**: `typing.Any` for free-form scalars like `JSON`.
+- **Your own types**: point at any type pydantic can validate (e.g. a `str` subclass implementing
+  `__get_pydantic_core_schema__`) to centralize invariants like "a `Slug` is always lowercase"
+  right in the deserialization layer.
+
+### Traits (`additional_bases`)
+
+Generated code shouldn't be edited — but it can be extended. `additional_bases` injects your own
+mixin classes as base classes of every generated model for a given GraphQL type — object types,
+fragments, and the nested classes inside operation results alike:
+
+```yaml
+additional_bases:
+  Country:
+    - myapp.traits.CountryTrait
+```
+
+```python
+# myapp/traits.py
+from pydantic import BaseModel, field_validator
+
+
+class CountryTrait(BaseModel):
+    @field_validator("code", check_fields=False)
+    @classmethod
+    def code_must_be_upper(cls, v: str) -> str:
+        if not v.isupper():
+            raise ValueError("country codes are uppercase")
+        return v
+
+    @property
+    def flag_url(self) -> str:
+        return f"https://flagcdn.com/{self.code.lower()}.svg"
+```
+
+Use traits to add **validators**, **computed properties and methods**, and to enable
+**`isinstance` checks** across all generated variants of a type. Traits are prepended to the base
+list, so their method resolution order beats the generated defaults. See
+[Traits](design/traits) for details.
 
 ### Freezing models (`freeze`)
 
@@ -245,9 +291,9 @@ TURMS_OUT_DIR=generated TURMS_VERBOSE=1 turms gen
 
 | Command | Description |
 | --- | --- |
-| `turms init` | Create a starter `graphql.config.yaml` in the current directory |
+| `turms init` | Create a starter `graphql.config.yaml`. `--template documents\|rath\|gql\|strawberry` picks the scaffold (default: `documents`), `--config` the file name |
 | `turms gen [PROJECT]` | Generate all projects, or only the named one. `--config path` selects a config file |
-| `turms watch [PROJECT]` | Watch the documents glob and regenerate on change (requires the `watch` extra) |
+| `turms watch [PROJECT]` | Watch the documents glob and regenerate on change |
 | `turms download` | Download each project's schema as SDL. `--out` sets the file suffix, `--dir` the directory |
 
 Note that `turms gen` must run from the directory containing the config file (or use `--config`),

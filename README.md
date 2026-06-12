@@ -78,7 +78,6 @@ and run it with `uv run turms gen` (or plain `turms gen` in an activated environ
 
 | Extra | Enables |
 | --- | --- |
-| `watch` | `turms watch` mode (watchfiles) |
 | `black` | `BlackProcessor` |
 | `isort` | `IsortProcessor` |
 | `ruff` | `RuffProcessor` |
@@ -273,6 +272,63 @@ schema:
 
 See the [documentation website](https://jhnnsrs.github.io/turms) for the full configuration reference, including all per-plugin options.
 
+### Custom scalars
+
+GraphQL only ships five builtin scalars (`String`, `Int`, `Float`, `Boolean`, `ID`) — everything else (`DateTime`, `JSON`, `UUID`, …) is schema-specific, and turms requires you to decide what each one becomes in Python via `scalar_definitions`:
+
+```yaml
+scalar_definitions:
+  DateTime: datetime.datetime # ISO strings are parsed into real datetime objects
+  UUID: uuid.UUID             # validated UUIDs instead of raw strings
+  JSON: typing.Any            # pass through untouched
+  Slug: myapp.scalars.Slug    # your own type with custom validation
+```
+
+The mapping is more than a type annotation: because the generated models are Pydantic models, the type you choose drives **parsing and validation**. Map `DateTime` to `str` and you get raw strings; map it to `datetime.datetime` and every response is parsed into timezone-aware datetime objects on arrival — and serialized back correctly when you send inputs. Any dotted path works, so you can point at your own types (anything Pydantic can validate, e.g. a `str` subclass with `__get_pydantic_core_schema__`, or an annotated type with constraints) to centralize invariants like "a `Slug` is always lowercase" right in the deserialization layer.
+
+### Traits: extending generated models
+
+Generated code shouldn't be edited — but it can be **extended**. `additional_bases` injects your own mixin classes ("traits") as base classes of every generated model for a given GraphQL type:
+
+```yaml
+additional_bases:
+  Country:
+    - myapp.traits.CountryTrait
+```
+
+```python
+# myapp/traits.py
+from pydantic import BaseModel, field_validator
+
+class CountryTrait(BaseModel):
+    @field_validator("code", check_fields=False)
+    @classmethod
+    def code_must_be_upper(cls, v: str) -> str:
+        if not v.isupper():
+            raise ValueError("country codes are uppercase")
+        return v
+
+    @property
+    def flag_url(self) -> str:
+        return f"https://flagcdn.com/{self.code.lower()}.svg"
+```
+
+Now every generated model that selects the `Country` type — top-level objects, fragments, and even the deeply nested classes inside operation results — inherits the trait:
+
+```python
+class GetCountriesCountries(CountryTrait, BaseModel):
+    code: str
+    name: str
+```
+
+This gives you, everywhere that type appears:
+
+- **Validators** — enforce domain invariants (`field_validator`, `model_validator`) on data the moment it arrives from the API
+- **Computed properties and methods** — `country.flag_url`, conversion helpers (`.to_numpy()`, `.as_tuple()`), business logic that travels with the data
+- **`isinstance` checks** — `isinstance(obj, CountryTrait)` works across all generated variants of the type, however deeply nested the selection was
+
+Traits are prepended to the base list, so their method resolution order beats the generated defaults.
+
 ## Server-side generation (Strawberry)
 
 Point turms at an SDL file and use the Strawberry plugin to scaffold a typed server:
@@ -310,10 +366,23 @@ With the `MergeProcessor` enabled you can evolve the schema and regenerate freel
 
 | Command | Description |
 | --- | --- |
-| `turms init` | Create a starter `graphql.config.yaml` in the current directory |
+| `turms init` | Create a starter `graphql.config.yaml` in the current directory. `--template` picks a scaffold (see below), `--config` the file name |
 | `turms gen [PROJECT]` | Generate all (or one named) project. `--config` selects a config file explicitly |
-| `turms watch [PROJECT]` | Watch the documents glob and regenerate on save (requires the `watch` extra) |
+| `turms watch [PROJECT]` | Watch the documents glob and regenerate on save |
 | `turms download` | Download a project's schema as SDL (`--out` suffix, `--dir` target directory) |
+
+### Init templates
+
+`turms init --template <name>` scaffolds sensible defaults for common setups:
+
+| Template | Scaffolds |
+| --- | --- |
+| `documents` (default) | Pydantic models (enums, inputs, fragments, operations) from your documents |
+| `rath` | `documents` plus typed call functions for the [rath](https://github.com/jhnnsrs/rath) client (async + sync) |
+| `gql` | `documents` plus typed call functions for the [gql](https://github.com/graphql-python/gql) client |
+| `strawberry` | A server-side [Strawberry](https://strawberry.rocks/) schema from a local SDL file, with disclaimer and merge-on-regenerate |
+
+Every template adapts to your environment: formatter processors (black, isort — and merge for `strawberry`) are only included when the tools are actually installed.
 
 ## Examples
 
