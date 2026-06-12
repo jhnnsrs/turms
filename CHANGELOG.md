@@ -1,12 +1,24 @@
 # CHANGELOG
 
 
+## v0.10.3 (2026-06-12)
+
+
 ## v0.10.2 (2026-04-13)
 
 ### Bug Fixes
 
+- Add copilot insturctions
+  ([`db4c9b0`](https://github.com/jhnnsrs/turms/commit/db4c9b0ac2d6002d7de9c662ac6361a3430c21c9))
+
+- Add strawberry one of support
+  ([`b8d5cd8`](https://github.com/jhnnsrs/turms/commit/b8d5cd8fc5668569bbd8a0fe13adb9f1c98d0d94))
+
 - Fi support for spread in union
   ([`84b70a8`](https://github.com/jhnnsrs/turms/commit/84b70a8a9c22cffb976c2143d27d518ac293d462))
+
+- Trying to
+  ([`a25d6a9`](https://github.com/jhnnsrs/turms/commit/a25d6a96d0bf63b5ecd5ee67fcf776005387a9f5))
 
 
 ## v0.10.1 (2025-10-29)
