@@ -44,7 +44,9 @@
         "reference/processors/__init__",
         "reference/processors/base",
         "reference/processors/black",
-        "reference/processors/isort"
+        "reference/processors/command",
+        "reference/processors/isort",
+        "reference/processors/ruff"
       ],
       "label": "processors",
       "type": "category"
