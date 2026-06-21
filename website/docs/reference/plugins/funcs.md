@@ -89,7 +89,7 @@ Please consult the examples for more information.
 async def aexecute(operation: Model, variables: Dict[str, Any], client = None):
     client = client # is the grahql client that can be passed as an extra argument (or retrieved from a contextvar)
     x = await client.aquery(
-        operation.Meta.document, operation.Arguments(**variables).dict(by_alias=True)
+        operation.Meta.document, operation.Arguments(**variables).dict(by_alias=True, exclude_unset=True)
     )# is the proxy function that will be called (u can validate the variables here)
     return operation(**x.data) # Serialize the result
 

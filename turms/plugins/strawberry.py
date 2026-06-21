@@ -36,6 +36,7 @@ from graphql.type.definition import (
 )
 from turms.registry import ClassRegistry
 from turms.utils import (
+    convert_default_value_to_ast,
     generate_pydantic_config,
     get_additional_bases_for_type,
     interface_is_extended_by_other_interfaces,
@@ -142,37 +143,6 @@ def convert_valuenode_to_ast(value: ConstValueNode):
             values=values,
         )
     
-    raise NotImplementedError(f"Unknown default value {repr(value)}")
-
-    
-
-def convert_default_value_to_ast(value):
-    if value is Undefined:
-        return None
-    if value is None:
-        return ast.Constant(value=None)
-    if isinstance(value, str):
-        return ast.Constant(value=value)
-    if isinstance(value, int):
-        return ast.Constant(value=value)
-    if isinstance(value, float):
-        return ast.Constant(value=value)
-    if isinstance(value, bool):
-        return ast.Constant(value=value)
-    if isinstance(value, list):
-        return ast.List(elts=[convert_default_value_to_ast(x) for x in value], ctx=ast.Load())
-    if isinstance(value, dict):
-        keys = []
-        values = []
-
-        for key, value in value.items():
-            keys.append(key)
-            values.append(convert_default_value_to_ast(value))
-
-        return ast.Dict(
-            keys=keys,
-            values=values,
-        )
     raise NotImplementedError(f"Unknown default value {repr(value)}")
 
 
@@ -1081,7 +1051,6 @@ def generate_types(
                     ),
                     body=body,
                     decorator_list=[field_decorator],
-                    simple=1,
                 )
 
             fields += [assign]

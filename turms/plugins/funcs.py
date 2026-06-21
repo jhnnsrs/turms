@@ -12,7 +12,6 @@ from graphql import (
     GraphQLInputType,
     GraphQLObjectType,
     NamedTypeNode,
-    Undefined,
     VariableNode,
 )
 from graphql.type.definition import (
@@ -36,7 +35,6 @@ from turms.utils import (
     inspect_operation_for_documentation,
     non_typename_fields,
     parse_documents,
-    parse_value_node,
     recurse_outputtype_annotation,
     recurse_outputtype_label,
     recurse_type_annotation,
@@ -305,6 +303,34 @@ def generate_input_type_descriptions(
     return description
 
 
+def unset_union_annotation(annotation: ast.expr, registry: ClassRegistry) -> ast.expr:
+    """Wraps a parameter annotation in ``Union[<annotation>, UnsetType]`` so the
+    UNSET default is part of the parameter's type."""
+    registry.register_import("typing.Union")
+    return ast.Subscript(
+        value=ast.Name(id="Union", ctx=ast.Load()),
+        slice=ast.Tuple(
+            elts=[annotation, registry.reference_unset_type()],
+            ctx=ast.Load(),
+        ),
+        ctx=ast.Load(),
+    )
+
+
+def dict_str_any_annotation(registry: ClassRegistry) -> ast.expr:
+    """Returns a ``Dict[str, Any]`` annotation for the loosely-typed variables dict."""
+    registry.register_import("typing.Dict")
+    registry.register_import("typing.Any")
+    return ast.Subscript(
+        value=ast.Name(id="Dict", ctx=ast.Load()),
+        slice=ast.Tuple(
+            elts=[ast.Name(id="str", ctx=ast.Load()), ast.Name(id="Any", ctx=ast.Load())],
+            ctx=ast.Load(),
+        ),
+        ctx=ast.Load(),
+    )
+
+
 def generate_input_type_params(
     input_type: GraphQLInputObjectType,
     plugin_config: FuncsPluginConfig,
@@ -333,21 +359,18 @@ def generate_input_type_params(
             kw_args.append(
                 ast.arg(
                     arg=field_name,
-                    annotation=generate_input_annotation(
-                        value.type,
+                    annotation=unset_union_annotation(
+                        generate_input_annotation(
+                            value.type,
+                            registry,
+                            plugin_config,
+                            is_optional=True,
+                        ),
                         registry,
-                        plugin_config,
-                        is_optional=True,
                     ),
                 )
             )
-            kw_values.append(
-                ast.Constant(
-                    value=value.default_value
-                    if value.default_value and value.default_value is not Undefined
-                    else None
-                )
-            )
+            kw_values.append(registry.reference_unset())
 
     return pos_args, kw_args, kw_values
 
@@ -417,17 +440,19 @@ def generate_parameters(
         )
 
     for v in kwarg_variables:
+        # Optional variables default to the UNSET sentinel rather than a baked
+        # value, so the convenience function can omit ones the caller never
+        # provided (exclude_unset → server applies its own default). The sentinel
+        # is part of the parameter's type: Union[<type>, UnsetType].
         kw_args.append(
             ast.arg(
                 arg=registry.generate_parameter_name(v.variable.name.value),
-                annotation=recurse_type_annotation(v.type, registry),
+                annotation=unset_union_annotation(
+                    recurse_type_annotation(v.type, registry), registry
+                ),
             )
         )
-        kw_values.append(
-            ast.Constant(
-                value=parse_value_node(v.default_value) if v.default_value else None
-            )
-        )
+        kw_values.append(registry.reference_unset())
 
     extra_kwargs = get_extra_kwargs_for_onode(definition, plugin_config)
 
@@ -464,49 +489,108 @@ def generate_parameters(
     )
 
 
-def input_type_to_dict(input_type: GraphQLInputObjectType, registry: ClassRegistry):
-    keys = []
-    values = []
-
-    for value_key, value in input_type.fields.items():
-        field_name = registry.generate_node_name(value_key)
-
-        keys.append(ast.Constant(value=value_key))
-        values.append(ast.Name(id=field_name, ctx=ast.Load()))
-
-    return ast.Dict(
-        keys=keys,
-        values=values,
+def _guarded_variable_assign(
+    target_subscript: ast.Subscript,
+    param_name: str,
+    value_expr: ast.expr,
+    registry: ClassRegistry,
+) -> ast.If:
+    """``if <param_name> is not UNSET: <target_subscript> = <value_expr>``"""
+    return ast.If(
+        test=ast.Compare(
+            left=ast.Name(id=param_name, ctx=ast.Load()),
+            ops=[ast.IsNot()],
+            comparators=[registry.reference_unset()],
+        ),
+        body=[ast.Assign(targets=[target_subscript], value=value_expr)],
+        orelse=[],
     )
 
 
-def generate_variable_dict(
+def generate_variable_assignments(
     o: OperationDefinitionNode,
     plugin_config: FuncsPluginConfig,
     registry: ClassRegistry,
     client_schema: GraphQLSchema,
 ):
-    keys = []
-    values = []
+    """Builds the statements that assemble the ``variables`` dict for an
+    operation, omitting any argument the caller left as ``UNSET``. Combined with
+    ``exclude_unset`` serialization this lets the server apply its own defaults
+    for omitted arguments while still transmitting an explicitly-passed ``None``."""
+    stmts = []
+    stmts.append(
+        ast.AnnAssign(
+            target=ast.Name(id="variables", ctx=ast.Store()),
+            annotation=dict_str_any_annotation(registry),
+            value=ast.Dict(keys=[], values=[]),
+            simple=1,
+        )
+    )
 
     for v in o.variable_definitions:
-        if v.variable.name.value in plugin_config.expand_input_types:
-            input_type = v.type
+        gql_name = v.variable.name.value
+        is_required = isinstance(v.type, NonNullTypeNode) and not v.default_value
 
-            type = client_schema.type_map[input_type.type.name.value]
+        outer_subscript = ast.Subscript(
+            value=ast.Name(id="variables", ctx=ast.Load()),
+            slice=ast.Constant(value=gql_name),
+            ctx=ast.Store(),
+        )
 
-            keys.append(ast.Constant(value=v.variable.name.value))
-            values.append(input_type_to_dict(type, registry))
-        else:
-            keys.append(ast.Constant(value=v.variable.name.value))
-            values.append(
-                ast.Name(
-                    id=registry.generate_parameter_name(v.variable.name.value),
-                    ctx=ast.Load(),
+        if gql_name in plugin_config.expand_input_types:
+            # The input is spread into one parameter per field; build the inner
+            # dict, omitting fields the caller did not provide.
+            input_type = client_schema.type_map[v.type.type.name.value]
+            inner_name = f"_{registry.generate_parameter_name(gql_name)}"
+            stmts.append(
+                ast.AnnAssign(
+                    target=ast.Name(id=inner_name, ctx=ast.Store()),
+                    annotation=dict_str_any_annotation(registry),
+                    value=ast.Dict(keys=[], values=[]),
+                    simple=1,
                 )
             )
+            for value_key, field in input_type.fields.items():
+                field_param = registry.generate_node_name(value_key)
+                field_subscript = ast.Subscript(
+                    value=ast.Name(id=inner_name, ctx=ast.Load()),
+                    slice=ast.Constant(value=value_key),
+                    ctx=ast.Store(),
+                )
+                field_value = ast.Name(id=field_param, ctx=ast.Load())
+                if isinstance(field.type, GraphQLNonNull):
+                    # required field → always present (positional parameter)
+                    stmts.append(
+                        ast.Assign(targets=[field_subscript], value=field_value)
+                    )
+                else:
+                    stmts.append(
+                        _guarded_variable_assign(
+                            field_subscript, field_param, field_value, registry
+                        )
+                    )
+            stmts.append(
+                ast.Assign(
+                    targets=[outer_subscript],
+                    value=ast.Name(id=inner_name, ctx=ast.Load()),
+                )
+            )
+        else:
+            param = registry.generate_parameter_name(gql_name)
+            param_value = ast.Name(id=param, ctx=ast.Load())
+            if is_required:
+                # required positional argument → always present
+                stmts.append(
+                    ast.Assign(targets=[outer_subscript], value=param_value)
+                )
+            else:
+                stmts.append(
+                    _guarded_variable_assign(
+                        outer_subscript, param, param_value, registry
+                    )
+                )
 
-    return ast.Dict(keys=keys, values=values)
+    return stmts
 
 
 def generate_document_arg(o: OperationDefinitionNode, registry: ClassRegistry):
@@ -803,9 +887,7 @@ def genereate_async_call(
                     )
                     + [
                         generate_document_arg(o, registry),
-                        generate_variable_dict(
-                            o, plugin_config, registry, client_schema
-                        ),
+                        ast.Name(id="variables", ctx=ast.Load()),
                     ],
                 )
             )
@@ -833,9 +915,7 @@ def genereate_async_call(
                         )
                         + [
                             generate_document_arg(o, registry),
-                            generate_variable_dict(
-                                o, plugin_config, registry, client_schema
-                            ),
+                            ast.Name(id="variables", ctx=ast.Load()),
                         ],
                     )
                 ),
@@ -868,7 +948,7 @@ def genereate_sync_call(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o, registry),
-                    generate_variable_dict(o, plugin_config, registry, client_schema),
+                    ast.Name(id="variables", ctx=ast.Load()),
                 ],
             )
         )
@@ -894,9 +974,7 @@ def genereate_sync_call(
                     )
                     + [
                         generate_document_arg(o, registry),
-                        generate_variable_dict(
-                            o, plugin_config, registry, client_schema
-                        ),
+                        ast.Name(id="variables", ctx=ast.Load()),
                     ],
                 ),
                 attr=registry.generate_node_name(correct_attr),
@@ -929,7 +1007,7 @@ def genereate_async_iterator(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o, registry),
-                    generate_variable_dict(o, plugin_config, registry, client_schema),
+                    ast.Name(id="variables", ctx=ast.Load()),
                 ],
             ),
             body=[
@@ -957,7 +1035,7 @@ def genereate_async_iterator(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o, registry),
-                    generate_variable_dict(o, plugin_config, registry, client_schema),
+                    ast.Name(id="variables", ctx=ast.Load()),
                 ],
             ),
             body=[
@@ -999,7 +1077,7 @@ def genereate_sync_iterator(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o, registry),
-                    generate_variable_dict(o, plugin_config, registry, client_schema),
+                    ast.Name(id="variables", ctx=ast.Load()),
                 ],
             ),
             body=[
@@ -1027,7 +1105,7 @@ def genereate_sync_iterator(
                 args=generate_passing_extra_args_for_onode(definition, plugin_config)
                 + [
                     generate_document_arg(o, registry),
-                    generate_variable_dict(o, plugin_config, registry, client_schema),
+                    ast.Name(id="variables", ctx=ast.Load()),
                 ],
             ),
             body=[
@@ -1070,6 +1148,10 @@ def generate_operation_func(
         definition, o, client_schema, config, plugin_config, registry, collapse
     )
 
+    var_assignments = generate_variable_assignments(
+        o, plugin_config, registry, client_schema
+    )
+
     if definition.is_async:
         if o.operation == OperationType.SUBSCRIPTION:
             registry.register_import("typing.AsyncIterator")
@@ -1082,6 +1164,7 @@ def generate_operation_func(
                 ),
                 body=[
                     doc,
+                    *var_assignments,
                     (
                         genereate_async_call(
                             definition,
@@ -1128,6 +1211,7 @@ def generate_operation_func(
                 ),
                 body=[
                     doc,
+                    *var_assignments,
                     (
                         genereate_sync_call(
                             definition,
@@ -1184,7 +1268,9 @@ class FuncsPlugin(Plugin):
     async def aexecute(operation: Model, variables: Dict[str, Any], client = None):
         client = client # is the grahql client that can be passed as an extra argument (or retrieved from a contextvar)
         x = await client.aquery(
-            operation.Meta.document, operation.Arguments(**variables).dict(by_alias=True)
+            # exclude_unset omits arguments the caller never set, letting the
+            # server apply its own defaults while still sending explicit nulls.
+            operation.Meta.document, operation.Arguments(**variables).dict(by_alias=True, exclude_unset=True)
         )# is the proxy function that will be called (u can validate the variables here)
         return operation(**x.data) # Serialize the result
 

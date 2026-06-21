@@ -6,6 +6,7 @@ from pydantic import (
     Field,
     GetCoreSchemaHandler,
     field_validator,
+    model_validator,
     ConfigDict,
 )
 from pydantic_core import core_schema
@@ -37,7 +38,7 @@ class ImportableFunctionMixin(Protocol):
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
         return core_schema.no_info_before_validator_function(
-            cls.validate, handler(callable)
+            cls.validate, handler(Any)
         )
 
     @classmethod
@@ -243,6 +244,36 @@ class GeneratorConfig(BaseSettings):
         description="Additional config for mapping scalars to python types (e.g. ID: str). Can use dotted paths to import types from other modules.",
     )
     """Additional config for mapping scalars to python types (e.g. ID: str). Can use dotted paths to import types from other modules."""
+
+    graphql_default_class: Optional[PythonType] = Field(
+        default=None,
+        description="Importable class used as the Annotated marker carrying a field's GraphQL schema default value. If unset, a GraphQLDefault marker is generated into the output module.",
+    )
+    """Importable class for the GraphQLDefault Annotated marker. If unset, it is generated into the output module."""
+
+    deprecated_class: Optional[PythonType] = Field(
+        default=None,
+        description="Importable class used as the Annotated marker for deprecated fields. If unset, a Deprecated marker is generated into the output module.",
+    )
+    """Importable class for the Deprecated Annotated marker. If unset, it is generated into the output module."""
+
+    document_field_metadata: bool = Field(
+        default=True,
+        description="Fold the GraphQL deprecation reason and default value into the human-readable field documentation (description / comment), in addition to the Annotated markers. Set False to opt out and keep only the plain description.",
+    )
+    """Include the deprecation warning and default value in the field documentation. Opt out by setting False."""
+
+    unset_type_class: Optional[PythonType] = Field(
+        default=None,
+        description="Importable class used as the UNSET sentinel TYPE (the type referenced in Union[..., UnsetType] parameter annotations). If unset, an UnsetType class is generated into the output module. Must be set together with unset_instance.",
+    )
+    """Importable class for the UNSET sentinel type. If unset, it is generated. Set together with unset_instance."""
+
+    unset_instance: Optional[PythonType] = Field(
+        default=None,
+        description="Importable UNSET sentinel INSTANCE (used as the omitted-argument default and in identity checks). If unset, an UNSET instance is generated into the output module. Must be set together with unset_type_class.",
+    )
+    """Importable UNSET sentinel instance. If unset, it is generated. Set together with unset_type_class."""
     freeze: FreezeConfig = Field(
         default_factory=lambda: FreezeConfig(),
         description="Configuration for freezing the generated models",
@@ -304,6 +335,17 @@ class GeneratorConfig(BaseSettings):
         description="List of stylers to use. Style are used to enforce specific styles on the generaded class or fieldnames. ",
     )
     "List of stylers to use. Style are used to enforce specific styles on the generaded class or fieldnames. "
+
+    @model_validator(mode="after")
+    def validate_unset_override(self):
+        """The UNSET sentinel type and instance must be overridden together (the
+        generated ``UNSET = UnsetType()`` bundle is emitted only when neither is
+        overridden)."""
+        if (self.unset_type_class is None) != (self.unset_instance is None):
+            raise ValueError(
+                "unset_type_class and unset_instance must be set together (or neither)."
+            )
+        return self
 
     @field_validator("parsers", "plugins", "processors", "stylers", mode="after")
     def validate_importable(cls, v: List[ConfigProxy]) -> List[ConfigProxy]:

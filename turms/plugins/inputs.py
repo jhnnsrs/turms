@@ -6,6 +6,7 @@ from graphql import (
     GraphQLList,
     GraphQLNonNull,
     GraphQLScalarType,
+    Undefined,
 )
 from pydantic_settings import SettingsConfigDict
 from turms.plugins.base import Plugin, PluginConfig
@@ -21,6 +22,8 @@ from graphql.type.definition import (
 from turms.referencer import create_reference_registry_from_documents
 from turms.registry import ClassRegistry
 from turms.utils import (
+    annotate_field_metadata,
+    compose_field_documentation,
     generate_pydantic_config,
     get_additional_bases_for_type,
     parse_documents,
@@ -135,6 +138,67 @@ def generate_input_annotation(
     raise NotImplementedError(f"Unknown input type {type}")
 
 
+def generate_input_field_annotation(
+    value_type: GraphQLInputType,
+    parent: str,
+    config: GeneratorConfig,
+    plugin_config: InputsPluginConfig,
+    registry: ClassRegistry,
+    omittable: bool,
+):
+    """Builds an input field's annotation. A NonNull field that is nonetheless
+    omittable on the client (because it carries a schema default) defaults to
+    ``None``, so its annotation must be wrapped in ``Optional[...]`` even though
+    the GraphQL type is NonNull."""
+    annotation = generate_input_annotation(
+        value_type, parent, config, plugin_config, registry, is_optional=True
+    )
+    if omittable and isinstance(value_type, GraphQLNonNull):
+        registry.register_import("typing.Optional")
+        annotation = ast.Subscript(
+            value=ast.Name(id="Optional", ctx=ast.Load()),
+            slice=annotation,
+            ctx=ast.Load(),
+        )
+    return annotation
+
+
+def generate_input_field_value(
+    field_name: str,
+    value_key: str,
+    omittable: bool,
+    description: Optional[str],
+    registry: ClassRegistry,
+):
+    """Builds the AnnAssign value for an input field. Emits a ``Field(...)`` call
+    carrying the alias, the ``None`` default (for omittable fields) and the GraphQL
+    field description; falls back to a bare ``None``/required value when no
+    ``Field`` metadata is needed."""
+    has_alias = field_name != value_key
+    # A bare ``= None`` suffices for a plain optional field; only reach for a
+    # ``Field(...)`` call when there is real metadata (an alias or a description)
+    # to carry.
+    if not has_alias and not description:
+        return ast.Constant(value=None) if omittable else None
+
+    keywords = []
+    if has_alias:
+        keywords.append(ast.keyword(arg="alias", value=ast.Constant(value=value_key)))
+    if omittable:
+        keywords.append(ast.keyword(arg="default", value=ast.Constant(value=None)))
+    if description:
+        keywords.append(
+            ast.keyword(arg="description", value=ast.Constant(value=description))
+        )
+
+    registry.register_import("pydantic.Field")
+    return ast.Call(
+        func=ast.Name(id="Field", ctx=ast.Load()),
+        args=[],
+        keywords=keywords,
+    )
+
+
 @dataclass
 class Discriminator:
     discriminator: str
@@ -183,63 +247,57 @@ def generate_input_type(
 
     for value_key, value in type.fields.items():
         field_name = registry.generate_node_name(value_key)
+        # A field is omittable (and thus optional, defaulting to None) when it is
+        # nullable OR carries a schema default. For a default we no longer bake the
+        # value: the field is omitted on serialization (exclude_unset) so the
+        # server applies its own default.
+        has_default = value.default_value is not Undefined
+        # A null default carries no useful information; only mark non-null defaults.
+        default_string = (
+            str(value.default_value)
+            if has_default and value.default_value is not None
+            else None
+        )
+        omittable = has_default or not isinstance(value.type, GraphQLNonNull)
 
-        if field_name != value_key:
-            registry.register_import("pydantic.Field")
-
-            keywords = [ast.keyword(arg="alias", value=ast.Constant(value=value_key))]
-            if not isinstance(value.type, GraphQLNonNull):
-                keywords.append(ast.keyword(arg="default", value=ast.Constant(None)))
-
-            assign = ast.AnnAssign(
-                target=ast.Name(field_name, ctx=ast.Store()),
-                annotation=generate_input_annotation(
-                    value.type,
-                    name,
-                    config,
-                    plugin_config,
-                    registry,
-                    is_optional=True,
-                ),
-                value=ast.Call(
-                    func=ast.Name(id="Field", ctx=ast.Load()),
-                    args=[],
-                    keywords=keywords,
-                ),
-                simple=1,
-            )
-
-        else:
-            assign = ast.AnnAssign(
-                target=ast.Name(value_key, ctx=ast.Store()),
-                annotation=generate_input_annotation(
-                    value.type,
-                    name,
-                    config,
-                    plugin_config,
-                    registry,
-                    is_optional=True,
-                ),
-                simple=1,
-                value=(
-                    ast.Constant(None)
-                    if not isinstance(value.type, GraphQLNonNull)
-                    else None
-                ),
-            )
-
-        potential_comment = (
-            value.description
-            if not value.deprecation_reason
-            else f"DEPRECATED: {value.description}"
+        annotation = generate_input_field_annotation(
+            value.type, name, config, plugin_config, registry, omittable
+        )
+        # Record the GraphQL schema default (as a string) and deprecation as
+        # Annotated markers.
+        annotation = annotate_field_metadata(
+            annotation,
+            registry,
+            default_value_ast=(
+                ast.Constant(value=default_string) if default_string is not None else None
+            ),
+            deprecation_reason=value.deprecation_reason,
+        )
+        # The Field carries only the plain GraphQL description; the deprecation
+        # reason and default are folded into the inline comment documentation
+        # (unless opted out).
+        documentation = compose_field_documentation(
+            description=value.description,
+            deprecation_reason=value.deprecation_reason,
+            default_string=default_string,
+            include_metadata=config.document_field_metadata,
         )
 
-        if potential_comment:
-            fields += [
-                assign,
-                ast.Expr(value=ast.Constant(value=potential_comment)),
-            ]
+        assign = ast.AnnAssign(
+            target=ast.Name(field_name, ctx=ast.Store()),
+            annotation=annotation,
+            value=generate_input_field_value(
+                field_name, value_key, omittable, value.description, registry
+            ),
+            simple=1,
+        )
 
+        # Emit the inline comment only when it documents more than the plain
+        # description already on the Field.
+        if config.document_field_metadata and (
+            value.deprecation_reason or default_string is not None
+        ):
+            fields += [assign, ast.Expr(value=ast.Constant(value=documentation))]
         else:
             fields += [assign]
 
@@ -396,66 +454,55 @@ def generate_inputs(
 
         for value_key, value in type.fields.items():
             field_name = registry.generate_node_name(value_key)
+            # Omittable (optional, default None) when nullable OR carrying a schema
+            # default; defaults are deferred to the server via exclude_unset.
+            has_default = value.default_value is not Undefined
+            # A null default carries no useful information; only mark non-null defaults.
+            default_string = (
+                str(value.default_value)
+                if has_default and value.default_value is not None
+                else None
+            )
+            omittable = has_default or not isinstance(value.type, GraphQLNonNull)
 
-            if field_name != value_key:
-                registry.register_import("pydantic.Field")
-                keywords = [
-                    ast.keyword(arg="alias", value=ast.Constant(value=value_key))
-                ]
-                if not isinstance(value.type, GraphQLNonNull):
-                    keywords.append(
-                        ast.keyword(arg="default", value=ast.Constant(None))
-                    )
-
-                assign = ast.AnnAssign(
-                    target=ast.Name(field_name, ctx=ast.Store()),
-                    annotation=generate_input_annotation(
-                        value.type,
-                        name,
-                        config,
-                        plugin_config,
-                        registry,
-                        is_optional=True,
-                    ),
-                    value=ast.Call(
-                        func=ast.Name(id="Field", ctx=ast.Load()),
-                        args=[],
-                        keywords=keywords,
-                    ),
-                    simple=1,
-                )
-
-            else:
-                assign = ast.AnnAssign(
-                    target=ast.Name(value_key, ctx=ast.Store()),
-                    annotation=generate_input_annotation(
-                        value.type,
-                        name,
-                        config,
-                        plugin_config,
-                        registry,
-                        is_optional=True,
-                    ),
-                    simple=1,
-                    value=(
-                        ast.Constant(None)
-                        if not isinstance(value.type, GraphQLNonNull)
-                        else None
-                    ),
-                )
-
-            potential_comment = (
-                value.description
-                if not value.deprecation_reason
-                else f"DEPRECATED: {value.description}"
+            annotation = generate_input_field_annotation(
+                value.type, name, config, plugin_config, registry, omittable
+            )
+            # Record the GraphQL schema default (as a string) and deprecation as
+            # Annotated markers.
+            annotation = annotate_field_metadata(
+                annotation,
+                registry,
+                default_value_ast=(
+                    ast.Constant(value=default_string) if default_string is not None else None
+                ),
+                deprecation_reason=value.deprecation_reason,
+            )
+            documentation = compose_field_documentation(
+                description=value.description,
+                deprecation_reason=value.deprecation_reason,
+                default_string=default_string,
+                include_metadata=config.document_field_metadata,
             )
 
-            if potential_comment:
+            assign = ast.AnnAssign(
+                target=ast.Name(field_name, ctx=ast.Store()),
+                annotation=annotation,
+                value=generate_input_field_value(
+                    field_name, value_key, omittable, value.description, registry
+                ),
+                simple=1,
+            )
+
+            # Emit the inline comment only when it documents more than the plain
+            # description already on the Field.
+            if config.document_field_metadata and (
+                value.deprecation_reason or default_string is not None
+            ):
                 fields += [
                     assign,
-                    ast.Expr(value=ast.Constant(value=potential_comment)),
+                    ast.Expr(value=ast.Constant(value=documentation)),
                 ]
-
             else:
                 fields += [assign]
 

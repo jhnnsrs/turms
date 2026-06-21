@@ -8,6 +8,8 @@ from graphql.language.ast import (
 )
 from turms.registry import ClassRegistry
 from turms.utils import (
+    annotate_field_metadata,
+    compose_field_documentation,
     generate_generic_typename_field,
     generate_pydantic_config,
     generate_typename_field,
@@ -699,20 +701,27 @@ def type_field_node(
     if not isinstance(type, GraphQLNonNull):
         keywords.append(ast.keyword(arg="default", value=ast.Constant(value=None)))
 
+    annotation = recurse_annotation(
+        node,
+        parent,
+        type,
+        client_schema,
+        config,
+        subtree,
+        registry,
+        is_optional=is_optional,
+    )
+    # Record deprecation as an Annotated marker (result fields have no
+    # client-relevant default value).
+    annotation = annotate_field_metadata(
+        annotation, registry, deprecation_reason=field.deprecation_reason
+    )
+
     if target != field_name:
         registry.register_import("pydantic.Field")
         assign = ast.AnnAssign(
             target=ast.Name(field_name, ctx=ast.Store()),
-            annotation=recurse_annotation(
-                node,
-                parent,
-                type,
-                client_schema,
-                config,
-                subtree,
-                registry,
-                is_optional=is_optional,
-            ),
+            annotation=annotation,
             value=ast.Call(
                 func=ast.Name(id="Field", ctx=ast.Load()),
                 args=[],
@@ -726,16 +735,7 @@ def type_field_node(
             registry.register_import("pydantic.Field")
         assign = ast.AnnAssign(
             target=ast.Name(target, ctx=ast.Store()),
-            annotation=recurse_annotation(
-                node,
-                parent,
-                type,
-                client_schema,
-                config,
-                subtree,
-                registry,
-                is_optional=is_optional,
-            ),
+            annotation=annotation,
             value=(
                 ast.Call(
                     func=ast.Name(id="Field", ctx=ast.Load()),
@@ -748,10 +748,12 @@ def type_field_node(
             simple=1,
         )
 
-    potential_comment = (
-        field.description
-        if not field.deprecation_reason
-        else f"DEPRECATED {field.deprecation_reason}: : {field.description} "
+    # Deprecation lives on the Annotated marker; the comment folds the description
+    # and deprecation warning (unless opted out).
+    potential_comment = compose_field_documentation(
+        description=field.description,
+        deprecation_reason=field.deprecation_reason,
+        include_metadata=config.document_field_metadata,
     )
 
     if field.deprecation_reason:
