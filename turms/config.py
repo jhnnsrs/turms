@@ -245,6 +245,12 @@ class GeneratorConfig(BaseSettings):
     )
     """Additional config for mapping scalars to python types (e.g. ID: str). Can use dotted paths to import types from other modules."""
 
+    coercible_scalars: Dict[str, PythonType] = Field(
+        default_factory=dict,
+        description="Global map of scalar names to a coercible python type used in generated function/factory parameters (e.g. ID: pydantic.UUID4). Plugins (funcs, input_funcs) merge their own coercible_scalars on top of this, overriding per-scalar.",
+    )
+    """Global coercible scalar map. Plugins merge their own coercible_scalars on top (plugin entries override)."""
+
     graphql_default_class: Optional[PythonType] = Field(
         default=None,
         description="Importable class used as the Annotated marker carrying a field's GraphQL schema default value. If unset, a GraphQLDefault marker is generated into the output module.",

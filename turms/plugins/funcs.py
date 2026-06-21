@@ -1291,8 +1291,19 @@ class FuncsPlugin(Plugin):
     ) -> List[ast.AST]:
         plugin_tree = []
 
+        # Merge the global coercible_scalars with this plugin's overrides (plugin
+        # entries win) so funcs and input_funcs can share a global config.
+        plugin_config = self.config.model_copy(
+            update={
+                "coercible_scalars": {
+                    **config.coercible_scalars,
+                    **self.config.coercible_scalars,
+                }
+            }
+        )
+
         documents = parse_documents(
-            client_schema, self.config.funcs_glob or config.documents, config
+            client_schema, plugin_config.funcs_glob or config.documents, config
         )
 
         operations = [
@@ -1302,13 +1313,13 @@ class FuncsPlugin(Plugin):
         ]
 
         for operation in operations:
-            for definition in get_definitions_for_onode(operation, self.config):
+            for definition in get_definitions_for_onode(operation, plugin_config):
                 plugin_tree += generate_operation_func(
                     definition,
                     operation,
                     client_schema,
                     config,
-                    self.config,
+                    plugin_config,
                     registry,
                 )
 
