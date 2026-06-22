@@ -22,6 +22,8 @@ from graphql.type.definition import (
 )
 from turms.registry import ClassRegistry
 from turms.utils import (
+    annotate_field_metadata,
+    compose_field_documentation,
     generate_pydantic_config,
     get_additional_bases_for_type,
     interface_is_extended_by_other_interfaces,
@@ -290,18 +292,25 @@ def generate_types(
                     ast.keyword(arg="default", value=ast.Constant(value=None))
                 )
 
+            annotation = generate_object_field_annotation(
+                value.type,
+                classname,
+                config,
+                plugin_config,
+                registry,
+                is_optional=True,
+            )
+            # Record deprecation as an Annotated marker (output fields have no
+            # client-relevant default value).
+            annotation = annotate_field_metadata(
+                annotation, registry, deprecation_reason=value.deprecation_reason
+            )
+
             if field_name != value_key:
                 registry.register_import("pydantic.Field")
                 assign = ast.AnnAssign(
                     target=ast.Name(field_name, ctx=ast.Store()),
-                    annotation=generate_object_field_annotation(
-                        value.type,
-                        classname,
-                        config,
-                        plugin_config,
-                        registry,
-                        is_optional=True,
-                    ),
+                    annotation=annotation,
                     value=ast.Call(
                         func=ast.Name(id="Field", ctx=ast.Load()),
                         args=[],
@@ -319,14 +328,7 @@ def generate_types(
                     registry.register_import("pydantic.Field")
                 assign = ast.AnnAssign(
                     target=ast.Name(value_key, ctx=ast.Store()),
-                    annotation=generate_object_field_annotation(
-                        value.type,
-                        classname,
-                        config,
-                        plugin_config,
-                        registry,
-                        is_optional=True,
-                    ),
+                    annotation=annotation,
                     value=(
                         ast.Call(
                             func=ast.Name(id="Field", ctx=ast.Load()),
@@ -339,10 +341,12 @@ def generate_types(
                     simple=1,
                 )
 
-            potential_comment = (
-                value.description
-                if not value.deprecation_reason
-                else f"DEPRECATED: {value.description}"
+            # Deprecation lives on the Annotated marker; the comment folds the
+            # description and deprecation warning (unless opted out).
+            potential_comment = compose_field_documentation(
+                description=value.description,
+                deprecation_reason=value.deprecation_reason,
+                include_metadata=config.document_field_metadata,
             )
 
             if potential_comment:

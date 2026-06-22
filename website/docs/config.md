@@ -90,6 +90,12 @@ validated by pydantic — unknown keys are rejected, so typos fail loudly.
 | `exclude_typenames` | `bool` | `false` | Do not generate `__typename` literal fields |
 | `skip_forwards` | `bool` | `false` | Skip generating forward-reference updates (`model_rebuild`) |
 | `scalar_definitions` | `Dict[str, str]` | `{}` | Map of GraphQL scalar → python type (builtin or dotted import path) |
+| `coercible_scalars` | `Dict[str, str]` | `{}` | Global map of scalar → a coercible python type used in generated function/factory params. Plugins (`funcs`, `input_funcs`) merge their own on top |
+| `graphql_default_class` | `str` | – | Dotted path to your own class used as the `GraphQLDefault` Annotated marker. If unset, one is generated into the module |
+| `deprecated_class` | `str` | – | Dotted path to your own class used as the `Deprecated` Annotated marker. If unset, one is generated into the module |
+| `document_field_metadata` | `bool` | `true` | Fold the GraphQL deprecation reason and default value into the field documentation, in addition to the Annotated markers |
+| `unset_type_class` | `str` | – | Dotted path to your own UNSET sentinel **type**. If unset, one is generated. Must be set with `unset_instance` |
+| `unset_instance` | `str` | – | Dotted path to your own UNSET sentinel **instance**. If unset, one is generated. Must be set with `unset_type_class` |
 | `additional_bases` | `Dict[str, List[str]]` | `{}` | Extra base classes per GraphQL type name (dotted import paths) |
 | `additional_config` | `Dict[str, Dict]` | `{}` | Extra pydantic config attributes per GraphQL type name |
 | `force_plugin_order` | `bool` | `true` | Run plugins strictly in their configured order |
@@ -121,6 +127,28 @@ and serialized back correctly when you send inputs. Useful patterns:
 - **Your own types**: point at any type pydantic can validate (e.g. a `str` subclass implementing
   `__get_pydantic_core_schema__`) to centralize invariants like "a `Slug` is always lowercase"
   right in the deserialization layer.
+
+### Default values & the UNSET model
+
+GraphQL **schema defaults are not baked into the generated client**. A field with
+a default (`Int! = 5`, `Int = 10`) is emitted as **optional, defaulting to
+`None`**, and the value is owned by the server. The convenience functions
+default optional parameters to an `UNSET` sentinel and only send the ones the
+caller provided — combined with `exclude_unset=True` serialization in your
+executor proxy, omitted arguments are absent from the wire so the server applies
+its own defaults.
+
+The original default and any deprecation reason are preserved as introspectable
+`Annotated` markers (`GraphQLDefault`, `Deprecated`). The relevant options are
+`graphql_default_class`, `deprecated_class`, `document_field_metadata`,
+`unset_type_class`, and `unset_instance` (see the table above).
+
+:::warning Breaking change
+If you are upgrading from a version that baked defaults, your executor proxy must
+now serialize with `exclude_unset=True`. See the
+[Defaults & UNSET migration guide](migration-defaults-unset) for the full
+walkthrough.
+:::
 
 ### Traits (`additional_bases`)
 
@@ -232,7 +260,8 @@ Because components are resolved by import path, **your own classes work the same
 | `turms.plugins.objects.ObjectsPlugin` | `types_bases` (["pydantic.BaseModel"]), `skip_underscore` (false), `skip_double_underscore` (true) |
 | `turms.plugins.fragments.FragmentsPlugin` | `fragment_bases` ([]), `fragments_glob`, `add_documentation` (true), `generate_meta_class` (true) |
 | `turms.plugins.operations.OperationsPlugin` | `query_bases`/`mutation_bases`/`subscription_bases` ([]), `operations_glob`, `create_arguments` (true), `extract_documentation` (true), `arguments_allow_population_by_field_name` (false) |
-| `turms.plugins.funcs.FuncsPlugin` | `definitions` ([]), `global_args`/`global_kwargs` ([]), `prepend_sync` (""), `prepend_async` ("a"), `collapse_lonely` (true), `expand_input_types` ([]), `argument_key_is_styled` (false) |
+| `turms.plugins.funcs.FuncsPlugin` | `definitions` ([]), `global_args`/`global_kwargs` ([]), `prepend_sync` (""), `prepend_async` ("a"), `collapse_lonely` (true), `expand_input_types` ([]), `argument_key_is_styled` (false), `coercible_scalars` (\{\}) |
+| `turms.plugins.input_funcs.InputFuncsPlugin` | `coercible_scalars` (\{\}), `skip_underscore` (true), `skip_unreferenced` (true), `prepend` (""), `extract_documentation` (true) — see [Input Funcs](plugins/inputfuncs) |
 | `turms.plugins.strawberry.StrawberryPlugin` | `generate_directives` (true), `generate_scalars` (true), `builtin_directives`, `builtin_scalars` |
 
 The funcs plugin's `definitions` describe how each operation type is turned into a function:

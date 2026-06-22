@@ -23,6 +23,30 @@ SCALAR_DEFAULTS: Dict[str, str] = {
     "Float": "float",
 }
 
+# Annotated metadata markers generated into the output module (unless the user
+# overrides them via config). Authored as source and parsed to AST for clarity.
+_GRAPHQL_DEFAULT_SRC = """
+class GraphQLDefault:
+    'Records a GraphQL field schema default value. The client omits the field so the server applies its own default; this preserves the value for introspection.'
+
+    def __init__(self, value):
+        self.value = value
+
+    def __repr__(self):
+        return 'GraphQLDefault(' + repr(self.value) + ')'
+"""
+
+_DEPRECATED_SRC = """
+class Deprecated:
+    'Marks a field as deprecated, carrying the GraphQL deprecation reason.'
+
+    def __init__(self, reason=None):
+        self.reason = reason
+
+    def __repr__(self):
+        return 'Deprecated(' + repr(self.reason) + ')'
+"""
+
 
 built_in_map = {
     "__TypeKind": ast.ClassDef(
@@ -69,6 +93,121 @@ built_in_map = {
             ]
         ],
     ),
+    "UNSET": [
+        # Sentinel distinguishing "argument not provided" (omitted on serialize so
+        # the server applies its default) from an explicitly passed ``None``.
+        ast.ClassDef(
+            "UnsetType",
+            bases=[],
+            decorator_list=[],
+            keywords=[],
+            body=[
+                ast.Expr(
+                    value=ast.Constant(
+                        value=(
+                            "Sentinel for arguments the caller did not provide. "
+                            "Such fields are omitted on serialization so the GraphQL "
+                            "server applies its own default."
+                        )
+                    )
+                ),
+                ast.Assign(
+                    targets=[ast.Name(id="_instance", ctx=ast.Store())],
+                    value=ast.Constant(value=None),
+                ),
+                ast.FunctionDef(
+                    "__new__",
+                    args=ast.arguments(
+                        posonlyargs=[],
+                        args=[ast.arg(arg="cls")],
+                        kwonlyargs=[],
+                        kw_defaults=[],
+                        defaults=[],
+                    ),
+                    body=[
+                        ast.If(
+                            test=ast.Compare(
+                                left=ast.Attribute(
+                                    value=ast.Name(id="cls", ctx=ast.Load()),
+                                    attr="_instance",
+                                    ctx=ast.Load(),
+                                ),
+                                ops=[ast.Is()],
+                                comparators=[ast.Constant(value=None)],
+                            ),
+                            body=[
+                                ast.Assign(
+                                    targets=[
+                                        ast.Attribute(
+                                            value=ast.Name(id="cls", ctx=ast.Load()),
+                                            attr="_instance",
+                                            ctx=ast.Store(),
+                                        )
+                                    ],
+                                    value=ast.Call(
+                                        func=ast.Attribute(
+                                            value=ast.Call(
+                                                func=ast.Name(id="super", ctx=ast.Load()),
+                                                args=[],
+                                                keywords=[],
+                                            ),
+                                            attr="__new__",
+                                            ctx=ast.Load(),
+                                        ),
+                                        args=[ast.Name(id="cls", ctx=ast.Load())],
+                                        keywords=[],
+                                    ),
+                                )
+                            ],
+                            orelse=[],
+                        ),
+                        ast.Return(
+                            value=ast.Attribute(
+                                value=ast.Name(id="cls", ctx=ast.Load()),
+                                attr="_instance",
+                                ctx=ast.Load(),
+                            )
+                        ),
+                    ],
+                    decorator_list=[],
+                ),
+                ast.FunctionDef(
+                    "__repr__",
+                    args=ast.arguments(
+                        posonlyargs=[],
+                        args=[ast.arg(arg="self")],
+                        kwonlyargs=[],
+                        kw_defaults=[],
+                        defaults=[],
+                    ),
+                    body=[ast.Return(value=ast.Constant(value="UNSET"))],
+                    decorator_list=[],
+                ),
+                ast.FunctionDef(
+                    "__bool__",
+                    args=ast.arguments(
+                        posonlyargs=[],
+                        args=[ast.arg(arg="self")],
+                        kwonlyargs=[],
+                        kw_defaults=[],
+                        defaults=[],
+                    ),
+                    body=[ast.Return(value=ast.Constant(value=False))],
+                    decorator_list=[],
+                ),
+            ],
+        ),
+        ast.Assign(
+            targets=[ast.Name(id="UNSET", ctx=ast.Store())],
+            value=ast.Call(
+                func=ast.Name(id="UnsetType", ctx=ast.Load()),
+                args=[],
+                keywords=[],
+            ),
+        ),
+    ],
+    "GraphQLDefault": ast.parse(_GRAPHQL_DEFAULT_SRC).body[0],
+    "Deprecated": ast.parse(_DEPRECATED_SRC).body[0],
 }  # builtin map provides the default types for any schema if they are referenced
 
 
@@ -176,6 +315,11 @@ class ClassRegistry(object):
         classname = self.style_enum_class(typename)
         self.enum_class_map[typename] = classname
         return classname
+
+    def register_builtin(self, typename: str) -> None:
+        """Register a builtin definition (from ``built_in_map``) to be emitted at
+        the top of the generated module. Deduplicated via the builtins set."""
+        self._builtins.add(typename)
 
     def get_enum_class(self, typename: str) -> str:
         return self.enum_class_map[typename]
@@ -485,7 +629,11 @@ class ClassRegistry(object):
         builtins: list[ast.AST] = []
 
         for built_in in self._builtins:
-            builtins.append(built_in_map[built_in])
+            node = built_in_map[built_in]
+            if isinstance(node, list):
+                builtins.extend(node)
+            else:
+                builtins.append(node)
 
         return builtins
 
@@ -524,6 +672,46 @@ class ClassRegistry(object):
 
     def get_fragment_document(self, typename: str) -> str:
         return self.fragment_document_map[typename]
+
+    def reference_unset(self) -> ast.Name:
+        """Returns the name of the UNSET sentinel instance, importing the user's
+        override (config.unset_instance) or generating the builtin bundle."""
+        override = self.config.unset_instance
+        if override:
+            self.register_import(override)
+            return ast.Name(id=override.split(".")[-1], ctx=ast.Load())
+        self.register_builtin("UNSET")
+        return ast.Name(id="UNSET", ctx=ast.Load())
+
+    def reference_unset_type(self) -> ast.Name:
+        """Returns the name of the UNSET sentinel type, importing the user's
+        override (config.unset_type_class) or generating the builtin bundle."""
+        override = self.config.unset_type_class
+        if override:
+            self.register_import(override)
+            return ast.Name(id=override.split(".")[-1], ctx=ast.Load())
+        self.register_builtin("UNSET")
+        return ast.Name(id="UnsetType", ctx=ast.Load())
+
+    def reference_graphql_default(self) -> ast.Name:
+        """Returns the name of the GraphQLDefault metadata marker, importing the
+        user's override (config.graphql_default_class) or generating the builtin."""
+        override = self.config.graphql_default_class
+        if override:
+            self.register_import(override)
+            return ast.Name(id=override.split(".")[-1], ctx=ast.Load())
+        self.register_builtin("GraphQLDefault")
+        return ast.Name(id="GraphQLDefault", ctx=ast.Load())
+
+    def reference_deprecated(self) -> ast.Name:
+        """Returns the name of the Deprecated metadata marker, importing the user's
+        override (config.deprecated_class) or generating the builtin."""
+        override = self.config.deprecated_class
+        if override:
+            self.register_import(override)
+            return ast.Name(id=override.split(".")[-1], ctx=ast.Load())
+        self.register_builtin("Deprecated")
+        return ast.Name(id="Deprecated", ctx=ast.Load())
 
     def register_scalar(self, scalar_type: str, python_type: str):
         self.scalar_map[scalar_type] = python_type

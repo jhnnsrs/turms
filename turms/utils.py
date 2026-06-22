@@ -27,6 +27,7 @@ from graphql import (
     SelectionSetNode,
     StringValueNode,
     TypeNode,
+    Undefined,
     ValueNode,
     parse,
     print_ast,
@@ -913,3 +914,97 @@ def parse_value_node(value_node: ValueNode) -> Union[None, str, int, float, bool
         return None
     else:
         raise NotImplementedError(f"Cannot parse {value_node}")
+
+
+def convert_default_value_to_ast(value):
+    """Converts a coerced Python default value (as stored on a GraphQL input
+    field / argument) into an AST node usable as a pydantic field default."""
+    if value is Undefined:
+        return None
+    if value is None:
+        return ast.Constant(value=None)
+    if isinstance(value, str):
+        return ast.Constant(value=value)
+    if isinstance(value, bool):
+        return ast.Constant(value=value)
+    if isinstance(value, int):
+        return ast.Constant(value=value)
+    if isinstance(value, float):
+        return ast.Constant(value=value)
+    if isinstance(value, list):
+        return ast.List(
+            elts=[convert_default_value_to_ast(x) for x in value], ctx=ast.Load()
+        )
+    if isinstance(value, dict):
+        keys = []
+        values = []
+        for key, inner in value.items():
+            keys.append(ast.Constant(value=key))
+            values.append(convert_default_value_to_ast(inner))
+        return ast.Dict(keys=keys, values=values)
+    raise NotImplementedError(f"Unknown default value {repr(value)}")
+
+
+def compose_field_documentation(
+    description=None,
+    deprecation_reason=None,
+    default_string=None,
+    include_metadata=True,
+):
+    """Builds a field's human-readable documentation. When ``include_metadata`` is
+    True the GraphQL deprecation reason and default value are folded into the text
+    alongside the description; otherwise only the plain description is returned.
+    Returns ``None`` when there is nothing to document."""
+    if not include_metadata:
+        return description or None
+
+    parts = []
+    if description:
+        parts.append(description)
+    if deprecation_reason:
+        parts.append(f"DEPRECATED: {deprecation_reason}")
+    if default_string is not None:
+        parts.append(f"Default: {default_string}")
+    return "\n".join(parts) if parts else None
+
+
+def annotate_field_metadata(
+    annotation,
+    registry,
+    default_value_ast=None,
+    deprecation_reason=None,
+):
+    """Wraps a field annotation in ``Annotated[T, GraphQLDefault(...), Deprecated(...)]``
+    when the field carries a GraphQL schema default and/or a deprecation reason.
+
+    ``default_value_ast`` is a prebuilt ``ast.expr`` (pass ``None`` for no default
+    marker; an explicit-null default passes ``ast.Constant(value=None)``). The
+    marker classes are resolved through the registry, which either imports a
+    user-provided override or emits a generated builtin."""
+    markers = []
+    if default_value_ast is not None:
+        markers.append(
+            ast.Call(
+                func=registry.reference_graphql_default(),
+                args=[default_value_ast],
+                keywords=[],
+            )
+        )
+    if deprecation_reason is not None:
+        markers.append(
+            ast.Call(
+                func=registry.reference_deprecated(),
+                args=[ast.Constant(value=deprecation_reason)],
+                keywords=[],
+            )
+        )
+
+    if not markers:
+        return annotation
+
+    registry.register_import("typing.Annotated")
+    return ast.Subscript(
+        value=ast.Name(id="Annotated", ctx=ast.Load()),
+        slice=ast.Tuple(elts=[annotation, *markers], ctx=ast.Load()),
+        ctx=ast.Load(),
+    )

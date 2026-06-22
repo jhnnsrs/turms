@@ -7,7 +7,7 @@ def execute(operation, variables, rath: Rath = None):
     return operation(
         **rath.query(
             operation.Meta.document,
-            operation.Arguments(**variables).dict(by_alias=True),
+            operation.Arguments(**variables).dict(by_alias=True, exclude_unset=True),
         ).data
     )
 
@@ -15,7 +15,7 @@ def execute(operation, variables, rath: Rath = None):
 async def aexecute(operation, variables, rath: Rath = None):
     rath = rath or current_rath.get()
     x = await rath.aquery(
-        operation.Meta.document, operation.Arguments(**variables).dict(by_alias=True)
+        operation.Meta.document, operation.Arguments(**variables).dict(by_alias=True, exclude_unset=True)
     )
     return operation(**x.data)
 
@@ -24,7 +24,7 @@ def subscribe(operation, variables, rath: Rath = None):
     rath = rath or current_rath.get()
 
     for ev in rath.subscribe(
-        operation.Meta.document, operation.Arguments(**variables).dict(by_alias=True)
+        operation.Meta.document, operation.Arguments(**variables).dict(by_alias=True, exclude_unset=True)
     ):
         yield operation(**ev.data)
 
@@ -32,6 +32,6 @@ def subscribe(operation, variables, rath: Rath = None):
 async def asubscribe(operation, variables, rath: Rath = None):
     rath = rath or current_rath.get()
     async for event in rath.asubscribe(
-        operation.Meta.document, operation.Arguments(**variables).dict(by_alias=True)
+        operation.Meta.document, operation.Arguments(**variables).dict(by_alias=True, exclude_unset=True)
     ):
         yield operation(**event.data)

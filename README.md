@@ -148,7 +148,7 @@ from examples.api.schema import GetCountries, CountryFilterInput, StringQueryOpe
 variables = GetCountries.Arguments(
     filter=CountryFilterInput(code=StringQueryOperatorInput(eq="DE"))
 )
-response = my_client.execute(GetCountries.Meta.document, variables.model_dump(by_alias=True))
+response = my_client.execute(GetCountries.Meta.document, variables.model_dump(by_alias=True, exclude_unset=True))
 countries = GetCountries(**response["data"])
 
 for country in countries.countries:

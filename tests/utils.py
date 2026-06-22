@@ -57,6 +57,23 @@ class ExtraOnOperations(BaseModel):
 class ExtraArg(BaseModel):
     extra: Optional[str]
 
+
+class CustomDefault:
+    def __init__(self, value):
+        self.value = value
+
+
+class CustomDeprecated:
+    def __init__(self, reason=None):
+        self.reason = reason
+
+
+class CustomUnset:
+    pass
+
+
+CUSTOM_UNSET = CustomUnset()
+
 """
 
 

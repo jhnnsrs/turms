@@ -601,7 +601,6 @@ def generate_fragment(
                     ctx=ast.Load(),
                 ),
             ),
-            simple=1,
         )
 
         tree.append(mother_class)

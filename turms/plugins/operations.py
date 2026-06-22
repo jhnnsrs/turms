@@ -20,14 +20,15 @@ import re
 from graphql import NonNullTypeNode, VariableDefinitionNode, language
 from turms.registry import ClassRegistry
 from turms.utils import (
+    annotate_field_metadata,
     generate_pydantic_config,
     inspect_operation_for_documentation,
     merge_bases_sequences,
     merge_body_sequences,
     parse_documents,
+    parse_value_node,
     recurse_type_annotation,
     replace_iteratively,
-    parse_value_node,
 )
 import logging
 
@@ -301,6 +302,32 @@ def generate_operation(
         for v in o.variable_definitions:
             is_optional = not isinstance(v.type, NonNullTypeNode) or v.default_value
             annotation = recurse_type_annotation(v.type, registry)
+            # A NonNull variable that carries a schema default is optional on the
+            # client (the server fills the default when it is omitted), so its
+            # annotation must allow ``None`` even though the GraphQL type is NonNull.
+            if is_optional and isinstance(v.type, NonNullTypeNode):
+                registry.register_import("typing.Optional")
+                annotation = ast.Subscript(
+                    value=ast.Name(id="Optional", ctx=ast.Load()),
+                    slice=annotation,
+                    ctx=ast.Load(),
+                )
+            # Record the variable's non-null schema default as an Annotated marker
+            # (variables carry no deprecation metadata; null defaults are skipped).
+            default_python = (
+                parse_value_node(v.default_value)
+                if v.default_value is not None
+                else None
+            )
+            annotation = annotate_field_metadata(
+                annotation,
+                registry,
+                default_value_ast=(
+                    ast.Constant(value=str(default_python))
+                    if default_python is not None
+                    else None
+                ),
+            )
             field_name = registry.generate_parameter_name(v.variable.name.value)
             target = v.variable.name.value
 
@@ -319,13 +346,7 @@ def generate_operation(
                                 ),
                                 ast.keyword(
                                     arg="default",
-                                    value=ast.Constant(
-                                        value=(
-                                            parse_value_node(v.default_value)
-                                            if v.default_value is not None
-                                            else None
-                                        )
-                                    ),
+                                    value=ast.Constant(value=None),
                                 ),
                             ],
                         ),
@@ -357,13 +378,7 @@ def generate_operation(
                             keywords=[
                                 ast.keyword(
                                     arg="default",
-                                    value=ast.Constant(
-                                        value=(
-                                            parse_value_node(v.default_value)
-                                            if v.default_value is not None
-                                            else None
-                                        )
-                                    ),
+                                    value=ast.Constant(value=None),
                                 ),
                             ],
                         ),
