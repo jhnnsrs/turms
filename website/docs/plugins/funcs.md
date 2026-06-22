@@ -64,4 +64,26 @@ extra_kwargs:
   default: #str = None
 ```
 
+### Optional arguments & the UNSET sentinel
+
+Optional parameters of the generated functions default to a generated `UNSET`
+sentinel (`Union[Optional[T], UnsetType] = UNSET`) rather than to the schema
+default value. The function builds the `variables` dict conditionally — only
+arguments the caller actually passed are included:
+
+```python
+variables: Dict[str, Any] = {}
+if limit is not UNSET:
+    variables['limit'] = limit
+```
+
+:::warning The exclude_unset contract
+This only works if your **executor proxy** serializes with `exclude_unset=True`
+(`operation.Arguments(**variables).dict(by_alias=True, exclude_unset=True)`). That
+serialization lives in your own proxy code, not in generated code, so turms cannot
+enforce it. Without it, defaulted fields are sent as explicit `null` and override
+the server's defaults. See the
+[Defaults & UNSET migration guide](../migration-defaults-unset).
+:::
+
 ### Example Config
