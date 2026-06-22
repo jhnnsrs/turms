@@ -1,6 +1,42 @@
 # CHANGELOG
 
 
+## v1.0.0 (2026-06-22)
+
+### Bug Fixes
+
+- Input funcs
+  ([`bc3aa14`](https://github.com/jhnnsrs/turms/commit/bc3aa14541e530ad4f2cfc1483a5f929a5792b93))
+
+### Features
+
+- Document UNSET defaults model and input_funcs plugin
+  ([`caad384`](https://github.com/jhnnsrs/turms/commit/caad38464eb833f060733b33f107a06502f48ad9))
+
+GraphQL schema defaults are no longer baked into the generated client: defaulted fields become
+  optional `= None` and the value is owned by the server. Convenience functions default optionals to
+  an UNSET sentinel and build the payload conditionally, so callers must serialize with
+  exclude_unset=True — a breaking change for existing executor proxies.
+
+- add migration guide (migration-defaults-unset) covering the UNSET model, the
+  GraphQLDefault/Deprecated markers, and the required proxy change - add reference page for the new
+  input_funcs factory plugin - document the new global config options (coercible_scalars,
+  graphql_default_class, deprecated_class, document_field_metadata, unset_type_class,
+  unset_instance) and the InputFuncsPlugin row - note the exclude_unset contract in the funcs plugin
+  docs
+
+BREAKING CHANGE: executor proxies must serialize variables with exclude_unset=True; schema defaults
+  are no longer baked into client models.
+
+- Fixes the default type
+  ([`2ea0361`](https://github.com/jhnnsrs/turms/commit/2ea03614d9fa128393c0334d1f85e46b071b3bbf))
+
+### Breaking Changes
+
+- Executor proxies must serialize variables with exclude_unset=True; schema defaults are no longer
+  baked into client models.
+
+
 ## v0.12.0 (2026-06-12)
 
 ### Bug Fixes
