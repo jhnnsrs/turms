@@ -1,0 +1,25 @@
+# Spreads an interface fragment into a field whose type is a concrete
+# implementation (ImageLayer). The single-item collapse must resolve to the
+# implementation class (LayerImageLayer), not the bare interface fragment name.
+mutation CreateLayer($name: String!) {
+  createLayer(name: $name) {
+    ...Layer
+  }
+}
+
+# Same collapse but with an additional field selected alongside the interface
+# fragment, exercising the additional-bases (inheritance) path.
+mutation CreateLayerWithStatus($name: String!) {
+  createLayer(name: $name) {
+    ...Layer
+    status
+  }
+}
+
+# Spreads the interface fragment into a field that is genuinely the interface,
+# which must still produce the discriminated union.
+query GetLayer($id: ID!) {
+  layer(id: $id) {
+    ...Layer
+  }
+}

@@ -474,30 +474,47 @@ def recurse_annotation(
             sub_node = sub_nodes[0]
 
             if isinstance(sub_node, FragmentSpreadNode):
+                # An interface fragment spread into a concrete object field
+                # resolves to that object's implementation class, not the bare
+                # (non-existent) fragment name.
+                implementation = (
+                    registry.get_interface_fragment_implementation_or_none(
+                        sub_node.name.value, type.name
+                    )
+                )
+                if implementation is not None:
+                    reference: ast.expr = ast.Name(id=implementation, ctx=ast.Load())
+                else:
+                    reference = registry.reference_fragment(
+                        sub_node.name.value, parent
+                    )  # needs to be parent not object as reference will be to parent
+
                 if is_optional:
                     registry.register_import("typing.Optional")
                     return ast.Subscript(
                         value=ast.Name("Optional", ctx=ast.Load()),
-                        slice=registry.reference_fragment(
-                            sub_node.name.value, parent
-                        ),  # needs to be parent not object as reference will be to parent
+                        slice=reference,
                         ctx=ast.Load(),
                     )
 
                 else:
-                    return registry.reference_fragment(
-                        sub_node.name.value, parent
-                    )  # needs to be parent not object as reference will be to parent
+                    return reference
 
         additional_bases: list[ast.Name] = []
 
         for sub_node in sub_nodes:
             if isinstance(sub_node, FragmentSpreadNode):
-                if registry.is_interface_fragment(sub_node.name.value):
-                    raise Exception(
-                        "Interface Fragments with additional subfields are not yet implemented"
+                # An interface fragment mixed with additional fields inherits
+                # from the concrete object's implementation class.
+                implementation = (
+                    registry.get_interface_fragment_implementation_or_none(
+                        sub_node.name.value, type.name
                     )
-
+                )
+                if implementation is not None:
+                    additional_bases.append(
+                        ast.Name(id=implementation, ctx=ast.Load())
+                    )
                 else:
                     additional_bases.append(
                         ast.Name(

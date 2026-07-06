@@ -108,6 +108,13 @@ def multi_interface_schema():
 
 
 @pytest.fixture(scope="session")
+def interface_fragment_collapse_schema():
+    return build_schema_from_schema_type(
+        build_relative_glob("/schemas/interface_fragment_collapse.graphql")
+    )
+
+
+@pytest.fixture(scope="session")
 def mro_test_schema():
     return build_schema_from_schema_type(build_relative_glob("/schemas/mro.graphql"))
 

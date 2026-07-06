@@ -13,6 +13,7 @@ from graphql import (
     GraphQLObjectType,
     NamedTypeNode,
     VariableNode,
+    get_named_type,
 )
 from graphql.type.definition import (
     GraphQLEnumType,
@@ -662,12 +663,23 @@ def get_return_type_annotation(
             if isinstance(
                 collapsable_fragment_field, FragmentSpreadNode
             ):  # Dealing with a on element fragment
+                implementation = (
+                    registry.get_interface_fragment_implementation_or_none(
+                        collapsable_fragment_field.name.value,
+                        get_named_type(field_definition.type).name,
+                    )
+                )
+                overwrite_final = (
+                    implementation
+                    if implementation is not None
+                    else registry.reference_fragment(
+                        collapsable_fragment_field.name.value, "", allow_forward=False
+                    ).id
+                )
                 return recurse_outputtype_annotation(
                     field_definition.type,
                     registry,
-                    overwrite_final=registry.reference_fragment(
-                        collapsable_fragment_field.name.value, "", allow_forward=False
-                    ).id,
+                    overwrite_final=overwrite_final,
                 )
 
         field_name = (
@@ -715,12 +727,23 @@ def get_return_type_string(
             if isinstance(
                 collapsable_fragment_field, FragmentSpreadNode
             ):  # Dealing with a on element fragment
+                implementation = (
+                    registry.get_interface_fragment_implementation_or_none(
+                        collapsable_fragment_field.name.value,
+                        get_named_type(potential_return_type.type).name,
+                    )
+                )
+                overwrite_final = (
+                    implementation
+                    if implementation is not None
+                    else registry.reference_fragment(
+                        collapsable_fragment_field.name.value, "", allow_forward=False
+                    ).id
+                )
                 return recurse_outputtype_label(
                     potential_return_type.type,
                     registry,
-                    overwrite_final=registry.reference_fragment(
-                        collapsable_fragment_field.name.value, "", allow_forward=False
-                    ).id,
+                    overwrite_final=overwrite_final,
                 )
 
         return recurse_outputtype_label(

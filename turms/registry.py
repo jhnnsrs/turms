@@ -1,6 +1,6 @@
 import ast
 from keyword import iskeyword
-from typing import Callable, Dict, List, Set, Type
+from typing import Callable, Dict, List, Optional, Set, Type
 
 from graphql import DocumentNode, GraphQLNamedType
 
@@ -471,6 +471,43 @@ class ClassRegistry(object):
             self.fragment_class_map,
             "Fragment",
             allow_forward,
+        )
+
+    def get_interface_fragment_implementation_or_none(
+        self, fragmentname: str, typename: str
+    ) -> Optional[str]:
+        """Resolve an interface fragment spread against a concrete object type.
+
+        A fragment defined on an interface (e.g. ``fragment Layer on Layer``)
+        is generated as one implementation class per concrete type
+        (``LayerImageLayer``, ``LayerMeshLayer``, ...) rather than a single
+        class named after the fragment. When such a fragment is spread into a
+        field whose type is a concrete object (``createLayer: ImageLayer!``),
+        the reference must point at that object's implementation class.
+
+        Returns the implementation class name for ``typename`` if
+        ``fragmentname`` is an interface fragment spread into that concrete
+        implementation. Returns ``None`` when ``fragmentname`` is not an
+        interface fragment, or when ``typename`` is the interface itself (the
+        field genuinely returns the interface and keeps its union semantics);
+        in both cases the caller should fall back to a plain fragment
+        reference.
+        """
+        implementation_map = self.interfacefragments_impl_map.get(fragmentname)
+        if implementation_map is None:
+            return None
+        if typename in implementation_map:
+            return implementation_map[typename]
+
+        fragment_type = self.fragment_type_map.get(fragmentname)
+        if fragment_type is not None and fragment_type.name == typename:
+            # Spread into a field typed as the interface itself.
+            return None
+
+        raise RegistryError(
+            f"Interface fragment '{fragmentname}' has no implementation for "
+            f"type '{typename}'. Available implementations: "
+            f"{list(implementation_map)}."
         )
 
     def is_interface_fragment(self, typename: str):

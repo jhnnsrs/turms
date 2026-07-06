@@ -1,0 +1,33 @@
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+type Query {
+  "Returns the interface itself (single fragment spread on an interface field)."
+  layer(id: ID!): Layer!
+}
+
+type Mutation {
+  "Returns a concrete implementation while the document spreads an interface fragment."
+  createLayer(name: String!): ImageLayer!
+}
+
+"A layer placed in a scene."
+interface Layer {
+  id: ID!
+  scene: String!
+}
+
+type ImageLayer implements Layer {
+  id: ID!
+  scene: String!
+  lens: String!
+  status: String!
+}
+
+type MeshLayer implements Layer {
+  id: ID!
+  scene: String!
+  mesh: String!
+}
