@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.1 (2026-07-06)
+
+### Bug Fixes
+
+- Add interface to type coercion on specific narrow type mutations
+  ([`e044a8c`](https://github.com/jhnnsrs/turms/commit/e044a8cb88da3765dc257403b6327464de7431b9))
+
+
 ## v1.0.0 (2026-06-22)
 
 ### Bug Fixes
