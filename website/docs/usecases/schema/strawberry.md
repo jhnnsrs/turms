@@ -171,7 +171,7 @@ not be replaced, but just rerunning
 
 ## Example Project
 
-In the example project (here)[https://github.com/jhnnsrs/turms/tree/master/examples/beasts-strawberry]. We illustrate the necessary configuration to use code generation in a schema first approach.
+In the example project [here](https://github.com/jhnnsrs/turms/tree/master/examples/beasts-strawberry). We illustrate the necessary configuration to use code generation in a schema first approach.
 
 
 
