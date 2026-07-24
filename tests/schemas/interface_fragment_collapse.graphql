@@ -24,6 +24,11 @@ type ImageLayer implements Layer {
   scene: String!
   lens: String!
   status: String!
+  imageDetails: ImageDetails!
+}
+
+type ImageDetails {
+  id: ID!
 }
 
 type MeshLayer implements Layer {

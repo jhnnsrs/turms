@@ -23,3 +23,41 @@ query GetLayer($id: ID!) {
     ...Layer
   }
 }
+
+# Exercises the generated interface fragment implementations.
+query GetLayerFull($id: ID!) {
+  layer(id: $id) {
+    ...LayerFull
+  }
+}
+
+# Exercises recurse.py directly without a named interface fragment.
+query GetInlineLayerFull($id: ID!) {
+  layer(id: $id) {
+    ... on ImageLayer {
+      ...ImageLayerFull
+    }
+    ... on MeshLayer {
+      ...MeshLayerFull
+    }
+  }
+}
+
+query GetOverlappingLayerMeta($id: ID!) {
+  layer(id: $id) {
+    ...LayerMeta
+    ... on ImageLayer {
+      ...ImageLayerMeta
+    }
+  }
+}
+
+# The same selections in reverse order must generate the same valid bases.
+query GetReversedOverlappingLayerMeta($id: ID!) {
+  layer(id: $id) {
+    ... on ImageLayer {
+      ...ImageLayerMeta
+    }
+    ...LayerMeta
+  }
+}

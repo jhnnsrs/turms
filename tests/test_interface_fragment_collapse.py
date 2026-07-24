@@ -80,6 +80,13 @@ def _func_return_annotation(tree, func_name):
     raise AssertionError(f"function {func_name} not found in generated tree")
 
 
+def _class_bases(tree, class_name):
+    for node in tree:
+        if isinstance(node, ast.ClassDef) and node.name == class_name:
+            return {base.id for base in node.bases if isinstance(base, ast.Name)}
+    raise AssertionError(f"class {class_name} not found in generated tree")
+
+
 def test_interface_fragment_collapse_imports(interface_fragment_collapse_schema):
     """The generated module must be valid, importable Python (no dangling
     reference to the interface fragment name)."""
@@ -129,3 +136,96 @@ def test_interface_field_still_produces_union(interface_fragment_collapse_schema
     annotation = _class_field_annotation(generated_ast, "GetLayer", "layer")
     assert "Union" in annotation
     assert "discriminator" in annotation
+
+
+def test_interface_fragment_inline_spreads_inherit_concrete_fragments(
+    interface_fragment_collapse_schema,
+):
+    generated_ast = _generate(interface_fragment_collapse_schema, with_funcs=False)
+
+    assert "ImageLayerFull" in _class_bases(generated_ast, "LayerFullImageLayer")
+    assert "MeshLayerFull" in _class_bases(generated_ast, "LayerFullMeshLayer")
+
+    unit_test_with(
+        generated_ast,
+        """
+        result = GetLayerFull(
+            layer={
+                "__typename": "ImageLayer",
+                "id": "layer-1",
+                "scene": "scene-1",
+                "lens": "wide",
+                "status": "ready",
+            }
+        )
+        assert result.layer.id == "layer-1"
+        assert result.layer.lens == "wide"
+        assert result.layer.status == "ready"
+        """,
+    )
+
+
+def test_operation_interface_inline_spreads_inherit_concrete_fragments(
+    interface_fragment_collapse_schema,
+):
+    generated_ast = _generate(interface_fragment_collapse_schema, with_funcs=False)
+
+    assert "ImageLayerFull" in _class_bases(
+        generated_ast, "GetInlineLayerFullLayerBaseImageLayer"
+    )
+    assert "MeshLayerFull" in _class_bases(
+        generated_ast, "GetInlineLayerFullLayerBaseMeshLayer"
+    )
+
+    unit_test_with(
+        generated_ast,
+        """
+        result = GetInlineLayerFull(
+            layer={
+                "__typename": "ImageLayer",
+                "id": "layer-1",
+                "scene": "scene-1",
+                "lens": "wide",
+                "status": "ready",
+            }
+        )
+        assert result.layer.id == "layer-1"
+        assert result.layer.lens == "wide"
+        assert result.layer.status == "ready"
+        """,
+    )
+
+
+def test_overlapping_interface_fragment_bases_are_pruned(
+    interface_fragment_collapse_schema,
+):
+    generated_ast = _generate(interface_fragment_collapse_schema, with_funcs=False)
+
+    class_names = [
+        "GetOverlappingLayerMetaLayerBaseImageLayer",
+        "GetReversedOverlappingLayerMetaLayerBaseImageLayer",
+    ]
+    bases = [_class_bases(generated_ast, class_name) for class_name in class_names]
+
+    for class_bases in bases:
+        assert "ImageLayerMeta" in class_bases
+        assert "LayerMetaImageLayer" not in class_bases
+
+    unit_test_with(
+        generated_ast,
+        """
+        for result_type in (
+            GetOverlappingLayerMeta,
+            GetReversedOverlappingLayerMeta,
+        ):
+            result = result_type(
+                layer={
+                    "__typename": "ImageLayer",
+                    "id": "layer-1",
+                    "imageDetails": {"id": "details-1"},
+                }
+            )
+            assert result.layer.id == "layer-1"
+            assert result.layer.image_details.id == "details-1"
+        """,
+    )

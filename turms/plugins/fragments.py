@@ -71,6 +71,13 @@ def find_fragment_dependencies_recursive(
                     selection.selection_set, fragment_definitions, visited
                 )
             )
+        # Inline fragments can contain fragment spreads too.
+        elif isinstance(selection, InlineFragmentNode):
+            dependencies.update(
+                find_fragment_dependencies_recursive(
+                    selection.selection_set, fragment_definitions, visited
+                )
+            )
 
     return dependencies
 
@@ -221,7 +228,7 @@ def generate_fragment(
         # i.e eg subtype of the interface
         implementing_class_base_classes: Dict[str, List[str]] = {}
 
-        # This is a map of inlien fragments field on their respective types
+        # This is a map of inline fragments field on their respective types
         inline_fragment_fields: Dict[str, List[ast.AnnAssign | ast.Expr]] = {}
 
         for sub_node in sub_nodes:
@@ -262,6 +269,24 @@ def generate_fragment(
                 inline_fields = []
 
                 for field in sub_node.selection_set.selections:
+                    if isinstance(field, FragmentSpreadNode):
+                        try:
+                            implementation_map = (
+                                registry.get_interface_fragment_implementations(
+                                    field.name.value
+                                )
+                            )
+                            implementation = implementation_map.get(on_type_name)
+                            if implementation:
+                                implementing_class_base_classes.setdefault(
+                                    on_type_name, []
+                                ).append(implementation)
+                        except KeyError:
+                            implementing_class_base_classes.setdefault(
+                                on_type_name, []
+                            ).append(registry.inherit_fragment(field.name.value))
+                        continue
+
                     if isinstance(field, FieldNode):
                         if field.name.value == "__typename":
                             continue
@@ -327,7 +352,7 @@ def generate_fragment(
         tree.append(mother_class)
         tree.append(catch_class)
 
-        implementaionMap: Dict[str, str] = {}
+        implementation_map: Dict[str, str] = {}
 
         for i in implementing_types.objects:
             class_name = f"{base_fragment_name}{i.name}"
@@ -340,22 +365,26 @@ def generate_fragment(
                 else ast.Expr(value=ast.Constant(value="No documentation"))
             )
 
+            fragment_base_names = registry.prune_redundant_generated_bases(
+                implementing_class_base_classes.get(i.name, [])
+            )
             ast_base_nodes = [
                 ast.Name(id=x, ctx=ast.Load())
-                for x in implementing_class_base_classes.get(i.name, [])
+                for x in fragment_base_names
             ]
-            implementaionMap[i.name] = class_name
+            implementation_map[i.name] = class_name
 
             inline_fields = inline_fragment_fields.get(i.name, [])
+            implementing_bases = merge_bases_sequences(
+                ast_base_nodes,
+                [ast.Name(id=mother_class_name, ctx=ast.Load())],
+                additional_bases,
+                get_interface_bases(config, registry),
+            )
 
             implementing_class = ast.ClassDef(
                 class_name,
-                bases=merge_bases_sequences(
-                    ast_base_nodes,
-                    [ast.Name(id=mother_class_name, ctx=ast.Load())],
-                    additional_bases,
-                    get_interface_bases(config, registry),
-                ),  # Todo: fill with base
+                bases=implementing_bases,  # Todo: fill with base
                 decorator_list=[],
                 keywords=[],
                 type_params=[],
@@ -369,9 +398,17 @@ def generate_fragment(
             )
 
             tree.append(implementing_class)
+            registry.register_generated_class_bases(
+                class_name,
+                [
+                    base.id
+                    for base in implementing_bases
+                    if isinstance(base, ast.Name)
+                ],
+            )
 
         registry.register_interface_fragment_implementations(
-            f.name.value, implementaionMap
+            f.name.value, implementation_map
         )
 
         return tree
@@ -468,13 +505,14 @@ def generate_fragment(
         else:
             meta_body = []
 
+        fragment_bases = merge_bases_sequences(
+            additional_bases,
+            get_fragment_bases("OBJECT", config, plugin_config, registry),
+        )
         tree.append(
             ast.ClassDef(
                 name,
-                bases=merge_bases_sequences(
-                    additional_bases,
-                    get_fragment_bases("OBJECT", config, plugin_config, registry),
-                ),
+                bases=fragment_bases,
                 decorator_list=[],
                 keywords=[],
                 type_params=[],
@@ -484,6 +522,10 @@ def generate_fragment(
                     meta_body,
                 ),
             )
+        )
+        registry.register_generated_class_bases(
+            name,
+            [base.id for base in fragment_bases if isinstance(base, ast.Name)],
         )
         return tree
 

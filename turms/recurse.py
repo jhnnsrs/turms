@@ -277,6 +277,24 @@ def recurse_annotation(
                 inline_fields = []
 
                 for field in sub_node.selection_set.selections:
+                    if isinstance(field, FragmentSpreadNode):
+                        try:
+                            implementation_map = (
+                                registry.get_interface_fragment_implementations(
+                                    field.name.value
+                                )
+                            )
+                            implementation = implementation_map.get(on_type_name)
+                            if implementation:
+                                implementing_class_base_classes.setdefault(
+                                    on_type_name, []
+                                ).append(implementation)
+                        except KeyError:
+                            implementing_class_base_classes.setdefault(
+                                on_type_name, []
+                            ).append(registry.inherit_fragment(field.name.value))
+                        continue
+
                     if not isinstance(field, FieldNode):
                         continue
 
@@ -323,7 +341,7 @@ def recurse_annotation(
         )
         subtree.append(mother_class)
 
-        implementaionMap = {}
+        implementation_map = {}
         union_class_names = []
 
         for i in implementing_types.objects:
@@ -337,11 +355,14 @@ def recurse_annotation(
                 else ast.Expr(value=ast.Constant(value="No documentation"))
             )
 
+            fragment_base_names = registry.prune_redundant_generated_bases(
+                implementing_class_base_classes.get(i.name, [])
+            )
             ast_base_nodes = [
                 ast.Name(id=x, ctx=ast.Load())
-                for x in implementing_class_base_classes.get(i.name, [])
+                for x in fragment_base_names
             ]
-            implementaionMap[i.name] = class_name
+            implementation_map[i.name] = class_name
 
             inline_fields: List[ast.AnnAssign | ast.Expr] = inline_fragment_fields.get(
                 i.name, cast(List[ast.AnnAssign | ast.Expr], [])

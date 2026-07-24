@@ -1,6 +1,6 @@
 import ast
 from keyword import iskeyword
-from typing import Callable, Dict, List, Optional, Set, Type
+from typing import Callable, Dict, List, Optional, Sequence, Set, Type
 
 from graphql import DocumentNode, GraphQLNamedType
 
@@ -255,6 +255,10 @@ class ClassRegistry(object):
         self.interfacefragments_impl_map: Dict[str, Dict[str, str]] = {}
         self.unionfragment_members_map: Dict[str, Dict[str, str]] = {}
 
+        self.generated_class_bases: Dict[
+              str, Set[str]
+          ] = {} # This is used to store the generated class bases for each class to avoid MRO issues
+
         self.operation_single_operation_map: Dict[
             str, ast.AST
         ] = {}  # This is used to store the operation name and the root operation class name if single
@@ -446,6 +450,39 @@ class ClassRegistry(object):
         self, fragmentname: str, implementationMap: Dict[str, str]
     ):
         self.interfacefragments_impl_map[fragmentname] = implementationMap
+
+    def register_generated_class_bases(
+        self, classname: str, bases: Sequence[str]
+    ) -> None:
+        """Record generated inheritance for transitive base pruning."""
+        self.generated_class_bases[classname] = set(bases)
+
+    def prune_redundant_generated_bases(self, bases: Sequence[str]) -> List[str]:
+        """Remove bases inherited by another selected generated base.
+
+        Sorting makes the resulting inheritance independent of GraphQL selection
+        order. Only known generated inheritance participates, so configured or
+        imported bases retain their existing handling elsewhere.
+        """
+        candidates = set(bases)
+
+        def inherits(classname: str, ancestor: str, visited: Set[str]) -> bool:
+            if classname in visited:
+                return False
+            visited.add(classname)
+            direct_bases = self.generated_class_bases.get(classname, set())
+            return ancestor in direct_bases or any(
+                inherits(base, ancestor, visited) for base in direct_bases
+            )
+
+        return sorted(
+            candidate
+            for candidate in candidates
+            if not any(
+                candidate != other and inherits(other, candidate, set())
+                for other in candidates
+            )
+        )
 
     def get_interface_fragment_implementations(self, fragmentname: str):
         return self.interfacefragments_impl_map[fragmentname]
