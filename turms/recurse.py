@@ -277,6 +277,24 @@ def recurse_annotation(
                 inline_fields = []
 
                 for field in sub_node.selection_set.selections:
+                    if isinstance(field, FragmentSpreadNode):
+                        try:
+                            implementation_map = (
+                                registry.get_interface_fragment_implementations(
+                                    field.name.value
+                                )
+                            )
+                            implementation = implementation_map.get(on_type_name)
+                            if implementation:
+                                implementing_class_base_classes.setdefault(
+                                    on_type_name, []
+                                ).append(implementation)
+                        except KeyError:
+                            implementing_class_base_classes.setdefault(
+                                on_type_name, []
+                            ).append(registry.inherit_fragment(field.name.value))
+                        continue
+
                     if not isinstance(field, FieldNode):
                         continue
 

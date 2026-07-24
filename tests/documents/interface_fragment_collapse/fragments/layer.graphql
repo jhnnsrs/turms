@@ -5,3 +5,27 @@ fragment Layer on Layer {
     lens
   }
 }
+
+# Deliberately declared before its concrete dependencies to verify that nested
+# spreads participate in fragment dependency ordering.
+fragment LayerFull on Layer {
+  ... on ImageLayer {
+    ...ImageLayerFull
+  }
+  ... on MeshLayer {
+    ...MeshLayerFull
+  }
+}
+
+fragment ImageLayerFull on ImageLayer {
+  id
+  scene
+  lens
+  status
+}
+
+fragment MeshLayerFull on MeshLayer {
+  id
+  scene
+  mesh
+}

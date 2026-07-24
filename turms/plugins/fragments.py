@@ -71,6 +71,13 @@ def find_fragment_dependencies_recursive(
                     selection.selection_set, fragment_definitions, visited
                 )
             )
+        # Inline fragments can contain fragment spreads too.
+        elif isinstance(selection, InlineFragmentNode):
+            dependencies.update(
+                find_fragment_dependencies_recursive(
+                    selection.selection_set, fragment_definitions, visited
+                )
+            )
 
     return dependencies
 
@@ -262,6 +269,24 @@ def generate_fragment(
                 inline_fields = []
 
                 for field in sub_node.selection_set.selections:
+                    if isinstance(field, FragmentSpreadNode):
+                        try:
+                            implementation_map = (
+                                registry.get_interface_fragment_implementations(
+                                    field.name.value
+                                )
+                            )
+                            implementation = implementation_map.get(on_type_name)
+                            if implementation:
+                                implementing_class_base_classes.setdefault(
+                                    on_type_name, []
+                                ).append(implementation)
+                        except KeyError:
+                            implementing_class_base_classes.setdefault(
+                                on_type_name, []
+                            ).append(registry.inherit_fragment(field.name.value))
+                        continue
+
                     if isinstance(field, FieldNode):
                         if field.name.value == "__typename":
                             continue

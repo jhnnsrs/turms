@@ -23,3 +23,22 @@ query GetLayer($id: ID!) {
     ...Layer
   }
 }
+
+# Exercises the generated interface fragment implementations.
+query GetLayerFull($id: ID!) {
+  layer(id: $id) {
+    ...LayerFull
+  }
+}
+
+# Exercises recurse.py directly without a named interface fragment.
+query GetInlineLayerFull($id: ID!) {
+  layer(id: $id) {
+    ... on ImageLayer {
+      ...ImageLayerFull
+    }
+    ... on MeshLayer {
+      ...MeshLayerFull
+    }
+  }
+}
