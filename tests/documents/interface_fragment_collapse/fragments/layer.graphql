@@ -29,3 +29,14 @@ fragment MeshLayerFull on MeshLayer {
   scene
   mesh
 }
+
+fragment LayerMeta on Layer {
+  id
+}
+
+fragment ImageLayerMeta on ImageLayer {
+  ...LayerMeta
+  imageDetails {
+    id
+  }
+}

@@ -341,7 +341,7 @@ def recurse_annotation(
         )
         subtree.append(mother_class)
 
-        implementaionMap = {}
+        implementation_map = {}
         union_class_names = []
 
         for i in implementing_types.objects:
@@ -355,11 +355,14 @@ def recurse_annotation(
                 else ast.Expr(value=ast.Constant(value="No documentation"))
             )
 
+            fragment_base_names = registry.prune_redundant_generated_bases(
+                implementing_class_base_classes.get(i.name, [])
+            )
             ast_base_nodes = [
                 ast.Name(id=x, ctx=ast.Load())
-                for x in implementing_class_base_classes.get(i.name, [])
+                for x in fragment_base_names
             ]
-            implementaionMap[i.name] = class_name
+            implementation_map[i.name] = class_name
 
             inline_fields: List[ast.AnnAssign | ast.Expr] = inline_fragment_fields.get(
                 i.name, cast(List[ast.AnnAssign | ast.Expr], [])

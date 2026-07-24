@@ -194,3 +194,38 @@ def test_operation_interface_inline_spreads_inherit_concrete_fragments(
         assert result.layer.status == "ready"
         """,
     )
+
+
+def test_overlapping_interface_fragment_bases_are_pruned(
+    interface_fragment_collapse_schema,
+):
+    generated_ast = _generate(interface_fragment_collapse_schema, with_funcs=False)
+
+    class_names = [
+        "GetOverlappingLayerMetaLayerBaseImageLayer",
+        "GetReversedOverlappingLayerMetaLayerBaseImageLayer",
+    ]
+    bases = [_class_bases(generated_ast, class_name) for class_name in class_names]
+
+    for class_bases in bases:
+        assert "ImageLayerMeta" in class_bases
+        assert "LayerMetaImageLayer" not in class_bases
+
+    unit_test_with(
+        generated_ast,
+        """
+        for result_type in (
+            GetOverlappingLayerMeta,
+            GetReversedOverlappingLayerMeta,
+        ):
+            result = result_type(
+                layer={
+                    "__typename": "ImageLayer",
+                    "id": "layer-1",
+                    "imageDetails": {"id": "details-1"},
+                }
+            )
+            assert result.layer.id == "layer-1"
+            assert result.layer.image_details.id == "details-1"
+        """,
+    )
