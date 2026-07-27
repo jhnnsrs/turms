@@ -5,9 +5,11 @@ returns the corresponding pydantic input model. Modeled on the ``funcs`` plugin,
 but instead of building a ``variables`` dict and calling an executor it constructs
 the model directly (``return SomeInput(**data)``).
 
-Scalar parameters can be made *coercible* through ``coercible_scalars`` (same
-mechanism as the ``funcs`` plugin), so callers may pass friendlier types
-(e.g. ``ID -> pydantic.UUID4``); the input model / pydantic performs the coercion.
+Scalar parameters can be made *coercible* through ``coercible_scalars``
+(replacing the annotation), and input-object parameters through
+``coercible_inputs`` (unioning the additional type onto the input model, e.g.
+``AxisInput: str -> Union[AxisInput, str]``) -- same mechanism as the ``funcs``
+plugin; the input model / pydantic performs the coercion.
 """
 
 import ast
@@ -36,6 +38,9 @@ class InputFuncsPluginConfig(PluginConfig):
     type: str = "turms.plugins.input_funcs.InputFuncsPlugin"
     coercible_scalars: Dict[str, PythonType] = {}
     """Map of scalar names to a coercible python type used in the factory params."""
+    coercible_inputs: Dict[str, PythonType] = {}
+    """Map of input type names to an additional python type accepted in the factory
+    params (unioned onto the input model)."""
     skip_underscore: bool = True
     skip_unreferenced: bool = True
     prepend: str = ""
@@ -198,14 +203,19 @@ class InputFuncsPlugin(Plugin):
         config: GeneratorConfig,
         registry: ClassRegistry,
     ) -> List[ast.AST]:
-        # Merge the global coercible_scalars with this plugin's overrides (plugin
-        # entries win) so funcs and input_funcs can share a global config.
+        # Merge the global coercible_scalars/coercible_inputs with this plugin's
+        # overrides (plugin entries win) so funcs and input_funcs can share a
+        # global config.
         plugin_config = self.config.model_copy(
             update={
                 "coercible_scalars": {
                     **config.coercible_scalars,
                     **self.config.coercible_scalars,
-                }
+                },
+                "coercible_inputs": {
+                    **config.coercible_inputs,
+                    **self.config.coercible_inputs,
+                },
             }
         )
         return generate_input_funcs(client_schema, config, plugin_config, registry)

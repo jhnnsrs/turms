@@ -23,6 +23,7 @@ from graphql.language.ast import (
     NonNullTypeNode,
     OperationDefinitionNode,
     OperationType,
+    TypeNode,
 )
 from graphql import GraphQLSchema
 from graphql.utilities.get_operation_root_type import get_operation_root_type
@@ -88,6 +89,11 @@ class FuncsPluginConfig(PluginConfig):
     argument_key_is_styled: bool = False
     expand_input_types: List[str] = []
     coercible_scalars: dict[str, PythonType] = {}
+    coercible_inputs: dict[str, PythonType] = {}
+    """Map of input type names to an additional python type accepted in generated
+    function parameters. The annotation is generated as a Union of the input model
+    and the given type (e.g. AxisInput: str -> Union[AxisInput, str]); the input
+    model performs the actual coercion (e.g. via a before-validator)."""
 
 
 def camel_to_snake(name: str) -> str:
@@ -202,14 +208,20 @@ def generate_input_annotation(
         return slice
 
     if isinstance(type, GraphQLInputObjectType):
+        slice = registry.reference_inputtype(type.name, "SHOULD_NOT_BE_USED")
+        if type.name in plugin_config.coercible_inputs:
+            slice = coercible_input_union(
+                slice, plugin_config.coercible_inputs[type.name], registry
+            )
+
         if is_optional:
             registry.register_import("typing.Optional")
             return ast.Subscript(
                 value=ast.Name("Optional", ctx=ast.Load()),
-                slice=registry.reference_inputtype(type.name, "SHOULD_NOT_BE_USED"),
+                slice=slice,
                 ctx=ast.Load(),
             )
-        return registry.reference_inputtype(type.name, "SHOULD_NOT_BE_USED")
+        return slice
 
     if isinstance(type, GraphQLEnumType):
         if is_optional:
@@ -302,6 +314,60 @@ def generate_input_type_descriptions(
         description += f"    {registry.generate_parameter_name(value_key)}: {value.description or generate_input_description(value.type, registry)}\n"
 
     return description
+
+
+def coercible_input_union(
+    inputtype_reference: ast.expr,
+    coercible: PythonType,
+    registry: ClassRegistry,
+) -> ast.expr:
+    """Builds ``Union[<InputType>, <coercible>]``: the input model reference with
+    the additionally accepted (coercible) python type unioned onto it."""
+    registry.register_import(coercible)
+    registry.register_import("typing.Union")
+    return ast.Subscript(
+        value=ast.Name(id="Union", ctx=ast.Load()),
+        slice=ast.Tuple(
+            elts=[
+                inputtype_reference,
+                ast.Name(id=coercible.split(".")[-1], ctx=ast.Load()),
+            ],
+            ctx=ast.Load(),
+        ),
+        ctx=ast.Load(),
+    )
+
+
+def generate_variable_annotation(
+    type_node: TypeNode,
+    registry: ClassRegistry,
+    plugin_config: FuncsPluginConfig,
+) -> ast.expr:
+    """The annotation for a non-expanded operation variable, honoring
+    coercible_scalars and coercible_inputs on the final named type (the
+    NonNull/List structure around it is kept as is)."""
+    final = type_node
+    while not isinstance(final, NamedTypeNode):
+        final = final.type
+    name = final.name.value
+
+    scalar_coercible = plugin_config.coercible_scalars.get(name)
+    if scalar_coercible:
+        registry.register_import(scalar_coercible)
+        return recurse_type_annotation(
+            type_node, registry, overwrite_final=scalar_coercible.split(".")[-1]
+        )
+
+    input_coercible = plugin_config.coercible_inputs.get(name)
+    if input_coercible:
+        union = coercible_input_union(
+            registry.reference_inputtype(name, "SHOULD_NOT_BE_USED"),
+            input_coercible,
+            registry,
+        )
+        return recurse_type_annotation(type_node, registry, overwrite_final=union)
+
+    return recurse_type_annotation(type_node, registry)
 
 
 def unset_union_annotation(annotation: ast.expr, registry: ClassRegistry) -> ast.expr:
@@ -436,7 +502,9 @@ def generate_parameters(
         pos_args.append(
             ast.arg(
                 arg=registry.generate_parameter_name(v.variable.name.value),
-                annotation=recurse_type_annotation(v.type, registry),
+                annotation=generate_variable_annotation(
+                    v.type, registry, plugin_config
+                ),
             )
         )
 
@@ -449,7 +517,8 @@ def generate_parameters(
             ast.arg(
                 arg=registry.generate_parameter_name(v.variable.name.value),
                 annotation=unset_union_annotation(
-                    recurse_type_annotation(v.type, registry), registry
+                    generate_variable_annotation(v.type, registry, plugin_config),
+                    registry,
                 ),
             )
         )
@@ -1314,14 +1383,19 @@ class FuncsPlugin(Plugin):
     ) -> List[ast.AST]:
         plugin_tree = []
 
-        # Merge the global coercible_scalars with this plugin's overrides (plugin
-        # entries win) so funcs and input_funcs can share a global config.
+        # Merge the global coercible_scalars/coercible_inputs with this plugin's
+        # overrides (plugin entries win) so funcs and input_funcs can share a
+        # global config.
         plugin_config = self.config.model_copy(
             update={
                 "coercible_scalars": {
                     **config.coercible_scalars,
                     **self.config.coercible_scalars,
-                }
+                },
+                "coercible_inputs": {
+                    **config.coercible_inputs,
+                    **self.config.coercible_inputs,
+                },
             }
         )
 

@@ -60,6 +60,53 @@ def test_coercible_types_in_funcs(beast_schema):
     )
 
 
+def test_coercible_inputs_in_funcs(nested_input_schema):
+    """Test that coercible input types union the additional type onto the input
+    model annotation in generated function parameters (the model itself stays
+    strict and performs the coercion)."""
+    config = GeneratorConfig(
+        documents=build_relative_glob("/documents/coercible_inputs/*.graphql"),
+    )
+
+    generated_ast = generate_ast(
+        config,
+        nested_input_schema,
+        stylers=[DefaultStyler()],
+        plugins=[
+            EnumsPlugin(),
+            InputsPlugin(),
+            FragmentsPlugin(),
+            OperationsPlugin(),
+            FuncsPlugin(
+                config=FuncsPluginConfig(
+                    coercible_inputs={
+                        "NestedInput": "pathlib.Path",
+                    },
+                    definitions=[
+                        FunctionDefinition(
+                            type="mutation",
+                            use="mocks.query",
+                            is_async=False,
+                        ),
+                    ],
+                ),
+            ),
+        ],
+    )
+
+    unit_test_with(
+        generated_ast,
+        """
+import inspect
+
+sig = inspect.signature(something_with_nested_input)
+annotation = str(sig.parameters["input"].annotation)
+assert "NestedInput" in annotation, annotation
+assert "Path" in annotation, annotation
+""",
+    )
+
+
 def test_coercible_types_mixed_with_regular_scalars(beast_schema):
     """Test that coercible scalars work alongside regular scalar definitions."""
     config = GeneratorConfig(

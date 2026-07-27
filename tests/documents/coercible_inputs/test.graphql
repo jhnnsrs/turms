@@ -1,0 +1,5 @@
+mutation somethingWithNestedInput($input: NestedInput!) {
+  somethingWithNestedInput(input: $input) {
+    binomial
+  }
+}

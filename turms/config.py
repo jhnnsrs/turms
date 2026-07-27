@@ -251,6 +251,12 @@ class GeneratorConfig(BaseSettings):
     )
     """Global coercible scalar map. Plugins merge their own coercible_scalars on top (plugin entries override)."""
 
+    coercible_inputs: Dict[str, PythonType] = Field(
+        default_factory=dict,
+        description="Global map of input type names to an additional python type accepted in generated function/factory parameters. The annotation is generated as a Union of the input model and the given type (e.g. AxisInput: str -> Union[AxisInput, str]); the input model performs the coercion (e.g. via a before-validator). Plugins (funcs, input_funcs) merge their own coercible_inputs on top of this, overriding per-type.",
+    )
+    """Global coercible input-type map (input model unioned with the given type). Plugins merge their own coercible_inputs on top (plugin entries override)."""
+
     graphql_default_class: Optional[PythonType] = Field(
         default=None,
         description="Importable class used as the Annotated marker carrying a field's GraphQL schema default value. If unset, a GraphQLDefault marker is generated into the output module.",

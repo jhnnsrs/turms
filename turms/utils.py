@@ -635,7 +635,7 @@ def recurse_type_annotation(
     type: TypeNode,
     registry: ClassRegistry,
     optional: bool = True,
-    overwrite_final: Optional[str] = None,
+    overwrite_final: Optional[Union[str, ast.expr]] = None,
 ) -> ast.expr:
     if isinstance(type, NonNullTypeNode):
         return recurse_type_annotation(
@@ -667,7 +667,11 @@ def recurse_type_annotation(
     if isinstance(type, NamedTypeNode):
         x = None
         if overwrite_final is not None:
-            x = ast.Name(id=overwrite_final, ctx=ast.Load())
+            x = (
+                overwrite_final
+                if isinstance(overwrite_final, ast.expr)
+                else ast.Name(id=overwrite_final, ctx=ast.Load())
+            )
         else:
             try:
                 x = registry.reference_scalar(type.name.value)
