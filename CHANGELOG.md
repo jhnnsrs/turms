@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.1.0 (2026-07-27)
+
+### Features
+
+- Add coercible inputs (beyond scalars)
+  ([`2fd2279`](https://github.com/jhnnsrs/turms/commit/2fd2279b0e25c91865af23e84cb86f6fc0f6d086))
+
+
 ## v1.0.1 (2026-07-06)
 
 ### Bug Fixes
