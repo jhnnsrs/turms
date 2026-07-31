@@ -1,6 +1,7 @@
+import re
+import textwrap
 from dataclasses import dataclass
 from graphql import (
-    ConstArgumentNode,
     GraphQLInputObjectType,
     GraphQLInputType,
     GraphQLList,
@@ -8,6 +9,7 @@ from graphql import (
     GraphQLScalarType,
     Undefined,
 )
+from turms.errors import GenerationError
 from pydantic_settings import SettingsConfigDict
 from turms.plugins.base import Plugin, PluginConfig
 import ast
@@ -26,6 +28,7 @@ from turms.utils import (
     compose_field_documentation,
     generate_pydantic_config,
     get_additional_bases_for_type,
+    is_oneof_input_type,
     parse_documents,
 )
 from turms.config import GraphQLTypes
@@ -207,13 +210,12 @@ class Discriminator:
 
 def generate_input_type(
     name: str,
-    union_type_descriminators: Dict[str, str],
     type: GraphQLInputType,
     config: GeneratorConfig,
     plugin_config: InputsPluginConfig,
     registry: ClassRegistry,
     key: str,
-    discriminator: Optional[Discriminator] = None,
+    discriminators: Optional[List[Discriminator]] = None,
 ):
     additional_bases = get_additional_bases_for_type(type.name, config, registry)
 
@@ -223,7 +225,9 @@ def generate_input_type(
         else [ast.Expr(value=ast.Constant(value="No documentation"))]
     )
 
-    if discriminator:
+    for discriminator in discriminators or []:
+        registry.register_import("typing.Literal")
+        registry.register_import("pydantic.Field")
         fields.append(
             ast.AnnAssign(
                 target=ast.Name(discriminator.discriminator, ctx=ast.Store()),
@@ -301,6 +305,17 @@ def generate_input_type(
         else:
             fields += [assign]
 
+    if discriminators and config.pydantic_version == "v2":
+        # The discriminator carries a default and is never explicitly set, so an
+        # exclude_unset dump (the proxy contract) would drop it from the wire —
+        # but the server needs it to discriminate. Mark it as set on every
+        # construction so it always serializes.
+        names = ", ".join(repr(d.discriminator) for d in discriminators)
+        fields += ast.parse(
+            "def model_post_init(self, context):\n"
+            f"    self.__pydantic_fields_set__.update({{{names}}})\n"
+        ).body
+
     return ast.ClassDef(
         name,
         bases=additional_bases
@@ -313,6 +328,196 @@ def generate_input_type(
         body=fields
         + generate_pydantic_config(GraphQLTypes.INPUT, config, registry, typename=key),
     )
+
+
+def validate_oneof_input_type(type: GraphQLInputObjectType):
+    """Enforce the spec constraints on a ``@oneOf`` input: every field must be
+    nullable and must not carry a default value."""
+    for value_key, value in type.fields.items():
+        if isinstance(value.type, GraphQLNonNull):
+            raise GenerationError(
+                f"@oneOf input type '{type.name}' has a non-nullable field "
+                f"'{value_key}'. The spec requires all fields of a @oneOf input "
+                "to be nullable."
+            )
+        if value.default_value is not Undefined:
+            raise GenerationError(
+                f"@oneOf input type '{type.name}' has a default value on field "
+                f"'{value_key}'. The spec forbids defaults on @oneOf input fields."
+            )
+
+
+def get_oneof_member_map(
+    type: GraphQLInputObjectType,
+) -> Optional[Dict[str, GraphQLInputObjectType]]:
+    """Field-name → member-type map when the ``@oneOf`` input follows the tagged
+    input-union pattern: every field is a distinct, non-oneOf input object type.
+    Returns ``None`` when the type cannot be modelled as a direct union of its
+    member models (scalar/enum fields, duplicated member types, or oneOf
+    members, whose tag could not be recovered from the value's type)."""
+    members: Dict[str, GraphQLInputObjectType] = {}
+    for value_key, value in type.fields.items():
+        member = value.type
+        if not isinstance(member, GraphQLInputObjectType) or is_oneof_input_type(
+            member
+        ):
+            return None
+        members[value_key] = member
+    if len({member.name for member in members.values()}) != len(members):
+        return None
+    return members or None
+
+
+def _pascal(name: str) -> str:
+    return name[:1].upper() + name[1:]
+
+
+def _snake(name: str) -> str:
+    interim = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
+    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", interim).lower()
+
+
+def generate_union_alias(alias_name: str, member_names: List[str], registry: ClassRegistry):
+    if len(member_names) == 1:
+        value = ast.Name(id=member_names[0], ctx=ast.Load())
+    else:
+        registry.register_import("typing.Union")
+        value = ast.Subscript(
+            value=ast.Name("Union", ctx=ast.Load()),
+            slice=ast.Tuple(
+                elts=[ast.Name(id=name, ctx=ast.Load()) for name in member_names],
+                ctx=ast.Load(),
+            ),
+            ctx=ast.Load(),
+        )
+    return ast.Assign(
+        targets=[ast.Name(id=alias_name, ctx=ast.Store())],
+        value=value,
+    )
+
+
+def generate_oneof_wrapper_input(
+    key: str,
+    type: GraphQLInputObjectType,
+    config: GeneratorConfig,
+    plugin_config: InputsPluginConfig,
+    registry: ClassRegistry,
+):
+    """Generate a ``@oneOf`` input as a union of per-field wrapper classes, each
+    carrying its single field as required. A wrapper serializes to the tagged
+    wire form ``{fieldName: value}`` through the ordinary
+    ``dict(by_alias=True, exclude_unset=True)`` proxy contract."""
+    tree = []
+    additional_bases = get_additional_bases_for_type(type.name, config, registry)
+    member_names = []
+
+    for value_key, value in type.fields.items():
+        try:
+            classname = registry.generate_inputtype(f"{type.name}{_pascal(value_key)}")
+        except AssertionError as e:
+            raise GenerationError(
+                f"Cannot generate wrapper class for field '{value_key}' of @oneOf "
+                f"input '{type.name}': the name '{type.name}{_pascal(value_key)}' "
+                "is already taken by another type."
+            ) from e
+        member_names.append(classname)
+
+        field_name = registry.generate_node_name(value_key)
+        annotation = generate_input_annotation(
+            value.type, classname, config, plugin_config, registry, is_optional=False
+        )
+        annotation = annotate_field_metadata(
+            annotation, registry, deprecation_reason=value.deprecation_reason
+        )
+        docstring = (
+            value.description
+            or f"'{value_key}' variant of the @oneOf input '{type.name}'"
+        )
+
+        tree.append(
+            ast.ClassDef(
+                classname,
+                bases=additional_bases
+                + [
+                    ast.Name(id=base.split(".")[-1], ctx=ast.Load())
+                    for base in plugin_config.inputtype_bases
+                ],
+                decorator_list=[],
+                keywords=[],
+                body=[
+                    ast.Expr(value=ast.Constant(value=docstring)),
+                    ast.AnnAssign(
+                        target=ast.Name(field_name, ctx=ast.Store()),
+                        annotation=annotation,
+                        value=generate_input_field_value(
+                            field_name, value_key, False, value.description, registry
+                        ),
+                        simple=1,
+                    ),
+                ]
+                + generate_pydantic_config(
+                    GraphQLTypes.INPUT, config, registry, typename=key
+                ),
+            )
+        )
+
+    alias_name = registry.generate_inputtype(key)
+    tree.append(generate_union_alias(alias_name, member_names, registry))
+    return tree
+
+
+def generate_oneof_direct_union(
+    key: str,
+    type: GraphQLInputObjectType,
+    members: Dict[str, GraphQLInputObjectType],
+    registry: ClassRegistry,
+):
+    """Generate a ``@oneOf`` input following the tagged input-union pattern as a
+    direct union of the member models, with a ``WrapSerializer`` restoring the
+    ``{fieldName: memberDict}`` wire form. Must be emitted after all member
+    classes (the tag dict references them at module level)."""
+    alias_name = registry.generate_inputtype(key)
+    serializer_name = f"_serialize_{_snake(alias_name)}"
+
+    member_classnames = {
+        value_key: registry.get_inputtype_class(member.name)
+        for value_key, member in members.items()
+    }
+    tags = ", ".join(
+        f"{classname}: {value_key!r}"
+        for value_key, classname in member_classnames.items()
+    )
+    union = ", ".join(dict.fromkeys(member_classnames.values()))
+    if len(member_classnames) > 1:
+        registry.register_import("typing.Union")
+        union = f"Union[{union}]"
+
+    registry.register_import("typing.Annotated")
+    registry.register_import("pydantic.WrapSerializer")
+
+    source = textwrap.dedent(
+        f'''
+        def {serializer_name}(value, handler):
+            """Wire serializer for the @oneOf input '{type.name}': wraps the
+            serialized member under its field tag."""
+            tags = {{{tags}}}
+            tag = tags.get(type(value))
+            if tag is None:
+                for member_class, member_tag in tags.items():
+                    if isinstance(value, member_class):
+                        tag = member_tag
+                        break
+            if tag is None:
+                raise ValueError(
+                    f"{{type(value)!r}} is not a member of the @oneOf input '{type.name}'"
+                )
+            return {{tag: handler(value)}}
+
+
+        {alias_name} = Annotated[{union}, WrapSerializer({serializer_name})]
+        '''
+    )
+    return ast.parse(source).body
 
 
 def generate_inputs(
@@ -341,54 +546,113 @@ def generate_inputs(
 
     union_input_types = {}
     union_type_discriminators = {}
+    # Member types generated by the unionElementOf pre-pass; the main loop must
+    # not generate them a second time.
+    union_member_types = set()
 
-    for key, type in inputobjects_type.items():
+    for type_key, type in inputobjects_type.items():
         directives = type.ast_node.directives if type.ast_node else []
+        # unionElementOf is repeatable: a member may belong to several unions.
+        memberships = []
         for directive in directives:
-            directive_name = directive.name.value
-            if directive_name == "unionElementOf":
-                union_type = None
-                discriminator = None
-                key = None
-                for arg in directive.arguments:
-                    if isinstance(arg.value, ConstArgumentNode):
-                        if arg.name.value == "union":
-                            union_type = arg.value.value
-                        if arg.name.value == "discriminator":
-                            discriminator = arg.value.value
-                        if arg.name.value == "key":
-                            key = arg.value.value
-
-                if union_type in ref_registry.inputs:
-                    if union_type not in union_input_types:
-                        union_input_types[union_type] = []
-                    if union_type not in union_type_discriminators:
-                        union_type_discriminators[union_type] = discriminator
-
-                    assert union_type_discriminators[union_type] == discriminator, (
-                        f"Discriminator mismatch for {union_type} expected {union_type_discriminators[union_type]} got {discriminator}"
+            if directive.name.value != "unionElementOf":
+                continue
+            args = {arg.name.value: arg.value.value for arg in directive.arguments}
+            union_type = args.get("union")
+            discriminator = args.get("discriminator")
+            member_key = args.get("key")
+            if union_type is None or discriminator is None or member_key is None:
+                raise GenerationError(
+                    f"@unionElementOf on '{type.name}' needs 'union', "
+                    "'discriminator' and 'key' arguments."
+                )
+            # Skip memberships of unions that won't be generated.
+            if ref_registry is not None and union_type not in ref_registry.inputs:
+                continue
+            if union_type in union_type_discriminators:
+                if union_type_discriminators[union_type] != discriminator:
+                    raise GenerationError(
+                        f"Discriminator mismatch for union '{union_type}': expected "
+                        f"'{union_type_discriminators[union_type]}', got "
+                        f"'{discriminator}' on '{type.name}'."
                     )
+            else:
+                union_type_discriminators[union_type] = discriminator
+            memberships.append((union_type, discriminator, member_key))
 
-                    name = registry.generate_inputtype(type.name)
-                    union_input_types[union_type].append(name)
-                    tree.append(
-                        generate_input_type(
-                            name,
-                            union_type_discriminators,
-                            type,
-                            config,
-                            plugin_config,
-                            registry,
-                            type.name,
-                            Discriminator(discriminator=discriminator, value=key),
-                        )
-                    )
+        if not memberships:
+            continue
+
+        # One Literal field per distinct discriminator name; all unions sharing
+        # a discriminator name must agree on this member's key.
+        discriminators: Dict[str, Discriminator] = {}
+        for union_type, discriminator, member_key in memberships:
+            existing = discriminators.get(discriminator)
+            if existing is not None and existing.value != member_key:
+                raise GenerationError(
+                    f"'{type.name}' uses discriminator '{discriminator}' with "
+                    f"conflicting keys '{existing.value}' and '{member_key}'."
+                )
+            discriminators[discriminator] = Discriminator(
+                discriminator=discriminator, value=member_key
+            )
+
+        name = registry.generate_inputtype(type.name)
+        union_member_types.add(type_key)
+        for union_type, _, _ in memberships:
+            union_input_types.setdefault(union_type, [])
+            if name not in union_input_types[union_type]:
+                union_input_types[union_type].append(name)
+        tree.append(
+            generate_input_type(
+                name,
+                type,
+                config,
+                plugin_config,
+                registry,
+                type.name,
+                list(discriminators.values()),
+            )
+        )
+
+    # Direct oneOf unions reference their member classes at module level (tag
+    # dict + Union), so their emission is deferred until after every input
+    # class has been generated.
+    deferred_oneof_unions = []
 
     for key, type in inputobjects_type.items():
+        if key in union_member_types:
+            continue
+
         if ref_registry and key not in ref_registry.inputs:
             continue
 
         if plugin_config.skip_underscore and key.startswith("_"):  # pragma: no cover
+            continue
+
+        if is_oneof_input_type(type):
+            validate_oneof_input_type(type)
+            members = (
+                get_oneof_member_map(type)
+                if config.pydantic_version == "v2"
+                else None
+            )
+            if members is not None and any(
+                (ref_registry and member.name not in ref_registry.inputs)
+                or (plugin_config.skip_underscore and member.name.startswith("_"))
+                for member in members.values()
+            ):
+                # A member will not be generated into this module, so the direct
+                # union cannot reference it; fall back to wrapper classes.
+                members = None
+            if members is not None:
+                deferred_oneof_unions.append((key, type, members))
+            else:
+                tree.extend(
+                    generate_oneof_wrapper_input(
+                        key, type, config, plugin_config, registry
+                    )
+                )
             continue
 
         if type.name in union_input_types:
@@ -522,6 +786,9 @@ def generate_inputs(
                 ),
             )
         )
+
+    for key, type, members in deferred_oneof_unions:
+        tree.extend(generate_oneof_direct_union(key, type, members, registry))
 
     return tree
 

@@ -601,6 +601,20 @@ def get_additional_bases_for_type(
     return []
 
 
+def is_oneof_input_type(graphql_type) -> bool:
+    """Whether an input object type is declared with the spec ``@oneOf`` directive.
+
+    graphql-core 3.3+ exposes this as ``is_one_of``; on 3.2 the directive is only
+    visible on the SDL ``ast_node`` (which is ``None`` for introspected schemas,
+    where ``@oneOf`` is therefore undetectable)."""
+    if getattr(graphql_type, "is_one_of", False):
+        return True
+    ast_node = getattr(graphql_type, "ast_node", None)
+    if ast_node is None:
+        return False
+    return any(directive.name.value == "oneOf" for directive in ast_node.directives)
+
+
 def get_interface_bases(config: GeneratorConfig, registry: ClassRegistry):
     if config.interface_bases:
         for base in config.interface_bases:

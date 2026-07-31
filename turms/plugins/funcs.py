@@ -35,6 +35,7 @@ from turms.plugins.base import Plugin, PluginConfig
 from turms.registry import ClassRegistry
 from turms.utils import (
     inspect_operation_for_documentation,
+    is_oneof_input_type,
     non_typename_fields,
     parse_documents,
     recurse_outputtype_annotation,
@@ -611,6 +612,12 @@ def generate_variable_assignments(
             # The input is spread into one parameter per field; build the inner
             # dict, omitting fields the caller did not provide.
             input_type = client_schema.type_map[v.type.type.name.value]
+            if is_oneof_input_type(input_type):
+                registry.warn(
+                    f"Input type '{input_type.name}' is a @oneOf input: expanding "
+                    "it into separate parameters cannot enforce that exactly one "
+                    "of them is provided."
+                )
             inner_name = f"_{registry.generate_parameter_name(gql_name)}"
             stmts.append(
                 ast.AnnAssign(

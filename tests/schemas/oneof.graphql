@@ -4,6 +4,7 @@ directive @oneOf on INPUT_OBJECT
 type Query {
   findUser(input: FindUserInput!): User
   searchContent(filter: SearchFilter!): [Content]
+  findPet(pet: PetInput!): Pet
 }
 
 type User {
@@ -28,4 +29,25 @@ input FindUserInput @oneOf {
 input SearchFilter @oneOf {
   title: String
   authorId: ID
+}
+
+type Pet {
+  id: ID!
+  name: String!
+}
+
+input CatInput {
+  name: String!
+  meow: Boolean
+}
+
+input DogInput {
+  name: String!
+  bark: Boolean
+}
+
+"""A pet, expressed as a tagged input union"""
+input PetInput @oneOf {
+  cat: CatInput
+  dog: DogInput
 }

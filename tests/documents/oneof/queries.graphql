@@ -12,3 +12,10 @@ query SearchContent($filter: SearchFilter!) {
     title
   }
 }
+
+query FindPet($pet: PetInput!) {
+  findPet(pet: $pet) {
+    id
+    name
+  }
+}

@@ -40,6 +40,7 @@ from turms.utils import (
     generate_pydantic_config,
     get_additional_bases_for_type,
     interface_is_extended_by_other_interfaces,
+    is_oneof_input_type,
 )
 from turms.config import GraphQLTypes
 
@@ -741,7 +742,7 @@ def generate_inputs(
             continue
 
         decorator_keywords = generate_directive_keywords(type.ast_node, plugin_config)
-        if getattr(type, "is_one_of", False):
+        if is_oneof_input_type(type):
             decorator_keywords.append(
                 ast.keyword(arg="one_of", value=ast.Constant(value=True))
             )
