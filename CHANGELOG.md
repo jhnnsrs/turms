@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.2.0 (2026-07-31)
+
+### Features
+
+- Oneof support + unionElementof (discriminated union)
+  ([`38a39ef`](https://github.com/jhnnsrs/turms/commit/38a39ef9b4d8f498fea34216327af426193583c0))
+
+
 ## v1.1.0 (2026-07-27)
 
 ### Features
