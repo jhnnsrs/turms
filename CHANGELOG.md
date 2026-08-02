@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.2.1 (2026-08-02)
+
+### Bug Fixes
+
+- No two kinds of literals
+  ([`c9f2b8b`](https://github.com/jhnnsrs/turms/commit/c9f2b8b1713d94bc5c59d2cfe217c26bea4f58fc))
+
+
 ## v1.2.0 (2026-07-31)
 
 ### Features
