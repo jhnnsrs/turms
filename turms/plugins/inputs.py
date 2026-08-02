@@ -249,8 +249,17 @@ def generate_input_type(
             )
         )
 
+    # A union member normally declares the discriminator as an ordinary field
+    # (`kind: ElementKind! = LASER`), because it *is* an ordinary field on the
+    # wire. The Literal emitted above is the same field, narrowed to the one
+    # value this member answers to, so emitting it again here would shadow the
+    # Literal with the open enum and leave pydantic unable to discriminate.
+    discriminator_names = {d.discriminator for d in discriminators or []}
+
     for value_key, value in type.fields.items():
         field_name = registry.generate_node_name(value_key)
+        if field_name in discriminator_names:
+            continue
         # A field is omittable (and thus optional, defaulting to None) when it is
         # nullable OR carries a schema default. For a default we no longer bake the
         # value: the field is omitted on serialization (exclude_unset) so the
