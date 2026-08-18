@@ -256,6 +256,8 @@ turms complies with [graphql-config](https://www.graphql-config.com/docs/user/us
 | `create_catchall` | `true` | Add a catch-all model for unknown interface implementations |
 | `skip_forwards` | `false` | Skip generating forward-reference updates |
 | `pydantic_version` | `"v2"` | Target Pydantic major version (`"v1"` or `"v2"`) |
+| `type_annotation_style` | `"auto"` | How annotations are spelled: `auto` (derived from `min_python_version`), `modern` (`list[X] | None`), or `legacy` (`Optional[List[X]]`) |
+| `min_python_version` | `"3.10"` | Oldest Python the generated code must run on — drives `type_annotation_style: auto` |
 | `omited_document_rules` | `[]` | GraphQL validation rules to skip for documents |
 | `dump_schema` / `dump_configuration` | `false` | Also write the resolved schema / project config next to the output |
 
@@ -271,6 +273,35 @@ schema:
 ```
 
 See the [documentation website](https://jhnnsrs.github.io/turms) for the full configuration reference, including all per-plugin options.
+
+### Modern type annotations
+
+turms writes annotations in the modern spelling — [PEP 585](https://peps.python.org/pep-0585/) builtin generics and [PEP 604](https://peps.python.org/pep-0604/) unions — whenever `min_python_version` allows it, which the default of `3.10` does:
+
+```python
+# legacy                                    # modern (default)
+tags: Optional[List[str]] = None            tags: list[str] | None = None
+extra: Optional[Dict] = None                extra: dict | None = None
+nested: Optional["Filter"] = None           nested: "Filter | None" = None
+```
+
+The obsolete `typing` imports are dropped from the generated file. Forward references are emitted as whole string annotations, because `"Filter" | None` would raise a `TypeError` while the class body is evaluated — Pydantic resolves them on `model_rebuild()` exactly as before.
+
+Lower the floor and `auto` steps back accordingly — useful when the generated client is published for a range of interpreters:
+
+```yaml
+min_python_version: "3.9"   # builtin generics, but Optional[...] instead of X | None
+```
+
+Set the style explicitly to ignore `min_python_version` altogether — `modern` forces both on, `legacy` restores the classic `typing` spelling everywhere:
+
+```yaml
+type_annotation_style: legacy
+```
+
+With `pydantic_version: v1`, PEP 604 unions need Pydantic 1.10 or newer.
+
+Only two thresholds change what turms emits: builtin generics (`list[X]`) from 3.9, and unions (`X | None`) from 3.10. The typing features added in 3.11 and later (`Self`, `NotRequired`, PEP 695 `type`) never appear in generated code, so `auto` on 3.11+ produces the same output as on 3.10.
 
 ### Custom scalars
 

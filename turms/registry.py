@@ -633,6 +633,15 @@ class ClassRegistry(object):
 
         self._imports.add(name)
 
+    def unregister_import(self, name: str) -> None:
+        """Drops a previously registered import (e.g. an annotation rewrite made
+        it obsolete). A no-op if it was never registered."""
+        self._imports.discard(name)
+
+    @property
+    def registered_imports(self) -> Set[str]:
+        return set(self._imports)
+
     def generate_imports(self) -> List[ast.AST]:
         """Generate the imports for the generated code. This is used to generate the"""
         imports: List[ast.AST] = []

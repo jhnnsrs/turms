@@ -190,6 +190,29 @@ class OptionsConfig(BaseSettings):
 
 PydanticVersion = Literal["v1", "v2"]
 
+PythonVersion = Literal[
+    "3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"
+]
+"""A python version the generated code can be targeted at."""
+
+TypeAnnotationStyle = Literal["legacy", "modern", "auto"]
+"""How type annotations are spelled in the generated code.
+
+- ``auto``: pick the most modern spelling that ``min_python_version`` supports (the default)
+- ``modern``: always ``list[X] | None`` (PEP 585 builtin generics + PEP 604 unions)
+- ``legacy``: always ``typing.Optional[typing.List[X]]``, whatever the target version
+"""
+
+#: The python version each modern-annotation feature became available in.
+BUILTIN_GENERICS_SINCE = (3, 9)  # PEP 585: list[int] instead of typing.List[int]
+UNION_OPERATOR_SINCE = (3, 10)  # PEP 604: int | None instead of typing.Optional[int]
+
+
+def parse_python_version(version: str) -> tuple:
+    """Turns a ``"3.10"`` style version string into a comparable tuple."""
+    return tuple(int(part) for part in version.split("."))
+
+
 
 class GeneratorConfig(BaseSettings):
     """Configuration for the generator
@@ -306,6 +329,18 @@ class GeneratorConfig(BaseSettings):
     skip_forwards: bool = False
     """Skip generating automatic forwards reference for the generated models"""
 
+    min_python_version: PythonVersion = Field(
+        default="3.10",
+        description="The oldest python version the generated code has to run on. Drives the annotation spelling while type_annotation_style is 'auto'.",
+    )
+    """The oldest python version the generated code has to run on (drives `type_annotation_style: auto`)"""
+
+    type_annotation_style: TypeAnnotationStyle = Field(
+        default="auto",
+        description="How type annotations are spelled: 'auto' picks the most modern spelling min_python_version supports, 'modern' always uses PEP 585 builtin generics and PEP 604 unions (list[X] | None), 'legacy' always uses typing.Optional/typing.List.",
+    )
+    """How type annotations are spelled: auto (derived from min_python_version), modern, or legacy"""
+
     additional_bases: Dict[str, List[str]] = Field(
         default_factory=dict,
         description="Additional bases for the generated models as map of GraphQL Type to importable base class (e.g. module.package.Class)",
@@ -347,6 +382,29 @@ class GeneratorConfig(BaseSettings):
         description="List of stylers to use. Style are used to enforce specific styles on the generaded class or fieldnames. ",
     )
     "List of stylers to use. Style are used to enforce specific styles on the generaded class or fieldnames. "
+
+    @property
+    def _target_python_version(self) -> tuple:
+        """The python version the annotation style is resolved against."""
+        if self.type_annotation_style == "modern":
+            # An explicit `modern` opts into every modern spelling turms knows,
+            # regardless of the declared floor.
+            return UNION_OPERATOR_SINCE
+        return parse_python_version(self.min_python_version)
+
+    @property
+    def use_builtin_generics(self) -> bool:
+        """Emit PEP 585 builtin generics (``list[X]``) instead of ``typing.List[X]``."""
+        if self.type_annotation_style == "legacy":
+            return False
+        return self._target_python_version >= BUILTIN_GENERICS_SINCE
+
+    @property
+    def use_union_operator(self) -> bool:
+        """Emit PEP 604 unions (``X | None``) instead of ``typing.Optional[X]``."""
+        if self.type_annotation_style == "legacy":
+            return False
+        return self._target_python_version >= UNION_OPERATOR_SINCE
 
     @model_validator(mode="after")
     def validate_unset_override(self):

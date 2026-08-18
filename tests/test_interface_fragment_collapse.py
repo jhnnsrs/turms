@@ -127,5 +127,5 @@ def test_interface_field_still_produces_union(interface_fragment_collapse_schema
     discriminated union (unchanged behaviour)."""
     generated_ast = _generate(interface_fragment_collapse_schema, with_funcs=False)
     annotation = _class_field_annotation(generated_ast, "GetLayer", "layer")
-    assert "Union" in annotation
+    assert "|" in annotation
     assert "discriminator" in annotation

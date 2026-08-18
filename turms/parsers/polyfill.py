@@ -42,13 +42,17 @@ def polyfill_python_seven(
                     )
 
                 okay_imports = aliases - need_extensions
-                new_nodes.append(
-                    ast.ImportFrom(
-                        names=[ast.alias(name=name) for name in okay_imports],
-                        module="typing",
-                        level=0,
+                if okay_imports:
+                    # Everything typing had to offer may have moved to
+                    # typing_extensions (or been modernized away), and an
+                    # `ast.ImportFrom` without names unparses to a syntax error.
+                    new_nodes.append(
+                        ast.ImportFrom(
+                            names=[ast.alias(name=name) for name in okay_imports],
+                            module="typing",
+                            level=0,
+                        )
                     )
-                )
             else:
                 new_nodes.append(node)
 

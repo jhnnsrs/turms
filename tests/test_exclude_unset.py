@@ -131,7 +131,7 @@ def test_unset_sentinel_override(tmp_path):
     assert "CustomUnset" in generated
     assert "CUSTOM_UNSET" in generated
     # Used in the convenience-function signature and conditional dict.
-    assert "Union[Optional[Filter], CustomUnset]=CUSTOM_UNSET" in generated
+    assert "Filter | None | CustomUnset=CUSTOM_UNSET" in generated
     assert "is not CUSTOM_UNSET" in generated
 
 
@@ -153,11 +153,11 @@ def test_funcs_build_variables_conditionally(tmp_path):
     assert "UNSET = UnsetType()" in generated
 
     # Optional args default to UNSET and carry UnsetType in their type union.
-    assert "filter: Union[Optional[Filter], UnsetType]=UNSET" in generated
-    assert "limit: Union[Optional[int], UnsetType]=UNSET" in generated
+    assert "filter: Filter | None | UnsetType=UNSET" in generated
+    assert "limit: int | None | UnsetType=UNSET" in generated
 
     # The variables dict is loosely typed and assembled conditionally.
-    assert "variables: Dict[str, Any] = {}" in generated
+    assert "variables: dict[str, Any] = {}" in generated
     assert "if filter is not UNSET:" in generated
     assert "variables['filter'] = filter" in generated
     assert "if limit is not UNSET:" in generated

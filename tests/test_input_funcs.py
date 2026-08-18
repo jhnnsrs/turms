@@ -51,13 +51,13 @@ def _generate(**inputfuncs_kwargs):
 def test_factory_signature_and_body():
     generated = parse_to_code(_generate())
 
-    # Required field -> positional; optional fields -> Union[..., UnsetType] = UNSET.
+    # Required field -> positional; optional fields -> `... | UnsetType = UNSET`.
     assert (
-        "def user_input(name: str, age: Union[Optional[int], UnsetType]=UNSET, address: Union[Optional[AddressInput], UnsetType]=UNSET, tags: Union[Optional[Iterable[str]], UnsetType]=UNSET) -> UserInput:"
+        "def user_input(name: str, age: int | None | UnsetType=UNSET, address: AddressInput | None | UnsetType=UNSET, tags: Iterable[str] | None | UnsetType=UNSET) -> UserInput:"
         in generated
     )
     # Body builds the dict conditionally and constructs the model.
-    assert "data: Dict[str, Any] = {}" in generated
+    assert "data: dict[str, Any] = {}" in generated
     assert "data['name'] = name" in generated
     assert "if age is not UNSET:" in generated
     assert "data['age'] = age" in generated

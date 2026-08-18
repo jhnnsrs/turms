@@ -298,7 +298,7 @@ def recurse_annotation(
                         registry,
                     )
 
-                inline_fragment_fields.setdefault(on_type_name, []).append(
+                inline_fragment_fields.setdefault(on_type_name, []).extend(
                     inline_fields
                 )
 

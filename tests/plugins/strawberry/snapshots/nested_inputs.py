@@ -1,5 +1,3 @@
-from typing import List, Optional
-
 import strawberry
 
 
@@ -10,12 +8,12 @@ class RemoveItemFromPlaylistTrackInput:
 @strawberry.input
 class RemoveItemFromPlaylistInput:
     playlistId: str
-    snapshotId: Optional[str]
-    tracks: List[RemoveItemFromPlaylistTrackInput]
+    snapshotId: str | None
+    tracks: list[RemoveItemFromPlaylistTrackInput]
 
 @strawberry.type
 class Query:
 
     @strawberry.field()
-    def hi(self) -> Optional[str]:
+    def hi(self) -> str | None:
         return None

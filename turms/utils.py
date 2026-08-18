@@ -37,6 +37,7 @@ from graphql.error.graphql_error import GraphQLError
 from graphql.language.ast import DocumentNode, FieldNode, NameNode
 from graphql import GraphQLSchema
 
+from turms.annotations import list_label, optional_label
 from turms.config import GeneratorConfig
 from turms.errors import (
     GenerationError,
@@ -805,47 +806,29 @@ def recurse_outputtype_label(
         )
 
     if isinstance(type, GraphQLList):
-        if optional:
-            return (
-                "Optional[List["
-                + recurse_outputtype_label(
-                    type.of_type, registry, overwrite_final=overwrite_final
-                )
-                + "]]"
-            )
-
-        return (
-            "List["
-            + recurse_outputtype_label(
+        inner = list_label(
+            recurse_outputtype_label(
                 type.of_type, registry, overwrite_final=overwrite_final
-            )
-            + "]"
+            ),
+            registry.config,
         )
+        return optional_label(inner, registry.config) if optional else inner
 
     if isinstance(type, GraphQLEnumType):
-        if optional:
-            return (
-                "Optional["
-                + registry.reference_enum(type.name, "", allow_forward=False).id
-                + "]"
-            )
-
-        return registry.reference_enum(type.name, "", allow_forward=False).id
+        inner = registry.reference_enum(type.name, "", allow_forward=False).id
+        return optional_label(inner, registry.config) if optional else inner
 
     if isinstance(type, GraphQLScalarType):
-        if optional:
-            return "Optional[" + registry.reference_scalar(type.name).id + "]"
-
-        else:
-            return registry.reference_scalar(type.name).id
+        inner = registry.reference_scalar(type.name).id
+        return optional_label(inner, registry.config) if optional else inner
 
     if isinstance(type, (GraphQLObjectType, GraphQLInterfaceType, GraphQLUnionType)):
         assert overwrite_final, "Needs to be set"
-        if optional:
-            return "Optional[" + overwrite_final + "]"
-
-        else:
-            return overwrite_final
+        return (
+            optional_label(overwrite_final, registry.config)
+            if optional
+            else overwrite_final
+        )
 
     raise NotImplementedError("oisnosin")
 
@@ -862,20 +845,11 @@ def recurse_type_label(
         )
 
     if isinstance(type, ListTypeNode):
-        if optional:
-            return (
-                "Optional[List["
-                + recurse_type_label(
-                    type.type, registry, overwrite_final=overwrite_final
-                )
-                + "]]"
-            )
-
-        return (
-            "List["
-            + recurse_type_label(type.type, registry, overwrite_final=overwrite_final)
-            + "]"
+        inner = list_label(
+            recurse_type_label(type.type, registry, overwrite_final=overwrite_final),
+            registry.config,
         )
+        return optional_label(inner, registry.config) if optional else inner
 
     if isinstance(type, NamedTypeNode):
         if overwrite_final is not None:
@@ -899,10 +873,7 @@ def recurse_type_label(
                         )
 
         label = x.id if isinstance(x, ast.Name) else x.value
-        if optional:
-            return "Optional[" + label + "]"
-
-        return label
+        return optional_label(label, registry.config) if optional else label
 
     raise NotImplementedError("Not implemented for this type")
 

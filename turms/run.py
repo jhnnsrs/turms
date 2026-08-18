@@ -28,6 +28,7 @@ from turms.helpers import (
     load_dsl_from_url,
     import_string,
 )
+from turms.annotations import modernize_annotations
 from turms.plugins.base import Plugin
 from turms.parsers.base import Parser
 from turms.processors.base import Processor
@@ -501,6 +502,8 @@ def generate_ast(
             raise GenerationError(
                 f"{plugin.__class__.__name__} failed!\n {str(e)}"
             ) from e
+
+    global_tree = modernize_annotations(global_tree, config, registry)
 
     global_tree = (
         registry.generate_imports() + registry.generate_builtins() + global_tree
