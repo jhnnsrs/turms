@@ -56,9 +56,9 @@ The attached serializer restores the tagged wire form `{fieldName: value}` that
 `@oneOf` servers expect, preserving the client's usual
 `dict(by_alias=True, exclude_unset=True)` serialization.
 
-In every other case — scalar or enum fields, the same member type appearing
-under two fields, or `pydantic_version: v1` (which has no annotated
-serializers) — turms falls back to one wrapper class per field, unioned under
+In every other case — scalar or enum fields, or the same member type
+appearing under two fields — turms falls back to one wrapper class per field,
+unioned under
 the input type's name. Each wrapper carries its single field as required, so it
 serializes to the tagged wire form without any custom serializer:
 

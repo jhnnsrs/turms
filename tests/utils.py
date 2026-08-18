@@ -82,7 +82,9 @@ def parse_to_code(tree: List[ast.AST]) -> str:
     return ast.unparse(ast.fix_missing_locations(md))
 
 
-def unit_test_with(generated_ast: List[ast.AST], test_string: str):
+def unit_test_with(
+    generated_ast: List[ast.AST], test_string: str, strict_warnings: bool = False
+):
 
     added_code = ast.parse(dedent(test_string)).body
     # We need to unparse before otherwise there might be complaints with missing lineno
@@ -92,7 +94,10 @@ def unit_test_with(generated_ast: List[ast.AST], test_string: str):
 
         filename = write_code_to_file(parsed_code, tmpdirname, "minimal.py")
         write_code_to_file(mocks_code, tmpdirname, "mocks.py")
-        s = subprocess.run([sys.executable, filename], capture_output=True)
+        argv = [sys.executable]
+        if strict_warnings:
+            argv += ["-W", "error::UserWarning"]
+        s = subprocess.run(argv + [filename], capture_output=True)
         if s.returncode == 0:
             return True
         else:

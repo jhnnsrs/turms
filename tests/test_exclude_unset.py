@@ -6,7 +6,6 @@ the caller never set are omitted (the server applies its own default), while an
 explicitly-passed ``None`` is still transmitted.
 """
 
-import pytest
 from graphql import build_ast_schema, parse
 
 from turms.config import GeneratorConfig
@@ -133,9 +132,9 @@ def test_unset_sentinel_override(tmp_path):
 
 def test_unset_override_must_be_paired():
     """Overriding only one of the UNSET type/instance is a config error."""
-    import pytest as _pytest
+    import pytest
 
-    with _pytest.raises(Exception):
+    with pytest.raises(Exception):
         GeneratorConfig(unset_type_class="mocks.CustomUnset")
 
 

@@ -160,17 +160,32 @@ class OptionsConfig(BaseSettings):
     """Enabling this, will freeze the schema"""
     extra: ExtraOptions = None
     """Extra options for pydantic"""
-    allow_mutation: Optional[bool] = None
-    """Allow mutation"""
     allow_population_by_field_name: Optional[bool] = None
     """Allow population by field name"""
-    orm_mode: Optional[bool] = None
-    """ORM mode"""
+    from_attributes: Optional[bool] = None
+    """Let the generated models validate from arbitrary class instances"""
     use_enum_values: Optional[bool] = None
     """Use enum values"""
 
     validate_assignment: Optional[bool] = None
     """Validate assignment"""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_pydantic_v1_options(cls, values: Any) -> Any:
+        if isinstance(values, dict):
+            if "orm_mode" in values:
+                raise ValueError(
+                    "'orm_mode' is a pydantic v1 config key and was removed in "
+                    "turms 2.0. Use 'from_attributes' instead."
+                )
+            if "allow_mutation" in values:
+                raise ValueError(
+                    "'allow_mutation' is a pydantic v1 config key and was "
+                    "removed in turms 2.0. Use the 'freeze' section to generate "
+                    "immutable models."
+                )
+        return values
 
     types: List[GraphQLTypes] = Field(
         default=[GraphQLTypes.INPUT, GraphQLTypes.FRAGMENT, GraphQLTypes.OBJECT],

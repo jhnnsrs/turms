@@ -237,14 +237,6 @@ def generate_pydantic_config(
             elif config.options.include and typename not in config.options.include:
                 pass
             else:
-                if config.options.allow_mutation is not None:
-                    config_keywords.append(
-                        ast.keyword(
-                            arg="allow_mutation",
-                            value=ast.Constant(value=config.options.allow_mutation),
-                        )
-                    )
-
                 if config.options.extra is not None:
                     config_keywords.append(
                         ast.keyword(
@@ -272,11 +264,13 @@ def generate_pydantic_config(
                         )
                     )
 
-                if config.options.orm_mode is not None:
+                if config.options.from_attributes is not None:
                     config_keywords.append(
                         ast.keyword(
-                            arg="orm_mode",
-                            value=ast.Constant(value=config.options.orm_mode),
+                            arg="from_attributes",
+                            value=ast.Constant(
+                                value=config.options.from_attributes
+                            ),
                         )
                     )
 

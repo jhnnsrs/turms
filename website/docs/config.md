@@ -82,7 +82,6 @@ validated by pydantic — unknown keys are rejected, so typos fail loudly.
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `pydantic_version` | `"v1"` \| `"v2"` | `"v2"` | Which pydantic major version the generated code targets |
 | `object_bases` | `List[str]` | `["pydantic.BaseModel"]` | Base class(es) for generated models |
 | `interface_bases` | `List[str]` | – | Separate base classes for interfaces (defaults to `object_bases`) |
 | `always_resolve_interfaces` | `bool` | `true` | Resolve interfaces to unions of concrete types |
@@ -217,11 +216,14 @@ options:
   use_enum_values: true
   validate_assignment: true
   allow_population_by_field_name: true
+  from_attributes: true
   types: [input, fragment, object]
 ```
 
-`include` / `exclude` lists by type name are supported here as well. `allow_mutation` and `orm_mode`
-are available for pydantic v1 targets.
+`include` / `exclude` lists by type name are supported here as well.
+
+The pydantic v1 spellings `allow_mutation` and `orm_mode` were removed in turms 2.0. Use the
+[`freeze`](#freezing-models-freeze) section for immutable models, and `from_attributes` in place of `orm_mode`.
 
 ## Component sections
 

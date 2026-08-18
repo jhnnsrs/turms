@@ -7,7 +7,6 @@ and the old `DEPRECATED:` prefix is dropped. Both marker classes are generated i
 the module by default, or imported from a user override via config.
 """
 
-import pytest
 from graphql import build_ast_schema, parse
 
 from turms.config import GeneratorConfig

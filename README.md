@@ -255,7 +255,6 @@ turms complies with [graphql-config](https://www.graphql-config.com/docs/user/us
 | `always_resolve_interfaces` | `true` | Resolve interfaces to concrete implementation unions |
 | `create_catchall` | `true` | Add a catch-all model for unknown interface implementations |
 | `skip_forwards` | `false` | Skip generating forward-reference updates |
-| `pydantic_version` | `"v2"` | Target Pydantic major version (`"v1"` or `"v2"`) |
 | `type_annotation_style` | `"auto"` | How annotations are spelled: `auto` (derived from `min_python_version`), `modern` (`list[X] | None`), or `legacy` (`Optional[List[X]]`) |
 | `min_python_version` | `"3.10"` | Oldest Python the generated code must run on — drives `type_annotation_style: auto` |
 | `omited_document_rules` | `[]` | GraphQL validation rules to skip for documents |
@@ -298,8 +297,6 @@ Set the style explicitly to ignore `min_python_version` altogether — `modern` 
 ```yaml
 type_annotation_style: legacy
 ```
-
-With `pydantic_version: v1`, PEP 604 unions need Pydantic 1.10 or newer.
 
 Only two thresholds change what turms emits: builtin generics (`list[X]`) from 3.9, and unions (`X | None`) from 3.10. The typing features added in 3.11 and later (`Self`, `NotRequired`, PEP 695 `type`) never appear in generated code, so `auto` on 3.11+ produces the same output as on 3.10.
 
