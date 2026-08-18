@@ -188,8 +188,6 @@ class OptionsConfig(BaseSettings):
     """The types to freeze"""
 
 
-PydanticVersion = Literal["v1", "v2"]
-
 PythonVersion = Literal[
     "3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"
 ]
@@ -229,7 +227,22 @@ class GeneratorConfig(BaseSettings):
         env_prefix="TURMS_",
         extra="forbid",
     )
-    pydantic_version: PydanticVersion = "v2"
+    pydantic_version: Optional[Literal["v2"]] = None
+    """Deprecated no-op. Turms only targets pydantic v2; setting this to "v1"
+    is an error. The key is still accepted (and ignored) so that existing
+    configurations saying ``pydantic_version: v2`` keep loading."""
+
+    @field_validator("pydantic_version", mode="before")
+    @classmethod
+    def _reject_pydantic_v1(cls, value: object) -> object:
+        if value in ("v1", "1", 1):
+            raise ValueError(
+                "pydantic v1 targets were removed in turms 2.0. The generated "
+                "code now always targets pydantic v2 — drop the "
+                "'pydantic_version' key from your configuration and upgrade "
+                "the consuming project to pydantic>=2."
+            )
+        return value
 
     domain: Optional[str] = None
     """The domain of the GraphQL API ( will be set as a config variable)"""

@@ -43,12 +43,11 @@ query GetCountries($filter: Filter, $limit: Int = 10, $req: Int! = 5) {
 """
 
 
-def _generate(tmp_path, pydantic_version, with_funcs=False, **config_kwargs):
+def _generate(tmp_path, with_funcs=False, **config_kwargs):
     doc = tmp_path / "ops.graphql"
     doc.write_text(operation)
 
     config = GeneratorConfig(
-        pydantic_version=pydantic_version,
         documents=str(tmp_path / "**/*.graphql"),
         **config_kwargs,
     )
@@ -73,11 +72,10 @@ def _generate(tmp_path, pydantic_version, with_funcs=False, **config_kwargs):
     )
 
 
-@pytest.mark.parametrize("pydantic_version", ["v1", "v2"])
-def test_input_omits_unset_keeps_explicit_null(tmp_path, pydantic_version):
+def test_input_omits_unset_keeps_explicit_null(tmp_path):
     """An omitted input field is absent from the exclude_unset dump; an explicitly
     passed None is present as null."""
-    generated_ast = _generate(tmp_path, pydantic_version)
+    generated_ast = _generate(tmp_path)
 
     unit_test_with(
         generated_ast,
@@ -91,11 +89,10 @@ def test_input_omits_unset_keeps_explicit_null(tmp_path, pydantic_version):
     )
 
 
-@pytest.mark.parametrize("pydantic_version", ["v1", "v2"])
-def test_arguments_defaulted_var_is_optional_and_omitted(tmp_path, pydantic_version):
+def test_arguments_defaulted_var_is_optional_and_omitted(tmp_path):
     """A NonNull-with-default operation variable ($req: Int! = 5) is optional on the
     client and omitted when unset, so the server applies its default."""
-    generated_ast = _generate(tmp_path, pydantic_version)
+    generated_ast = _generate(tmp_path)
 
     unit_test_with(
         generated_ast,
@@ -118,7 +115,6 @@ def test_unset_sentinel_override(tmp_path):
     generated = parse_to_code(
         _generate(
             tmp_path,
-            "v2",
             with_funcs=True,
             unset_type_class="mocks.CustomUnset",
             unset_instance="mocks.CUSTOM_UNSET",
@@ -146,7 +142,7 @@ def test_unset_override_must_be_paired():
 def test_funcs_build_variables_conditionally(tmp_path):
     """The generated convenience function defaults optional args to UNSET and only
     adds the ones the caller provided to the variables dict."""
-    generated = parse_to_code(_generate(tmp_path, "v2", with_funcs=True))
+    generated = parse_to_code(_generate(tmp_path, with_funcs=True))
 
     # The sentinel is emitted into the module.
     assert "class UnsetType:" in generated

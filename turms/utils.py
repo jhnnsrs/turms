@@ -200,13 +200,13 @@ def generate_generic_typename_field(registry: ClassRegistry, config: GeneratorCo
     )
 
 
-def generate_config_dict(
+def generate_pydantic_config(
     graphQLType: GraphQLTypes,
     config: GeneratorConfig,
-    registy: ClassRegistry,
+    registry: ClassRegistry,
     typename: Optional[str] = None,
 ) -> list[ast.Assign]:
-    """Generates the config class for a specific type version 2
+    """Generates the ``model_config`` assignment for a specific type
 
     It will append the config class to the registry, and set the frozen
     attribute for the class to True, if the freeze config is enabled and
@@ -296,7 +296,7 @@ def generate_config_dict(
                 )
 
     if len(config_keywords) > 0:
-        registy.register_import("pydantic.ConfigDict")
+        registry.register_import("pydantic.ConfigDict")
         return [
             ast.Assign(
                 targets=[ast.Name(id="model_config", ctx=ast.Store())],
@@ -309,145 +309,6 @@ def generate_config_dict(
         ]
     else:
         return []
-
-
-def generate_config_class_pydantic(
-    graphQLType: GraphQLTypes, config: GeneratorConfig, typename: str | None = None
-) -> list[ast.ClassDef]:
-    """Generates the config class for a specific type
-
-    It will append the config class to the registry, and set the frozen
-    attribute for the class to True, if the freeze config is enabled and
-    the type appears in the freeze list.
-
-    It will also add config attributes to the class, if the type appears in
-    'additional_config' in the config file.
-
-    """
-
-    config_fields: list[ast.stmt] = []
-
-    if config.freeze.enabled:
-        if graphQLType in config.freeze.types:
-            if config.freeze.exclude and typename in config.freeze.exclude:
-                pass
-            elif config.freeze.include and typename not in config.freeze.include:
-                pass
-            else:
-                config_fields.append(
-                    ast.Assign(
-                        targets=[ast.Name(id="frozen", ctx=ast.Store())],
-                        value=ast.Constant(value=True),
-                    )
-                )
-
-    if config.options.enabled:
-        if graphQLType in config.options.types:
-            if config.options.exclude and typename in config.options.exclude:
-                pass
-            elif config.options.include and typename not in config.options.include:
-                pass
-            else:
-                if config.options.allow_mutation is not None:
-                    config_fields.append(
-                        ast.Assign(
-                            targets=[ast.Name(id="allow_mutation", ctx=ast.Store())],
-                            value=ast.Constant(value=config.options.allow_mutation),
-                        )
-                    )
-
-                if config.options.extra is not None:
-                    config_fields.append(
-                        ast.Assign(
-                            targets=[ast.Name(id="extra", ctx=ast.Store())],
-                            value=ast.Constant(value=config.options.extra),
-                        )
-                    )
-
-                if config.options.validate_assignment is not None:
-                    config_fields.append(
-                        ast.Assign(
-                            targets=[
-                                ast.Name(id="validate_assignment", ctx=ast.Store())
-                            ],
-                            value=ast.Constant(
-                                value=config.options.validate_assignment
-                            ),
-                        )
-                    )
-
-                if config.options.allow_population_by_field_name is not None:
-                    config_fields.append(
-                        ast.Assign(
-                            targets=[
-                                ast.Name(
-                                    id="allow_population_by_field_name", ctx=ast.Store()
-                                )
-                            ],
-                            value=ast.Constant(
-                                value=config.options.allow_population_by_field_name
-                            ),
-                        )
-                    )
-
-                if config.options.orm_mode is not None:
-                    config_fields.append(
-                        ast.Assign(
-                            targets=[ast.Name(id="orm_mode", ctx=ast.Store())],
-                            value=ast.Constant(value=config.options.orm_mode),
-                        )
-                    )
-
-                if config.options.use_enum_values is not None:
-                    config_fields.append(
-                        ast.Assign(
-                            targets=[ast.Name(id="use_enum_values", ctx=ast.Store())],
-                            value=ast.Constant(value=config.options.use_enum_values),
-                        )
-                    )
-
-    if typename:
-        if typename in config.additional_config:
-            for key, value in config.additional_config[typename].items():
-                config_fields.append(
-                    ast.Assign(
-                        targets=[ast.Name(id=key, ctx=ast.Store())],
-                        value=ast.Constant(value=value),
-                    )
-                )
-
-    if len(config_fields) > 0:
-        config_fields.insert(
-            0,
-            ast.Expr(
-                value=ast.Constant(value="A config class"),
-            ),
-        )
-    if len(config_fields) > 0:
-        return [
-            ast.ClassDef(
-                name="Config",
-                bases=[],
-                keywords=[],
-                body=config_fields,
-                decorator_list=[],
-                type_params=[],
-            )
-        ]
-    else:
-        return []
-
-
-def generate_pydantic_config(
-    graphQLType: GraphQLTypes,
-    config: GeneratorConfig,
-    registry: ClassRegistry,
-    typename: str | None = None,
-) -> Union[List[ast.Assign], List[ast.ClassDef]]:
-    if config.pydantic_version == "v2":
-        return generate_config_dict(graphQLType, config, registry, typename)
-    else:
-        return generate_config_class_pydantic(graphQLType, config, typename)
 
 
 def add_typename_recursively(

@@ -314,7 +314,7 @@ def generate_input_type(
         else:
             fields += [assign]
 
-    if discriminators and config.pydantic_version == "v2":
+    if discriminators:
         # The discriminator carries a default and is never explicitly set, so an
         # exclude_unset dump (the proxy contract) would drop it from the wire —
         # but the server needs it to discriminate. Mark it as set on every
@@ -641,11 +641,7 @@ def generate_inputs(
 
         if is_oneof_input_type(type):
             validate_oneof_input_type(type)
-            members = (
-                get_oneof_member_map(type)
-                if config.pydantic_version == "v2"
-                else None
-            )
+            members = get_oneof_member_map(type)
             if members is not None and any(
                 (ref_registry and member.name not in ref_registry.inputs)
                 or (plugin_config.skip_underscore and member.name.startswith("_"))

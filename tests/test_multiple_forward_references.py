@@ -31,11 +31,12 @@ def test_generation(multiple_forward_references_schema):
             continue
         if not isinstance(node.value.func, ast.Attribute):
             continue
-        if node.value.func.attr == "update_forward_refs" and isinstance(
+        if node.value.func.attr == "model_rebuild" and isinstance(
             node.value.func.value, ast.Name
         ):
             forward_refs.append(node.value.func.value.id)
 
+    assert forward_refs, "expected model_rebuild() calls to be generated"
     assert forward_refs == sorted(forward_refs)
 
     unit_test_with(generated_ast, "")

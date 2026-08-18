@@ -102,64 +102,30 @@ def generate_arguments_config(
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
 ):
-    if config.pydantic_version == "1":
-        config_fields = []
+    config_keywords = []
 
-        if plugin_config.arguments_allow_population_by_field_name:
-            config_fields.append(
-                ast.Assign(
-                    targets=[
-                        ast.Name(id="allow_population_by_field_name", ctx=ast.Store())
-                    ],
-                    value=ast.Constant(value=True),
-                )
+    if plugin_config.arguments_allow_population_by_field_name:
+        config_keywords.append(
+            ast.keyword(
+                arg="populate_by_name",
+                value=ast.Constant(value=True),
             )
+        )
 
-        if len(config_fields) > 0:
-            return [
-                ast.ClassDef(
-                    name="Config",
-                    bases=[],
-                    keywords=[],
-                    body=[
-                        ast.Expr(
-                            value=ast.Constant(value=" Arguments config class"),
-                        )
-                    ]
-                    + config_fields,
-                    decorator_list=[],
-                )
-            ]
-        else:
-            return []
+    if len(config_keywords) == 0:
+        return []
 
-    else:
-        config_keywords = []
-
-        if plugin_config.arguments_allow_population_by_field_name is not None:
-            config_keywords.append(
-                ast.keyword(
-                    arg="populate_by_name",
-                    value=ast.Constant(
-                        value=config.options.allow_population_by_field_name
-                    ),
-                )
-            )
-
-        if len(config_keywords) > 0:
-            registry.register_import("pydantic.ConfigDict")
-            return [
-                ast.Assign(
-                    targets=[ast.Name(id="model_config", ctx=ast.Store())],
-                    value=ast.Call(
-                        func=ast.Name(id="ConfigDict", ctx=ast.Load()),
-                        args=[],
-                        keywords=config_keywords,
-                    ),
-                )
-            ]
-        else:
-            return []
+    registry.register_import("pydantic.ConfigDict")
+    return [
+        ast.Assign(
+            targets=[ast.Name(id="model_config", ctx=ast.Store())],
+            value=ast.Call(
+                func=ast.Name(id="ConfigDict", ctx=ast.Load()),
+                args=[],
+                keywords=config_keywords,
+            ),
+        )
+    ]
 
 
 def get_arguments_bases(

@@ -25,9 +25,8 @@ from turms.stylers.default import DefaultStyler
 from .utils import build_relative_glob, parse_to_code, unit_test_with
 
 
-def _generate(oneof_schema, pydantic_version, with_funcs=False):
+def _generate(oneof_schema, with_funcs=False):
     config = GeneratorConfig(
-        pydantic_version=pydantic_version,
         documents=build_relative_glob("/documents/oneof/*.graphql"),
     )
     plugins = [InputsPlugin(), ObjectsPlugin(), OperationsPlugin()]
@@ -48,11 +47,10 @@ def _generate(oneof_schema, pydantic_version, with_funcs=False):
     )
 
 
-@pytest.mark.parametrize("pydantic_version", ["v1", "v2"])
-def test_scalar_oneof_generates_wrapper_union(oneof_schema, pydantic_version):
+def test_scalar_oneof_generates_wrapper_union(oneof_schema):
     """A @oneOf input with scalar fields becomes per-field wrapper classes whose
     single required field serializes to the tagged wire form (incl. aliases)."""
-    generated_ast = _generate(oneof_schema, pydantic_version)
+    generated_ast = _generate(oneof_schema)
 
     unit_test_with(
         generated_ast,
@@ -81,7 +79,7 @@ def test_scalar_oneof_generates_wrapper_union(oneof_schema, pydantic_version):
 def test_tagged_union_oneof_generates_direct_union(oneof_schema):
     """A @oneOf input whose fields are distinct input types becomes a direct
     union of the member models; the serializer restores the tag wrapping."""
-    generated_ast = _generate(oneof_schema, "v2")
+    generated_ast = _generate(oneof_schema)
 
     unit_test_with(
         generated_ast,
@@ -99,27 +97,6 @@ def test_tagged_union_oneof_generates_direct_union(oneof_schema):
         # Direct mode: the members ARE the union, no wrapper classes.
         assert 'PetInputCat' not in globals()
         assert '_serialize_pet_input' in globals()
-        """,
-    )
-
-
-def test_v1_falls_back_to_wrapper_union(oneof_schema):
-    """pydantic v1 has no annotated serializers, so even the tagged-union
-    pattern falls back to wrapper classes."""
-    generated_ast = _generate(oneof_schema, "v1")
-
-    unit_test_with(
-        generated_ast,
-        """
-        wire = PetInputCat(cat=CatInput(name='whiskers')).dict(
-            by_alias=True, exclude_unset=True
-        )
-        assert wire == {'cat': {'name': 'whiskers'}}, wire
-
-        args = FindPet.Arguments(pet=PetInputDog(dog=DogInput(name='rex'))).dict(
-            by_alias=True, exclude_unset=True
-        )
-        assert args == {'pet': {'dog': {'name': 'rex'}}}, args
         """,
     )
 
@@ -204,11 +181,10 @@ def test_oneof_field_must_not_have_default():
         )
 
 
-@pytest.mark.parametrize("pydantic_version", ["v1", "v2"])
-def test_full_stack_with_funcs(oneof_schema, pydantic_version):
+def test_full_stack_with_funcs(oneof_schema):
     """The whole Operations + Funcs stack generates importable code over oneOf
     documents (exercises registry references and forward refs)."""
-    generated_ast = _generate(oneof_schema, pydantic_version, with_funcs=True)
+    generated_ast = _generate(oneof_schema, with_funcs=True)
     unit_test_with(generated_ast, "")
 
 

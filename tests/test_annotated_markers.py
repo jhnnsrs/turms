@@ -44,11 +44,10 @@ query GetCountries($filter: FilterInput, $page: Int = 1) {
 """
 
 
-def _generate(tmp_path, pydantic_version="v2", **config_kwargs):
+def _generate(tmp_path, **config_kwargs):
     doc = tmp_path / "ops.graphql"
     doc.write_text(operation)
     config = GeneratorConfig(
-        pydantic_version=pydantic_version,
         documents=str(tmp_path / "**/*.graphql"),
         **config_kwargs,
     )
@@ -139,10 +138,9 @@ def test_opt_out_of_documentation(tmp_path):
     assert "Default: 10" not in generated
 
 
-@pytest.mark.parametrize("pydantic_version", ["v1", "v2"])
-def test_generated_code_executes(tmp_path, pydantic_version):
-    """pydantic must accept the Annotated metadata at runtime (both versions)."""
-    generated_ast = _generate(tmp_path, pydantic_version=pydantic_version)
+def test_generated_code_executes(tmp_path):
+    """pydantic must accept the Annotated metadata at runtime."""
+    generated_ast = _generate(tmp_path)
     unit_test_with(
         generated_ast,
         """
