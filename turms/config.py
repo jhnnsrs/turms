@@ -244,8 +244,9 @@ class GeneratorConfig(BaseSettings):
     )
     pydantic_version: Optional[Literal["v2"]] = None
     """Deprecated no-op. Turms only targets pydantic v2; setting this to "v1"
-    is an error. The key is still accepted (and ignored) so that existing
-    configurations saying ``pydantic_version: v2`` keep loading."""
+    is an error. The key is still accepted so that existing configurations
+    saying ``pydantic_version: v2`` keep loading, but it is normalized away so
+    a dumped configuration does not carry the dead key forward."""
 
     @field_validator("pydantic_version", mode="before")
     @classmethod
@@ -257,7 +258,7 @@ class GeneratorConfig(BaseSettings):
                 "'pydantic_version' key from your configuration and upgrade "
                 "the consuming project to pydantic>=2."
             )
-        return value
+        return None
 
     domain: Optional[str] = None
     """The domain of the GraphQL API ( will be set as a config variable)"""

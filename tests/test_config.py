@@ -143,8 +143,8 @@ def test_pydantic_v1_options_are_rejected(removed_option, replacement):
 
 
 def test_pydantic_v1_target_is_rejected():
-    """pydantic_version: v2 still loads (it is a no-op); v1 is an error."""
-    assert GeneratorConfig(pydantic_version="v2").pydantic_version == "v2"
+    """pydantic_version: v2 still loads but is normalized away; v1 is an error."""
+    assert GeneratorConfig(pydantic_version="v2").pydantic_version is None
     with pytest.raises(ValidationError, match="pydantic v2"):
         GeneratorConfig(pydantic_version="v1")
 
