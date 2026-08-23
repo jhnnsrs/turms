@@ -1,8 +1,10 @@
+import pytest
 
 from turms.config import GeneratorConfig, Extensions, ConfigProxy
 from turms.run import generate, GraphQLProject
 
 
+@pytest.mark.network
 def test_project_pipeline():
     config = GraphQLProject(
         schema="https://countries.trevorblades.com/",

@@ -1,8 +1,14 @@
 from turms.parsers.base import Parser, ParserConfig
-from typing import List, Union
+from typing import List, Union, get_args
 import ast
 from pydantic_settings import SettingsConfigDict
 from pydantic import Field, field_validator
+
+from turms.config import PythonVersion
+
+#: The versions this parser accepts, kept in sync with the versions the
+#: generator itself can target so the two cannot drift apart.
+SUPPORTED_PYTHON_VERSIONS = get_args(PythonVersion)
 
 
 class PolyfillPluginConfig(ParserConfig):
@@ -16,7 +22,7 @@ class PolyfillPluginConfig(ParserConfig):
         if isinstance(value, (int, float)):
             value = str(value)
 
-        if value not in ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]:
+        if value not in SUPPORTED_PYTHON_VERSIONS:
             raise ValueError("Invalid python version")
 
         return value

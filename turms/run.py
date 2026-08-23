@@ -42,16 +42,25 @@ import os
 
 
 try:
-    # If toml is installed, use it to load the config file
-    import toml
+    # Python 3.11+ ships a TOML parser; older versions get it from the `tomli`
+    # backport that turms depends on there.
+    import tomllib as _tomllib
+except ImportError:  # pragma: no cover - only taken on python 3.10
+    try:
+        import tomli as _tomllib
+    except ImportError:
+        _tomllib = None
+
+
+if _tomllib is not None:
 
     def toml_loader(file):
-        return toml.loads(file.read())
+        return _tomllib.loads(file.read())
 
-except ImportError:
+else:  # pragma: no cover - only reachable without the 3.10 backport installed
 
     def toml_loader(file):
-        raise NotImplementedError("TOML not supported. Please install `toml`")
+        raise NotImplementedError("TOML not supported. Please install `tomli`")
 
 
 def json_loader(file):

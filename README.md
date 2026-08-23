@@ -83,7 +83,7 @@ and run it with `uv run turms gen` (or plain `turms gen` in an activated environ
 | `ruff` | `RuffProcessor` |
 | `merge` | `MergeProcessor` (libcst) |
 
-Python 3.10 or higher is required.
+Python 3.10 or higher is required. Turms is tested on 3.10, 3.11, 3.12, 3.13 and 3.14.
 
 ## Quickstart
 
@@ -434,9 +434,16 @@ turms uses [uv](https://github.com/astral-sh/uv) for project management:
 
 ```bash
 uv sync --all-extras --dev   # install everything
-uv run pytest                # run the test suite
+uv run pytest                     # run the test suite
+uv run pytest -m "not network"    # skip the tests that make outbound requests
+uv run pytest -m network          # only those tests
 uv run pytest --snapshot-update   # update generation snapshots after intentional changes
 ```
+
+A handful of tests make outbound requests, mostly introspecting the
+`countries.trevorblades.com` schema instead of reading one from disk. That API rate
+limits by IP, so they are marked `network`: the CI matrix runs with
+`-m "not network"` and the coverage job runs the full suite.
 
 The architecture is plugin-first: to add your own plugin, subclass `turms.plugins.base.Plugin` and implement `generate_ast(client_schema, config, registry)`; to add a processor, subclass `turms.processors.base.Processor` and implement `run(gen_file, config)`. Any importable class can be referenced from the config by its dotted path — no registration step needed.
 

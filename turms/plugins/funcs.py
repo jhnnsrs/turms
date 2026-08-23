@@ -880,7 +880,6 @@ def generate_query_doc(
     collapse=False,
 ):
     x = get_operation_root_type(client_schema, o)
-    o.__annotations__
 
     get_operation_class_name(o, registry)
 

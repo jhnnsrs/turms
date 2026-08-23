@@ -1,3 +1,4 @@
+import pytest
 from .utils import build_relative_glob, unit_test_with
 from turms.config import GeneratorConfig
 from turms.run import generate_ast, parse_asts_to_string
@@ -15,6 +16,7 @@ from turms.stylers.capitalize import CapitalizeStyler
 from turms.run import generate_ast
 
 
+@pytest.mark.network
 def test_skip_unreferenced(countries_schema):
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/countries/*.graphql"),

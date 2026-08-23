@@ -13,6 +13,7 @@ from turms.plugins.operations import OperationsPlugin
 from turms.stylers.default import DefaultStyler
 
 
+@pytest.mark.network
 def test_allow_population_by_field_name(countries_schema):
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/countries/**.graphql"),
@@ -43,6 +44,7 @@ def test_allow_population_by_field_name(countries_schema):
     assert "from enum import Enum" in generated, "EnumPlugin not working"
 
 
+@pytest.mark.network
 def test_extra_forbid(countries_schema):
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/countries/**.graphql"),
@@ -73,6 +75,7 @@ def test_extra_forbid(countries_schema):
         )
 
 
+@pytest.mark.network
 def test_extra_allow(countries_schema):
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/countries/**.graphql"),
@@ -102,6 +105,7 @@ def test_extra_allow(countries_schema):
     )
 
 
+@pytest.mark.network
 def test_from_attributes(countries_schema):
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/countries/**.graphql"),
@@ -149,6 +153,7 @@ def test_pydantic_v1_target_is_rejected():
         GeneratorConfig(pydantic_version="v1")
 
 
+@pytest.mark.network
 def test_generated_options_module_imports_without_warnings(countries_schema):
     """Every option the OptionsConfig can emit must be a config key pydantic v2
     actually accepts -- a v1 leftover surfaces as a UserWarning on import."""

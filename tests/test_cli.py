@@ -6,6 +6,7 @@ import os
 import pytest
 
 
+@pytest.mark.network
 def test_run_gen(tmp_path):
     runner = CliRunner()
 
@@ -22,6 +23,7 @@ def test_run_gen(tmp_path):
         assert result.exit_code == 0
 
 
+@pytest.mark.network
 def test_run_gen_multiple(tmp_path):
     runner = CliRunner()
 
@@ -51,6 +53,7 @@ def test_run_gen_multiple(tmp_path):
         assert result.exit_code == 0, result.output
 
 
+@pytest.mark.network
 def test_run_gen_display_errors(tmp_path):
     runner = CliRunner()
 
@@ -79,6 +82,7 @@ def test_run_gen_display_errors(tmp_path):
         assert "*.graphql" in result.output
 
 
+@pytest.mark.network
 def test_run_gen_multiple_but_one(tmp_path):
     runner = CliRunner()
 
@@ -100,6 +104,7 @@ def test_run_gen_multiple_but_one(tmp_path):
         assert result.exit_code == 0, result.output
 
 
+@pytest.mark.network
 def test_run_download(tmp_path):
     runner = CliRunner()
 
@@ -115,6 +120,7 @@ def test_run_download(tmp_path):
         assert result.exit_code == 0, result.output
 
 
+@pytest.mark.network
 def test_run_download_multiple(tmp_path):
     runner = CliRunner()
 
@@ -154,6 +160,7 @@ def test_run_init(tmp_path):
         assert result.exit_code == 0, result.output
 
 
+@pytest.mark.network
 def test_run_error_code(tmp_path):
     runner = CliRunner()
 
@@ -170,6 +177,7 @@ def test_run_error_code(tmp_path):
         assert result.exit_code == 1, result.output
 
 
+@pytest.mark.network
 def test_run_no_error_code(tmp_path):
     runner = CliRunner()
 

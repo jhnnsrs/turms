@@ -1,3 +1,4 @@
+import pytest
 import ast
 
 from turms.config import GeneratorConfig
@@ -10,6 +11,7 @@ from turms.run import generate_ast
 from .utils import unit_test_with
 
 
+@pytest.mark.network
 def test_complex_operations(countries_schema):
     config = GeneratorConfig()
 

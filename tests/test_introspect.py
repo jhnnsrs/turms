@@ -11,12 +11,14 @@ class Schema(BaseModel):
     schema_url: SchemaType
 
 
+@pytest.mark.network
 def test_introspect():
     build_client_schema(
         load_introspection_from_url("https://countries.trevorblades.com/")
     )
 
 
+@pytest.mark.network
 def test_introspect_wrong():
     with pytest.raises(GenerationError):
         return build_client_schema(
@@ -24,6 +26,7 @@ def test_introspect_wrong():
         )
 
 
+@pytest.mark.network
 def test_do_not_allow_schema_introspection():
     s = Schema(schema_url="https://countries.trevorblades.com/")
 
@@ -31,6 +34,7 @@ def test_do_not_allow_schema_introspection():
         return build_schema_from_schema_type(s.schema_url, allow_introspection=False)
 
 
+@pytest.mark.network
 def test_with_schema_intrsopection():
     s = Schema(schema_url="https://countries.trevorblades.com/")
 
