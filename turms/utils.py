@@ -50,6 +50,10 @@ from turms.registry import ClassRegistry
 from .config import GraphQLTypes
 
 commentline_regex = re.compile(r"^.*#(.*)")
+#: A line that is *only* a comment. Used to walk back over the block of `#` lines above an
+#: operation: graphql-core puts the operation's `loc.start` on the last of them, so slicing
+#: forward from there would keep that line alone and drop the rest of the block.
+comment_only_regex = re.compile(r"^\s*#")
 
 
 class FragmentNotFoundError(GenerationError):
@@ -129,10 +133,19 @@ def inspect_operation_for_documentation(operation: OperationDefinitionNode):
             "Could not find loc for first operation. This should not happen"
         )
 
-    definition = operation.loc.source.body.splitlines()[
-        operation.loc.source.get_location(operation.loc.start).line
-        - 1 : operation.loc.source.get_location(first_operation.loc.start).line - 1
-    ]
+    lines = operation.loc.source.body.splitlines()
+    end = operation.loc.source.get_location(first_operation.loc.start).line - 1
+    start = operation.loc.source.get_location(operation.loc.start).line - 1
+
+    # Comments *above* the operation are part of its documentation, but `loc.start` lands on
+    # the last comment token rather than on the `query`/`mutation` keyword, so starting there
+    # keeps only the block's final line. Walk back over the contiguous block instead. Any
+    # non-comment line stops the walk -- a blank line, or the previous operation's closing
+    # brace -- so a neighbouring block can never be absorbed into this one.
+    while start > 0 and comment_only_regex.match(lines[start - 1]):
+        start -= 1
+
+    definition = lines[start:end]
     doc: list[str] = []
     for line in definition:
         if line and line != "":

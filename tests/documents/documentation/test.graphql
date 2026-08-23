@@ -16,3 +16,12 @@ mutation fsdfsd($nested: [[String!]!], $nonOptionalParameter: String!) {
     binomial
   }
 }
+
+# A comment block above the operation documents it too, and every line of it counts.
+# graphql-core puts the operation's `loc.start` on the last of these lines, so a naive
+# slice forward from there keeps only this sentence and silently drops the two above.
+mutation commentedAbove($nested: [[String!]!], $nonOptionalParameter: String!) {
+  createBeast(nested: $nested, nonOptionalParameter: $nonOptionalParameter) {
+    binomial
+  }
+}
