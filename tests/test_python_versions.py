@@ -5,14 +5,12 @@ Two separate things carry a version number and drift apart easily:
 * the interpreters turms itself is supported on -- declared by the trove
   classifiers in ``pyproject.toml`` and exercised by the CI matrix,
 * the interpreters generated code may be targeted at -- the ``PythonVersion``
-  literal, shared by ``GeneratorConfig.min_python_version`` and the polyfill
-  parser.
+  literal behind ``GeneratorConfig.min_python_version``.
 
 These tests pin both down so adding a new python release means touching one
 list, not four.
 """
 
-import ast
 import re
 import sys
 from pathlib import Path
@@ -22,11 +20,6 @@ import pytest
 from graphql import build_ast_schema, parse
 
 from turms.config import GeneratorConfig, PythonVersion, parse_python_version
-from turms.parsers.polyfill import (
-    SUPPORTED_PYTHON_VERSIONS,
-    PolyfillParser,
-    PolyfillPluginConfig,
-)
 from turms.plugins.inputs import InputsPlugin
 from turms.plugins.objects import ObjectsPlugin
 from turms.run import generate_ast
@@ -142,10 +135,6 @@ def test_toml_configs_load_without_a_third_party_parser():
 # --------------------------------------------------------------------------- #
 
 
-def test_generator_and_polyfill_accept_the_same_versions():
-    assert SUPPORTED_PYTHON_VERSIONS == get_args(PythonVersion)
-
-
 def test_every_supported_host_version_is_targetable():
     """You can always target the interpreter you are generating on."""
     for version in SUPPORTED_HOST_VERSIONS:
@@ -155,18 +144,17 @@ def test_every_supported_host_version_is_targetable():
 @pytest.mark.parametrize("version", get_args(PythonVersion))
 def test_target_version_is_accepted_everywhere(version):
     assert GeneratorConfig(min_python_version=version).min_python_version == version
-    assert PolyfillPluginConfig(python_version=version).python_version == version
     # a version that parses into a comparable tuple is a version the annotation
     # style can be resolved against
-    assert parse_python_version(version) >= (3, 7)
+    assert parse_python_version(version) >= (3, 9)
 
 
-@pytest.mark.parametrize("version", ["3.6", "4.0", "nonsense"])
-def test_unknown_target_version_is_rejected_everywhere(version):
+@pytest.mark.parametrize("version", ["3.6", "3.7", "3.8", "4.0", "nonsense"])
+def test_unknown_target_version_is_rejected(version):
+    """3.7 and 3.8 went with the polyfill parser in turms 2.0: pydantic v2 never
+    supported 3.7, and turms emits ``typing.Annotated``, which is 3.9+."""
     with pytest.raises(Exception):
         GeneratorConfig(min_python_version=version)
-    with pytest.raises(Exception):
-        PolyfillPluginConfig(python_version=version)
 
 
 @pytest.mark.parametrize("version", ["3.13", "3.14"])
@@ -188,21 +176,3 @@ def test_recent_targets_generate_importable_code(version):
     """The output has to be valid syntax for the interpreter running it."""
     code = parse_to_code(generate(min_python_version=version))
     compile(code, "<generated>", "exec")
-
-
-@pytest.mark.parametrize("version", ["3.13", "3.14"])
-def test_polyfill_is_a_noop_for_recent_targets(version):
-    """Nothing needs backporting on a modern target -- the tree passes through."""
-    tree = generate(min_python_version=version)
-    parser = PolyfillParser(config=PolyfillPluginConfig(python_version=version))
-    assert parse_to_code(parser.parse_ast(tree)) == parse_to_code(tree)
-
-
-def test_polyfill_still_backports_for_old_targets():
-    """Sharing the version list with the generator must not disarm the 3.7 path."""
-    tree = ast.parse("from typing import Literal, Optional").body
-    parser = PolyfillParser(config=PolyfillPluginConfig(python_version="3.7"))
-    generated = parse_to_code(parser.parse_ast(tree))
-    assert "from typing_extensions import Literal" in generated
-    assert "from typing import Optional" in generated
-    ast.parse(generated)

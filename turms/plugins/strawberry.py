@@ -37,12 +37,10 @@ from graphql.type.definition import (
 from turms.registry import ClassRegistry
 from turms.utils import (
     convert_default_value_to_ast,
-    generate_pydantic_config,
     get_additional_bases_for_type,
     interface_is_extended_by_other_interfaces,
     is_oneof_input_type,
 )
-from turms.config import GraphQLTypes
 
 
 @runtime_checkable
@@ -272,10 +270,7 @@ def default_generate_directives(
                 bases=[],
                 decorator_list=[decorator],
                 keywords=[],
-                body=(fields or [ast.Pass()])
-                + generate_pydantic_config(
-                    GraphQLTypes.DIRECTIVE, config, registry, directive.name
-                ),
+                body=(fields or [ast.Pass()]),
             )
         )
 
@@ -823,10 +818,7 @@ def generate_inputs(
                 ],
                 decorator_list=[decorator],
                 keywords=[],
-                body=fields
-                + generate_pydantic_config(
-                    GraphQLTypes.INPUT, config, registry, typename=key
-                ),
+                body=fields,
             )
         )
 
@@ -1062,8 +1054,7 @@ def generate_types(
                 bases=additional_bases,
                 decorator_list=[decorator],
                 keywords=[],
-                body=fields
-                + generate_pydantic_config(GraphQLTypes.OBJECT, config, registry, key),
+                body=fields,
             )
         )
 

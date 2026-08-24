@@ -619,7 +619,7 @@ def recurse_annotation(
         )
 
     if isinstance(type, GraphQLList):
-        if config.freeze.enabled:
+        if config.freeze.enabled and config.freeze.convert_list_to_tuple:
             registry.register_import("typing.Tuple")
 
             def list_builder(x: ast.Name | ast.Subscript | ast.Constant):

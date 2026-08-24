@@ -79,7 +79,7 @@ if limit is not UNSET:
 
 :::warning The exclude_unset contract
 This only works if your **executor proxy** serializes with `exclude_unset=True`
-(`operation.Arguments(**variables).dict(by_alias=True, exclude_unset=True)`). That
+(`operation.Arguments(**variables).model_dump(by_alias=True, exclude_unset=True)`). That
 serialization lives in your own proxy code, not in generated code, so turms cannot
 enforce it. Without it, defaulted fields are sent as explicit `null` and override
 the server's defaults. See the

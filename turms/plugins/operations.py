@@ -1,5 +1,5 @@
 import ast
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic_settings import SettingsConfigDict
 from turms.config import GeneratorConfig
@@ -7,7 +7,7 @@ from graphql import GraphQLSchema, InputObjectTypeDefinitionNode
 from graphql.language.ast import OperationDefinitionNode, OperationType
 from turms.recurse import type_field_node
 from turms.plugins.base import Plugin, PluginConfig
-from pydantic import Field
+from pydantic import Field, model_validator
 from graphql.language.ast import (
     FieldNode,
     OperationDefinitionNode,
@@ -48,7 +48,24 @@ class OperationsPluginConfig(PluginConfig):
     operations_glob: Optional[str] = None
     create_arguments: bool = True
     extract_documentation: bool = True
-    arguments_allow_population_by_field_name: bool = False
+    arguments_populate_by_name: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def _rename_v1_spelling(cls, values: Any) -> Any:
+        """Accept ``arguments_allow_population_by_field_name``, the pydantic v1
+        spelling, as a deprecated alias.
+
+        Done here rather than with ``validation_alias`` because a validation alias
+        on a ``BaseSettings`` field replaces the ``TURMS_PLUGINS_OPERATIONS_``
+        env-var lookup instead of adding to it.
+        """
+        if isinstance(values, dict) and "arguments_allow_population_by_field_name" in values:
+            values.setdefault(
+                "arguments_populate_by_name",
+                values.pop("arguments_allow_population_by_field_name"),
+            )
+        return values
 
 
 def get_query_bases(
@@ -105,7 +122,7 @@ def generate_arguments_config(
 ):
     config_keywords = []
 
-    if plugin_config.arguments_allow_population_by_field_name:
+    if plugin_config.arguments_populate_by_name:
         config_keywords.append(
             ast.keyword(
                 arg="populate_by_name",

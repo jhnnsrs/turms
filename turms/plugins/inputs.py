@@ -13,11 +13,11 @@ from turms.errors import GenerationError
 from pydantic_settings import SettingsConfigDict
 from turms.plugins.base import Plugin, PluginConfig
 import ast
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from turms.config import GeneratorConfig
 from graphql import GraphQLSchema
 from turms.plugins.base import Plugin
-from pydantic import Field
+from pydantic import Field, model_validator
 from graphql.type.definition import (
     GraphQLEnumType,
 )
@@ -41,9 +41,19 @@ class InputsPluginConfig(PluginConfig):
     )
     type: str = "turms.plugins.inputs.InputsPlugin"
     inputtype_bases: List[str] = ["pydantic.BaseModel"]
-    allow_population_by_field_name: bool = True
     skip_underscore: bool = True
     skip_unreferenced: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_removed_options(cls, values: Any) -> Any:
+        if isinstance(values, dict) and "allow_population_by_field_name" in values:
+            raise ValueError(
+                "'allow_population_by_field_name' was never read by the inputs "
+                "plugin and was removed in turms 2.0. Use the top-level "
+                "'options.populate_by_name' instead."
+            )
+        return values
 
 
 def generate_input_annotation(
@@ -439,7 +449,7 @@ def generate_oneof_wrapper_input(
     """Generate a ``@oneOf`` input as a union of per-field wrapper classes, each
     carrying its single field as required. A wrapper serializes to the tagged
     wire form ``{fieldName: value}`` through the ordinary
-    ``dict(by_alias=True, exclude_unset=True)`` proxy contract."""
+    ``model_dump(by_alias=True, exclude_unset=True)`` proxy contract."""
     tree = []
     additional_bases = get_additional_bases_for_type(type.name, config, registry)
     member_names = []

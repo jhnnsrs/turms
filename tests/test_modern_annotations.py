@@ -6,13 +6,11 @@ generics and PEP 604 unions -- `list[str] | None` instead of
 `Optional[List[str]]` -- and the typing imports that became obsolete are pruned.
 """
 
-import ast
 
 import pytest
 from graphql import build_ast_schema, parse
 
 from turms.config import GeneratorConfig
-from turms.parsers.polyfill import PolyfillParser, PolyfillPluginConfig
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.fragments import FragmentsPlugin
 from turms.plugins.funcs import FuncsPlugin, FuncsPluginConfig, FunctionDefinition
@@ -21,7 +19,7 @@ from turms.plugins.inputs import InputsPlugin
 from turms.plugins.objects import ObjectsPlugin
 from turms.plugins.operations import OperationsPlugin
 from turms.plugins.strawberry import StrawberryPlugin
-from turms.run import generate_ast, parse_ast
+from turms.run import generate_ast
 from turms.stylers.capitalize import CapitalizeStyler
 from turms.stylers.default import DefaultStyler
 from turms.stylers.snake_case import SnakeCaseStyler
@@ -72,8 +70,8 @@ def generate(**config_kwargs):
     "style,version,builtin_generics,union_operator",
     [
         ("legacy", "3.13", False, False),
-        ("modern", "3.8", True, True),
-        ("auto", "3.8", False, False),
+        # `modern` opts into every modern spelling regardless of the declared floor
+        ("modern", "3.9", True, True),
         ("auto", "3.9", True, False),
         ("auto", "3.10", True, True),
         ("auto", "3.12", True, True),
@@ -354,36 +352,6 @@ def test_modern_strawberry(arkitekt_schema):
         skip_forwards=True,
     )
     unit_test_with(generated_ast, "")
-
-
-# --------------------------------------------------------------------------- #
-# interaction with the polyfill parser
-# --------------------------------------------------------------------------- #
-
-
-def test_polyfill_with_modern_annotations(arkitekt_schema):
-    """Modernizing can leave `Literal` as the only typing import, which the
-    polyfill parser moves to typing_extensions -- the leftover `from typing
-    import` must not be emitted empty."""
-    config = GeneratorConfig(
-        documents=build_relative_glob("/documents/arkitekt/**/*.graphql"),
-        scalar_definitions={"Callback": "str", "Any": "typing.Any", "QString": "str"},
-        **MODERN,
-    )
-    generated_ast = generate_ast(
-        config,
-        arkitekt_schema,
-        stylers=[CapitalizeStyler(), SnakeCaseStyler()],
-        plugins=[EnumsPlugin(), InputsPlugin(), FragmentsPlugin(), OperationsPlugin()],
-    )
-    parsed = parse_ast(
-        config,
-        generated_ast,
-        parsers=[PolyfillParser(config=PolyfillPluginConfig(python_version="3.7"))],
-    )
-    code = parse_to_code(parsed)
-    assert "from typing import\n" not in code
-    ast.parse(code)
 
 
 # --------------------------------------------------------------------------- #

@@ -19,7 +19,6 @@ def test_project_pipeline():
                 stylers=[
                     ConfigProxy(type="turms.stylers.default.DefaultStyler"),
                 ],
-                parsers=[ConfigProxy(type="turms.parsers.polyfill.PolyfillParser")],
             )
         ),
     )

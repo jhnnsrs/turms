@@ -240,7 +240,7 @@ def write_project(project: GraphQLProject, outdir: str, filepath: str):
         "w",
         encoding="utf-8",
     ) as file:
-        file.write(project.model_dump_json(indent=4))
+        file.write(project.model_dump_json(indent=4, by_alias=True))
 
     return generated_file
 

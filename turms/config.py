@@ -1,6 +1,7 @@
 import builtins
 from graphql import ASTValidationRule
 from pydantic import (
+    AliasChoices,
     AnyHttpUrl,
     BaseModel,
     Field,
@@ -98,7 +99,7 @@ class LogFunction(Protocol):
         pass
 
 
-class FreezeConfig(BaseSettings):
+class FreezeConfig(BaseModel):
     """Configuration for freezing the generated pydantic
     models
 
@@ -128,19 +129,13 @@ class FreezeConfig(BaseSettings):
         default=None, description="List of types to include in freezing"
     )
     """The types to freeze"""
-    exclude_fields: Optional[List[str]] = Field(
-        default_factory=list, description="List of fields to exclude from freezing"
-    )
-    include_fields: Optional[List[str]] = Field(
-        default_factory=list, description="List of fields to include in freezing"
-    )
     convert_list_to_tuple: bool = Field(
         default=True, description="Convert GraphQL List to tuple (with varying length"
     )
     """Convert GraphQL List to tuple (with varying length)"""
 
 
-ExtraOptions = Optional[Union[Literal["ignore"], Literal["allow"], Literal["forbid"]]]
+ExtraOptions = Optional[Literal["ignore", "allow", "forbid"]]
 
 AliasMode = Literal["single", "split"]
 """How a field whose python name differs from its GraphQL name carries that name.
@@ -156,7 +151,7 @@ AliasMode = Literal["single", "split"]
 """
 
 
-class OptionsConfig(BaseSettings):
+class OptionsConfig(BaseModel):
     """Configuration for freezing the generated pydantic
     models
 
@@ -173,8 +168,16 @@ class OptionsConfig(BaseSettings):
     """Enabling this, will freeze the schema"""
     extra: ExtraOptions = None
     """Extra options for pydantic"""
-    allow_population_by_field_name: Optional[bool] = None
-    """Allow population by field name"""
+    populate_by_name: Optional[bool] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "populate_by_name", "allow_population_by_field_name"
+        ),
+    )
+    """Emit ``populate_by_name`` on the generated models.
+
+    ``allow_population_by_field_name`` -- the pydantic v1 spelling of this key --
+    is still accepted as a deprecated alias."""
     from_attributes: Optional[bool] = None
     """Let the generated models validate from arbitrary class instances"""
     use_enum_values: Optional[bool] = None
@@ -233,9 +236,7 @@ class OptionsConfig(BaseSettings):
     """The types to freeze"""
 
 
-PythonVersion = Literal[
-    "3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"
-]
+PythonVersion = Literal["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
 """A python version the generated code can be targeted at."""
 
 TypeAnnotationStyle = Literal["legacy", "modern", "auto"]
@@ -257,6 +258,22 @@ def parse_python_version(version: str) -> tuple:
 
 
 
+#: Components removed in turms 2.0, mapped to the error a config still naming one gets.
+#: Without this they would fail as an opaque "Invalid import".
+REMOVED_COMPONENTS = {
+    "turms.parsers.polyfill.PolyfillParser": (
+        "'turms.parsers.polyfill.PolyfillParser' was removed in turms 2.0. It only "
+        "backported 'Literal' to typing_extensions for a python 3.7 target, and "
+        "pydantic v2 -- the only target turms generates for -- has never supported "
+        "python 3.7. Drop the parser from your configuration."
+    ),
+    "turms.parsers.polyfill.PolyfillPlugin": (
+        "'turms.parsers.polyfill.PolyfillPlugin' was removed in turms 2.0. Drop the "
+        "parser from your configuration."
+    ),
+}
+
+
 class GeneratorConfig(BaseSettings):
     """Configuration for the generator
 
@@ -272,23 +289,25 @@ class GeneratorConfig(BaseSettings):
         env_prefix="TURMS_",
         extra="forbid",
     )
-    pydantic_version: Optional[Literal["v2"]] = None
-    """Deprecated no-op. Turms only targets pydantic v2; setting this to "v1"
-    is an error. The key is still accepted so that existing configurations
-    saying ``pydantic_version: v2`` keep loading, but it is normalized away so
-    a dumped configuration does not carry the dead key forward."""
-
-    @field_validator("pydantic_version", mode="before")
+    @model_validator(mode="before")
     @classmethod
-    def _reject_pydantic_v1(cls, value: object) -> object:
-        if value in ("v1", "1", 1):
-            raise ValueError(
-                "pydantic v1 targets were removed in turms 2.0. The generated "
-                "code now always targets pydantic v2 — drop the "
-                "'pydantic_version' key from your configuration and upgrade "
-                "the consuming project to pydantic>=2."
-            )
-        return None
+    def _drop_pydantic_version(cls, values: Any) -> Any:
+        """``pydantic_version`` is a dead key: turms only targets pydantic v2.
+
+        Configurations saying ``pydantic_version: v2`` keep loading -- the key
+        is accepted and discarded, so it carries forward into neither
+        ``model_dump()`` nor ``model_json_schema()`` nor a dumped
+        ``project.json``. Asking for v1 is an error.
+        """
+        if isinstance(values, dict) and "pydantic_version" in values:
+            if values.pop("pydantic_version") in ("v1", "1", 1):
+                raise ValueError(
+                    "pydantic v1 targets were removed in turms 2.0. The generated "
+                    "code now always targets pydantic v2 — drop the "
+                    "'pydantic_version' key from your configuration and upgrade "
+                    "the consuming project to pydantic>=2."
+                )
+        return values
 
     domain: Optional[str] = None
     """The domain of the GraphQL API ( will be set as a config variable)"""
@@ -481,6 +500,8 @@ class GeneratorConfig(BaseSettings):
         """Validate that the importable is a valid importable function or class"""
 
         for parser in v:
+            if parser.type in REMOVED_COMPONENTS:
+                raise ValueError(REMOVED_COMPONENTS[parser.type])
             try:
                 import_string(parser.type)
             except Exception as e:
@@ -556,7 +577,10 @@ class GraphQLProject(BaseSettings):
         extra="allow",
     )
 
-    schema_url: SchemaType = Field(alias="schema")
+    schema_url: SchemaType = Field(
+        validation_alias=AliasChoices("schema", "schema_url"),
+        serialization_alias="schema",
+    )
     """The schema url or path to the schema file"""
     documents: Optional[str] = None
     """The documents (operations,fragments) to parse"""
@@ -564,13 +588,13 @@ class GraphQLProject(BaseSettings):
     """The extensions configuration for the project (here resides the turms configuration)"""
 
 
-class GraphQLConfigMultiple(BaseSettings):
+class GraphQLConfigMultiple(BaseModel):
     """Configuration for multiple GraphQL projects
 
     This is the main configuration for multiple GraphQL projects. It is compliant with
     the graphql-config specification for multiple projec."""
 
-    model_config = SettingsConfigDict(
+    model_config = ConfigDict(
         extra="allow",
     )
 

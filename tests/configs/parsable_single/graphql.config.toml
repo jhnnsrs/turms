@@ -3,9 +3,6 @@ documents = "tests/documents/inputs_default/*.graphql"
 
 [extensions.turms]
 out_dir = "examples/api"
-[[extensions.turms.parsers]]
-type = "turms.parsers.polyfill.PolyfillParser"
-python_version = 3.7
 
 [[extensions.turms.stylers]]
 type = "turms.stylers.capitalize.CapitalizeStyler"

@@ -32,7 +32,7 @@ Schema/Documents
   Plugins  → generate ast.AST nodes from GraphQL types/operations
       │
       ▼
-  Parsers  → transform the collected AST list (e.g., polyfill compatibility)
+  Parsers  → transform the collected AST list (extension point; none ship with turms)
       │
       ▼
   Stylers  → rename identifiers (snake_case, capitalize, append suffix, etc.)
@@ -54,7 +54,7 @@ The **`ReferenceRegistry`** (`turms/referencer.py`) enables `skip_unreferenced`:
 | `turms/plugins/` | AST generators per GraphQL construct (enums, inputs, fragments, operations, funcs, objects, strawberry) |
 | `turms/processors/` | Source-string transformers: `black`, `isort`, `merge` (libcst), `disclaimer` |
 | `turms/stylers/` | Identifier transformers: `default`, `snake_case`, `capitalize`, `appender` |
-| `turms/parsers/` | AST-level post-processors (currently: `polyfill`) |
+| `turms/parsers/` | AST-level post-processors (extension point; no built-ins) |
 | `turms/config.py` | All Pydantic config models (`GeneratorConfig`, `GraphQLProject`, etc.) |
 | `turms/registry.py` | `ClassRegistry` — resolves types across plugins |
 | `turms/referencer.py` | `ReferenceRegistry` — determines which types are reachable |

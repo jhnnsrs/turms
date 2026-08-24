@@ -166,7 +166,7 @@ GraphQL schema + documents
    │ Plugins │   (enums, inputs, fragments, operations, funcs, strawberry…)
    └────┬────┘
    ┌────▼────┐   transform the AST
-   │ Parsers │   (e.g. polyfill typing imports for older Python)
+   │ Parsers │   (your own AST transforms; none ship with turms)
    └────┬────┘
    ┌────▼────┐   style class/field names as they are generated
    │ Stylers │   (snake_case, capitalize, suffix appending…)
@@ -232,9 +232,11 @@ Processors run over the rendered source before it is written to disk.
 
 ### Parsers
 
-| Parser | Purpose |
-| --- | --- |
-| `turms.parsers.polyfill.PolyfillPlugin` | Rewrites typing constructs for an older target `python_version` |
+No parsers ship with turms — the stage is an extension point. Point `type` at any importable
+subclass of `turms.parsers.base.Parser` to transform the generated AST before it is unparsed.
+
+(`turms.parsers.polyfill.PolyfillPlugin` was removed in turms 2.0: it only ever backported
+`Literal` for python 3.7, which pydantic v2 does not support.)
 
 ## Configuration
 

@@ -313,12 +313,12 @@ def generate_pydantic_config(
                         )
                     )
 
-                if config.options.allow_population_by_field_name is not None:
+                if config.options.populate_by_name is not None:
                     config_keywords.append(
                         ast.keyword(
                             arg="populate_by_name",
                             value=ast.Constant(
-                                value=config.options.allow_population_by_field_name
+                                value=config.options.populate_by_name
                             ),
                         )
                     )

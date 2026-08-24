@@ -8,9 +8,6 @@ projects:
     extensions:
       turms:
         out_dir: examples/api
-        parsers:
-          - type: turms.parsers.polyfill.PolyfillParser
-            python_version: 3.7
         stylers:
           - type: turms.stylers.capitalize.CapitalizeStyler
           - type: turms.stylers.snake_case.SnakeCaseStyler
@@ -53,9 +50,6 @@ projects:
     extensions:
       turms:
         out_dir: examples/api
-        parsers:
-          - type: turms.parsers.polyfill.PolyfillParser
-            python_version: 3.7
         stylers:
           - type: turms.stylers.capitalize.CapitalizeStyler
           - type: turms.stylers.snake_case.SnakeCaseStyler
