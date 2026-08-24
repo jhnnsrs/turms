@@ -9,6 +9,9 @@ Parsers are plugings that take the Python AST and process it before it is unpars
 string.They are great for ensuring compatibility between different python versions, backporting
 more modern python constructs to older versions.
 
-Turms comes included with two parsers included
+No parsers ship with turms. The stage is an extension point: point a `parsers` entry's `type`
+at any importable subclass of `turms.parsers.base.Parser`.
 
-- *polyill* The polyfill parser is used to polyfill the generated python code with additional imports and code to make it compatible with older python versions.(Right now it only supports polyfils for python 3.7 )
+The `polyfill` parser was removed in turms 2.0. It only ever backported `Literal` to
+`typing_extensions` for a python 3.7 target, and pydantic v2 -- the only target turms
+generates for -- has never supported python 3.7.

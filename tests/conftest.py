@@ -127,6 +127,13 @@ def forward_reference_to_interface_schema():
 
 
 @pytest.fixture(scope="session")
+def complex_defaults_schema():
+    return build_schema_from_schema_type(
+        build_relative_glob("/schemas/complex_defaults.graphql")
+    )
+
+
+@pytest.fixture(scope="session")
 def oneof_schema():
     return build_schema_from_schema_type(
         build_relative_glob("/schemas/oneof.graphql")

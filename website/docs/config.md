@@ -82,7 +82,6 @@ validated by pydantic — unknown keys are rejected, so typos fail loudly.
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `pydantic_version` | `"v1"` \| `"v2"` | `"v2"` | Which pydantic major version the generated code targets |
 | `object_bases` | `List[str]` | `["pydantic.BaseModel"]` | Base class(es) for generated models |
 | `interface_bases` | `List[str]` | – | Separate base classes for interfaces (defaults to `object_bases`) |
 | `always_resolve_interfaces` | `bool` | `true` | Resolve interfaces to unions of concrete types |
@@ -99,7 +98,7 @@ validated by pydantic — unknown keys are rejected, so typos fail loudly.
 | `additional_bases` | `Dict[str, List[str]]` | `{}` | Extra base classes per GraphQL type name (dotted import paths) |
 | `additional_config` | `Dict[str, Dict]` | `{}` | Extra pydantic config attributes per GraphQL type name |
 | `force_plugin_order` | `bool` | `true` | Run plugins strictly in their configured order |
-| `omited_document_rules` | `List[str]` | `[]` | GraphQL document validation rules to skip |
+| `omitted_document_rules` | `List[str]` | `[]` | GraphQL document validation rules to skip |
 
 ### Scalar definitions
 
@@ -203,7 +202,6 @@ freeze:
 | `enabled` | `false` | Enable freezing |
 | `types` | `[input, fragment, object]` | Which GraphQL kinds to freeze |
 | `include` / `exclude` | – | Explicit type-name allow/deny lists |
-| `include_fields` / `exclude_fields` | `[]` | Field-level allow/deny lists |
 | `convert_list_to_tuple` | `true` | Convert `List[...]` annotations to `Tuple[..., ...]` |
 
 ### Pydantic options (`options`)
@@ -216,12 +214,40 @@ options:
   extra: forbid # ignore | allow | forbid
   use_enum_values: true
   validate_assignment: true
-  allow_population_by_field_name: true
+  populate_by_name: true
+  from_attributes: true
+  alias_mode: single # single | split
   types: [input, fragment, object]
 ```
 
-`include` / `exclude` lists by type name are supported here as well. `allow_mutation` and `orm_mode`
-are available for pydantic v1 targets.
+`include` / `exclude` lists by type name are supported here as well.
+
+#### `alias_mode`
+
+Controls how the GraphQL field name is attached to a generated **input** field and to an
+operation's `Arguments` class. It is deliberately independent of `enabled` / `types` /
+`include` / `exclude` -- those select which classes get a `model_config`; `alias_mode`
+selects how every input field is aliased.
+
+| Value | Emitted | Effect |
+| --- | --- | --- |
+| `single` (default) | `Field(alias="someField")` | Today's behaviour. A type checker synthesizes `__init__` from the alias, so only the **camelCase** spelling type-checks -- `populate_by_name` is a runtime-only setting that pyright/mypy do not read. |
+| `split` | `Field(validation_alias=AliasChoices("some_field", "someField"), serialization_alias="someField")` | The **snake_case** python name is what type-checks; both spellings still validate at runtime, and `model_dump(by_alias=True)` is byte-identical. |
+
+`split` only touches inputs and `Arguments`. Fragments, object types and `__typename`
+keep the plain `alias=` form -- there the wire is the source of truth and the models are
+validate-only.
+
+Discriminated-union tag fields are never aliased in either mode: pydantic rejects
+`AliasChoices` on a discriminator. turms raises a `GenerationError` if a styler would
+rename a discriminator field, since that would require an alias.
+
+`allow_population_by_field_name` -- pydantic v1's name for this key -- is still accepted as a
+deprecated alias for `populate_by_name`, as is `arguments_allow_population_by_field_name` for
+the operations plugin's `arguments_populate_by_name`.
+
+The pydantic v1 spellings `allow_mutation` and `orm_mode` were removed in turms 2.0. Use the
+[`freeze`](#freezing-models-freeze) section for immutable models, and `from_attributes` in place of `orm_mode`.
 
 ## Component sections
 
@@ -241,8 +267,7 @@ extensions:
     stylers:
       - type: turms.stylers.default.DefaultStyler
     parsers:
-      - type: turms.parsers.polyfill.PolyfillPlugin
-        python_version: "3.9"
+      - type: your_module.YourParser
     processors:
       - type: turms.processors.ruff.RuffProcessor
         fix: true
@@ -256,11 +281,11 @@ Because components are resolved by import path, **your own classes work the same
 | Plugin | Key options (default) |
 | --- | --- |
 | `turms.plugins.enums.EnumsPlugin` | `skip_underscore` (false), `skip_double_underscore` (true), `skip_unreferenced` (true), `prepend`/`append` ("") |
-| `turms.plugins.inputs.InputsPlugin` | `inputtype_bases` (["pydantic.BaseModel"]), `allow_population_by_field_name` (true), `skip_underscore` (true), `skip_unreferenced` (true) |
-| `turms.plugins.objects.ObjectsPlugin` | `types_bases` (["pydantic.BaseModel"]), `skip_underscore` (false), `skip_double_underscore` (true) |
-| `turms.plugins.fragments.FragmentsPlugin` | `fragment_bases` ([]), `fragments_glob`, `add_documentation` (true), `generate_meta_class` (true) |
-| `turms.plugins.operations.OperationsPlugin` | `query_bases`/`mutation_bases`/`subscription_bases` ([]), `operations_glob`, `create_arguments` (true), `extract_documentation` (true), `arguments_allow_population_by_field_name` (false) |
-| `turms.plugins.funcs.FuncsPlugin` | `definitions` ([]), `global_args`/`global_kwargs` ([]), `prepend_sync` (""), `prepend_async` ("a"), `collapse_lonely` (true), `expand_input_types` ([]), `argument_key_is_styled` (false), `coercible_scalars` (\{\}) |
+| `turms.plugins.inputs.InputsPlugin` | `input_bases` (["pydantic.BaseModel"]), `skip_underscore` (true), `skip_unreferenced` (true) |
+| `turms.plugins.objects.ObjectsPlugin` | `object_bases` (["pydantic.BaseModel"]), `skip_underscore` (false), `skip_double_underscore` (true) |
+| `turms.plugins.fragments.FragmentsPlugin` | `fragment_bases` ([]), `fragments_glob`, `extract_documentation` (true), `generate_meta_class` (true) |
+| `turms.plugins.operations.OperationsPlugin` | `query_bases`/`mutation_bases`/`subscription_bases` ([]), `operations_glob`, `create_arguments` (true), `extract_documentation` (true), `arguments_populate_by_name` (false) |
+| `turms.plugins.funcs.FuncsPlugin` | `definitions` ([]), `global_args`/`global_kwargs` ([]), `prepend_sync` (""), `prepend_async` ("a"), `collapse_lonely` (true), `expand_input_types` ([]), `coercible_scalars` (\{\}) |
 | `turms.plugins.input_funcs.InputFuncsPlugin` | `coercible_scalars` (\{\}), `skip_underscore` (true), `skip_unreferenced` (true), `prepend` (""), `extract_documentation` (true) — see [Input Funcs](plugins/inputfuncs) |
 | `turms.plugins.strawberry.StrawberryPlugin` | `generate_directives` (true), `generate_scalars` (true), `builtin_directives`, `builtin_scalars` |
 
@@ -294,7 +319,6 @@ The funcs plugin's `definitions` describe how each operation type is turned into
 
 | Parser | Key options (default) |
 | --- | --- |
-| `turms.parsers.polyfill.PolyfillPlugin` | `python_version` ("3.9") — rewrites typing constructs for older python targets |
 
 ### Processors
 

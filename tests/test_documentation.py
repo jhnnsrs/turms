@@ -1,5 +1,8 @@
 
 from .utils import build_relative_glob, unit_test_with
+from graphql import OperationDefinitionNode, Source, parse
+
+from turms.utils import inspect_operation_for_documentation
 from turms.config import GeneratorConfig
 from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
@@ -84,3 +87,32 @@ def test_default_input_funcs(nested_input_schema):
     )
 
     unit_test_with(generated_ast, "")
+
+
+def test_documentation_above_an_operation_keeps_the_whole_block():
+    """A `#` block above an operation is its docstring, all of it.
+
+    graphql-core sets the operation's ``loc.start`` to the *last* preceding comment token
+    rather than to the `query`/`mutation` keyword, so slicing forward from that line kept
+    only the block's final line and dropped everything above it. Comments *inside* the
+    operation body -- the form the fixture below also covers -- were unaffected, which is
+    why this went unnoticed.
+    """
+    path = build_relative_glob("/documents/documentation/test.graphql")
+    with open(path) as file:
+        source = Source(file.read(), "test.graphql")
+
+    docs = {
+        definition.name.value: inspect_operation_for_documentation(definition)
+        for definition in parse(source).definitions
+        if isinstance(definition, OperationDefinitionNode)
+    }
+
+    assert docs["commentedAbove"] == (
+        " A comment block above the operation documents it too, and every line of it counts.\n"
+        " graphql-core puts the operation's `loc.start` on the last of these lines, so a naive\n"
+        " slice forward from there keeps only this sentence and silently drops the two above."
+    )
+    # The in-body form still works, and an operation with no comment still gets nothing.
+    assert docs["createBeast"] == " Testing the documentatoin ability"
+    assert docs["createBeastss"] is None

@@ -11,13 +11,12 @@ from graphql import (
 )
 from turms.errors import GenerationError
 from pydantic_settings import SettingsConfigDict
-from turms.plugins.base import Plugin, PluginConfig
+from turms.plugins.base import Plugin, PluginConfig, rename_deprecated_keys
 import ast
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from turms.config import GeneratorConfig
 from graphql import GraphQLSchema
-from turms.plugins.base import Plugin
-from pydantic import Field
+from pydantic import Field, model_validator
 from graphql.type.definition import (
     GraphQLEnumType,
 )
@@ -26,6 +25,7 @@ from turms.registry import ClassRegistry
 from turms.utils import (
     annotate_field_metadata,
     compose_field_documentation,
+    generate_alias_keywords,
     generate_pydantic_config,
     get_additional_bases_for_type,
     is_oneof_input_type,
@@ -39,10 +39,25 @@ class InputsPluginConfig(PluginConfig):
         extra="forbid", env_prefix="TURMS_PLUGINS_INPUTS_"
     )
     type: str = "turms.plugins.inputs.InputsPlugin"
-    inputtype_bases: List[str] = ["pydantic.BaseModel"]
-    allow_population_by_field_name: bool = True
+    input_bases: List[str] = ["pydantic.BaseModel"]
     skip_underscore: bool = True
     skip_unreferenced: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def _rename_deprecated(cls, values: Any) -> Any:
+        return rename_deprecated_keys(values, {"inputtype_bases": "input_bases"})
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_removed_options(cls, values: Any) -> Any:
+        if isinstance(values, dict) and "allow_population_by_field_name" in values:
+            raise ValueError(
+                "'allow_population_by_field_name' was never read by the inputs "
+                "plugin and was removed in turms 2.0. Use the top-level "
+                "'options.populate_by_name' instead."
+            )
+        return values
 
 
 def generate_input_annotation(
@@ -172,11 +187,16 @@ def generate_input_field_value(
     omittable: bool,
     description: Optional[str],
     registry: ClassRegistry,
+    config: GeneratorConfig,
 ):
     """Builds the AnnAssign value for an input field. Emits a ``Field(...)`` call
     carrying the alias, the ``None`` default (for omittable fields) and the GraphQL
     field description; falls back to a bare ``None``/required value when no
-    ``Field`` metadata is needed."""
+    ``Field`` metadata is needed.
+
+    Never called for a discriminated-union tag field -- those are emitted by the
+    ``discriminators`` loop in :func:`generate_input_type` and skipped here, which
+    matters because pydantic rejects a split alias on a discriminator."""
     has_alias = field_name != value_key
     # A bare ``= None`` suffices for a plain optional field; only reach for a
     # ``Field(...)`` call when there is real metadata (an alias or a description)
@@ -186,7 +206,9 @@ def generate_input_field_value(
 
     keywords = []
     if has_alias:
-        keywords.append(ast.keyword(arg="alias", value=ast.Constant(value=value_key)))
+        keywords.extend(
+            generate_alias_keywords(field_name, value_key, config, registry)
+        )
     if omittable:
         keywords.append(ast.keyword(arg="default", value=ast.Constant(value=None)))
     if description:
@@ -254,6 +276,22 @@ def generate_input_type(
     # wire. The Literal emitted above is the same field, narrowed to the one
     # value this member answers to, so emitting it again here would shadow the
     # Literal with the open enum and leave pydantic unable to discriminate.
+    #
+    # The Literal is emitted under the *raw GraphQL* name, while the loop below
+    # styles each field first, so a multi-word discriminator (`elementKind`)
+    # would fail to match and be emitted twice. It also must never pick up an
+    # alias: pydantic rejects a split alias on a discriminator ("Alias [...] is
+    # not supported in a discriminated union"). Refuse rather than mis-emit.
+    for _d in discriminators or []:
+        _styled = registry.generate_node_name(_d.discriminator)
+        if _styled != _d.discriminator:
+            raise GenerationError(
+                f"Discriminator '{_d.discriminator}' on '{type.name}' is styled to "
+                f"'{_styled}', so it would need an alias -- which pydantic forbids "
+                "on a discriminated-union tag field. Rename the field in the schema "
+                "or use a styler that leaves it unchanged."
+            )
+
     discriminator_names = {d.discriminator for d in discriminators or []}
 
     for value_key, value in type.fields.items():
@@ -300,7 +338,7 @@ def generate_input_type(
             target=ast.Name(field_name, ctx=ast.Store()),
             annotation=annotation,
             value=generate_input_field_value(
-                field_name, value_key, omittable, value.description, registry
+                field_name, value_key, omittable, value.description, registry, config
             ),
             simple=1,
         )
@@ -314,7 +352,7 @@ def generate_input_type(
         else:
             fields += [assign]
 
-    if discriminators and config.pydantic_version == "v2":
+    if discriminators:
         # The discriminator carries a default and is never explicitly set, so an
         # exclude_unset dump (the proxy contract) would drop it from the wire —
         # but the server needs it to discriminate. Mark it as set on every
@@ -330,7 +368,7 @@ def generate_input_type(
         bases=additional_bases
         + [
             ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-            for base in plugin_config.inputtype_bases
+            for base in plugin_config.input_bases
         ],
         decorator_list=[],
         keywords=[],
@@ -415,7 +453,7 @@ def generate_oneof_wrapper_input(
     """Generate a ``@oneOf`` input as a union of per-field wrapper classes, each
     carrying its single field as required. A wrapper serializes to the tagged
     wire form ``{fieldName: value}`` through the ordinary
-    ``dict(by_alias=True, exclude_unset=True)`` proxy contract."""
+    ``model_dump(by_alias=True, exclude_unset=True)`` proxy contract."""
     tree = []
     additional_bases = get_additional_bases_for_type(type.name, config, registry)
     member_names = []
@@ -449,7 +487,7 @@ def generate_oneof_wrapper_input(
                 bases=additional_bases
                 + [
                     ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                    for base in plugin_config.inputtype_bases
+                    for base in plugin_config.input_bases
                 ],
                 decorator_list=[],
                 keywords=[],
@@ -459,7 +497,7 @@ def generate_oneof_wrapper_input(
                         target=ast.Name(field_name, ctx=ast.Store()),
                         annotation=annotation,
                         value=generate_input_field_value(
-                            field_name, value_key, False, value.description, registry
+                            field_name, value_key, False, value.description, registry, config
                         ),
                         simple=1,
                     ),
@@ -550,7 +588,7 @@ def generate_inputs(
     else:
         ref_registry = None
 
-    for base in plugin_config.inputtype_bases:
+    for base in plugin_config.input_bases:
         registry.register_import(base)
 
     union_input_types = {}
@@ -641,11 +679,7 @@ def generate_inputs(
 
         if is_oneof_input_type(type):
             validate_oneof_input_type(type)
-            members = (
-                get_oneof_member_map(type)
-                if config.pydantic_version == "v2"
-                else None
-            )
+            members = get_oneof_member_map(type)
             if members is not None and any(
                 (ref_registry and member.name not in ref_registry.inputs)
                 or (plugin_config.skip_underscore and member.name.startswith("_"))
@@ -762,7 +796,7 @@ def generate_inputs(
                 target=ast.Name(field_name, ctx=ast.Store()),
                 annotation=annotation,
                 value=generate_input_field_value(
-                    field_name, value_key, omittable, value.description, registry
+                    field_name, value_key, omittable, value.description, registry, config
                 ),
                 simple=1,
             )
@@ -785,7 +819,7 @@ def generate_inputs(
                 bases=additional_bases
                 + [
                     ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                    for base in plugin_config.inputtype_bases
+                    for base in plugin_config.input_bases
                 ],
                 decorator_list=[],
                 keywords=[],
@@ -818,7 +852,7 @@ class InputsPlugin(Plugin):
         config: GeneratorConfig,
         registry: ClassRegistry,
     ) -> List[ast.AST]:
-        for base in self.config.inputtype_bases:
+        for base in self.config.input_bases:
             registry.register_import(base)
 
         return generate_inputs(client_schema, config, self.config, registry)

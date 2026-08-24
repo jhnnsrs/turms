@@ -54,27 +54,27 @@ def test_defaulted_fields_are_optional_none():
     # Field carries no folded description (the schema field has none); the default
     # is documented in the inline comment instead.
     assert (
-        "required_with_default: Annotated[Optional[int], GraphQLDefault('5')] = Field(alias='requiredWithDefault', default=None)"
+        "required_with_default: Annotated[int | None, GraphQLDefault('5')] = Field(alias='requiredWithDefault', default=None)"
         in generated
     )
     assert "'Default: 5'" in generated
     # nullable-with-default also defaults to None, with the value on the marker.
     assert (
-        "optional_with_default: Annotated[Optional[int], GraphQLDefault('10')] = Field(alias='optionalWithDefault', default=None)"
+        "optional_with_default: Annotated[int | None, GraphQLDefault('10')] = Field(alias='optionalWithDefault', default=None)"
         in generated
     )
     assert (
-        "string_with_default: Annotated[Optional[str], GraphQLDefault('hi')] = Field(alias='stringWithDefault', default=None)"
+        "string_with_default: Annotated[str | None, GraphQLDefault('hi')] = Field(alias='stringWithDefault', default=None)"
         in generated
     )
     # list-with-default likewise defaults to None — the value lives on the marker.
     assert (
-        "list_with_default: Annotated[Optional[List[int]], GraphQLDefault('[1, 2, 3]')] = Field(alias='listWithDefault', default=None)"
+        "list_with_default: Annotated[list[int] | None, GraphQLDefault('[1, 2, 3]')] = Field(alias='listWithDefault', default=None)"
         in generated
     )
     assert "'Default: [1, 2, 3]'" in generated
     # plain optional still defaults to None and has no marker.
-    assert "plain_optional: Optional[str] = Field(alias='plainOptional', default=None)" in generated
+    assert "plain_optional: str | None = Field(alias='plainOptional', default=None)" in generated
     # plain required carries no default.
     assert "Field(alias='plainRequired', default" not in generated
 

@@ -76,12 +76,11 @@ mutation CreateTransformation($input: CreateTransformationInput!) {
 """
 
 
-def _generate(tmp_path, pydantic_version, sdl=schema_sdl):
+def _generate(tmp_path, sdl=schema_sdl):
     doc = tmp_path / "ops.graphql"
     doc.write_text(operation)
 
     config = GeneratorConfig(
-        pydantic_version=pydantic_version,
         documents=str(tmp_path / "**/*.graphql"),
     )
     return generate_ast(
@@ -95,7 +94,7 @@ def _generate(tmp_path, pydantic_version, sdl=schema_sdl):
 def test_members_and_discriminated_union(tmp_path):
     """Members get an injected Literal discriminator, the placeholder becomes a
     discriminated union, and repeatable directives put a member in two unions."""
-    generated_ast = _generate(tmp_path, "v2")
+    generated_ast = _generate(tmp_path)
 
     unit_test_with(
         generated_ast,
@@ -133,7 +132,7 @@ def test_members_and_discriminated_union(tmp_path):
 def test_discriminator_survives_exclude_unset(tmp_path):
     """The injected discriminator is never explicitly set by the caller, but the
     server requires it: it must survive an exclude_unset dump."""
-    generated_ast = _generate(tmp_path, "v2")
+    generated_ast = _generate(tmp_path)
 
     unit_test_with(
         generated_ast,
@@ -151,18 +150,6 @@ def test_discriminator_survives_exclude_unset(tmp_path):
     )
 
 
-def test_v1_generates_working_union(tmp_path):
-    generated_ast = _generate(tmp_path, "v1")
-
-    unit_test_with(
-        generated_ast,
-        """
-        m = CreateTransformationInput(transform=AffineTransformInput(affine=[[1.0]]))
-        assert m.transform.kind == 'AFFINE'
-        """,
-    )
-
-
 def test_missing_directive_argument_is_error(tmp_path):
     # Declare the args as optional so graphql-core accepts the SDL and turms'
     # own validation is what rejects the incomplete directive.
@@ -174,7 +161,7 @@ def test_missing_directive_argument_is_error(tmp_path):
         'input FieldTransformInput @unionElementOf(union: "TransformInput", discriminator: "kind") {',
     )
     with pytest.raises(GenerationError, match="needs 'union'"):
-        _generate(tmp_path, "v2", sdl=sdl)
+        _generate(tmp_path, sdl=sdl)
 
 
 def test_discriminator_mismatch_is_error(tmp_path):
@@ -183,4 +170,4 @@ def test_discriminator_mismatch_is_error(tmp_path):
         '@unionElementOf(union: "TransformInput", discriminator: "type", key: "FIELD")',
     )
     with pytest.raises(GenerationError, match="Discriminator mismatch"):
-        _generate(tmp_path, "v2", sdl=sdl)
+        _generate(tmp_path, sdl=sdl)

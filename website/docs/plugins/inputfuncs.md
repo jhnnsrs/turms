@@ -52,7 +52,7 @@ addr = address_input(street="Main", zip="12345")
 user = user_input(name="bob", age=30, address=addr, tags=["x", "y"])
 
 # Omitted optionals stay unset, so exclude_unset drops them entirely:
-user_input(name="alice").dict(by_alias=True, exclude_unset=True)
+user_input(name="alice").model_dump(by_alias=True, exclude_unset=True)
 # -> {"name": "alice"}
 ```
 

@@ -1,3 +1,4 @@
+import pytest
 
 from turms.config import GeneratorConfig
 from turms.run import generate_ast
@@ -7,6 +8,7 @@ from turms.run import generate_ast
 from .utils import unit_test_with
 
 
+@pytest.mark.network
 def test_countries_schema(countries_schema):
     config = GeneratorConfig(scalar_definitions={"_Any": "typing.Any"})
 

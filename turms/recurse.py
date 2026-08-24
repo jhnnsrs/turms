@@ -7,9 +7,12 @@ from graphql.language.ast import (
     InlineFragmentNode,
 )
 from turms.registry import ClassRegistry
+from turms.errors import GenerationError
 from turms.utils import (
     annotate_field_metadata,
+    capitalize_first,
     compose_field_documentation,
+    field_is_conditional,
     generate_generic_typename_field,
     generate_pydantic_config,
     generate_typename_field,
@@ -102,10 +105,6 @@ def recurse_annotation(
 
                 for sub_sub_node in sub_node.selection_set.selections:
                     if isinstance(sub_sub_node, FragmentSpreadNode):
-                        if registry.is_interface_fragment(sub_sub_node.name.value):
-                            raise Exception(
-                                "Interface Fragments with additional subfields are not yet implemented"
-                            )
                         spread_fragment_bases.append(
                             ast.Name(
                                 id=registry.inherit_fragment(sub_sub_node.name.value),
@@ -136,6 +135,7 @@ def recurse_annotation(
                             config,
                             subtree,
                             registry,
+                            force_optional=field_is_conditional(sub_node),
                         )
 
                 if spread_fragment_bases:
@@ -219,7 +219,7 @@ def recurse_annotation(
 
         sub_nodes = non_typename_fields(node)
 
-        base_name = f"{parent}{target.capitalize()}"
+        base_name = f"{parent}{capitalize_first(target)}"
 
         if type.description:
             mother_class_fields.append(
@@ -277,6 +277,42 @@ def recurse_annotation(
                 inline_fields = []
 
                 for field in sub_node.selection_set.selections:
+                    if isinstance(field, FragmentSpreadNode):
+                        # A fragment spread inside an inline fragment narrows to
+                        # this one implementation, so it becomes a base class of
+                        # that implementation only. Dropping it here would emit a
+                        # model missing every field the document still requests.
+                        try:
+                            implementation_map = (
+                                registry.get_interface_fragment_implementations(
+                                    field.name.value
+                                )
+                            )
+                        except KeyError:
+                            implementing_class_base_classes.setdefault(
+                                on_type_name, []
+                            ).append(registry.inherit_fragment(field.name.value))
+                        else:
+                            implementation = implementation_map.get(on_type_name)
+                            if implementation is None:
+                                raise GenerationError(
+                                    f"Fragment '{field.name.value}' spread inside "
+                                    f"'... on {on_type_name}' has no implementation "
+                                    f"for {on_type_name}. Known: "
+                                    f"{sorted(implementation_map)}."
+                                )
+                            implementing_class_base_classes.setdefault(
+                                on_type_name, []
+                            ).append(implementation)
+                        continue
+
+                    if isinstance(field, InlineFragmentNode):
+                        raise GenerationError(
+                            "Nested inline fragments are not supported "
+                            f"(inside '... on {on_type_name}'). Please flatten them "
+                            "or use a named fragment."
+                        )
+
                     if not isinstance(field, FieldNode):
                         continue
 
@@ -296,9 +332,10 @@ def recurse_annotation(
                         config,
                         subtree,
                         registry,
+                        force_optional=field_is_conditional(sub_node),
                     )
 
-                inline_fragment_fields.setdefault(on_type_name, []).append(
+                inline_fragment_fields.setdefault(on_type_name, []).extend(
                     inline_fields
                 )
 
@@ -458,7 +495,7 @@ def recurse_annotation(
         pick_fields: list[ast.Expr | ast.AnnAssign] = []
 
         target = target_from_node(node)
-        object_class_name = f"{parent}{target.capitalize()}"
+        object_class_name = f"{parent}{capitalize_first(target)}"
 
         if type.description:
             pick_fields.append(ast.Expr(value=ast.Constant(value=type.description)))
@@ -538,7 +575,53 @@ def recurse_annotation(
                 )
 
             if isinstance(sub_node, InlineFragmentNode):
-                raise NotImplementedError("Inline Fragments are not yet implemented")
+                # The parent type is already concrete, so there is nothing to
+                # discriminate: an inline fragment here just groups fields (the
+                # usual reason being a @skip/@include on the whole group).
+                # Validation has already rejected impossible type conditions.
+                for inline_node in sub_node.selection_set.selections:
+                    if isinstance(inline_node, FragmentSpreadNode):
+                        implementation = (
+                            registry.get_interface_fragment_implementation_or_none(
+                                inline_node.name.value, type.name
+                            )
+                        )
+                        additional_bases.append(
+                            ast.Name(
+                                id=implementation
+                                if implementation is not None
+                                else registry.inherit_fragment(
+                                    inline_node.name.value
+                                ),
+                                ctx=ast.Load(),
+                            )
+                        )
+                        continue
+
+                    if isinstance(inline_node, InlineFragmentNode):
+                        raise GenerationError(
+                            "Nested inline fragments are not supported "
+                            f"(inside '... on {sub_node.type_condition.name.value}'). "
+                            "Please flatten them or use a named fragment."
+                        )
+
+                    if not isinstance(inline_node, FieldNode):
+                        continue
+
+                    if inline_node.name.value == "__typename":
+                        continue
+
+                    field_type = type.fields[inline_node.name.value]
+                    pick_fields += type_field_node(
+                        inline_node,
+                        object_class_name,
+                        field_type,
+                        client_schema,
+                        config,
+                        subtree,
+                        registry,
+                        force_optional=field_is_conditional(sub_node),
+                    )
 
         if not additional_bases:
             # We need to add the base class if we have no fragments
@@ -619,7 +702,7 @@ def recurse_annotation(
         )
 
     if isinstance(type, GraphQLList):
-        if config.freeze.enabled:
+        if config.freeze.enabled and config.freeze.convert_list_to_tuple:
             registry.register_import("typing.Tuple")
 
             def list_builder(x: ast.Name | ast.Subscript | ast.Constant):
@@ -689,6 +772,7 @@ def type_field_node(
     subtree: List[ast.ClassDef | ast.Assign],
     registry: ClassRegistry,
     is_optional: bool = True,
+    force_optional: bool = False,
 ) -> List[ast.AnnAssign | ast.Expr]:
     """Types a field node
 
@@ -714,6 +798,17 @@ def type_field_node(
     keywords: list[ast.keyword] = []
 
     type = cast(BoundType, field.type)
+
+    # @skip / @include let the server omit the field entirely, so it has to be
+    # generated as Optional[...] = None whatever the schema says. Dropping the
+    # NonNull wrapper here is enough: everything downstream derives both the
+    # annotation and the default from it.
+    # force_optional carries a @skip/@include sitting on an enclosing inline
+    # fragment down onto the fields it contains.
+    if (force_optional or field_is_conditional(node)) and isinstance(
+        type, GraphQLNonNull
+    ):
+        type = cast(BoundType, type.of_type)
 
     if not isinstance(type, GraphQLNonNull):
         keywords.append(ast.keyword(arg="default", value=ast.Constant(value=None)))

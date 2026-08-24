@@ -174,7 +174,7 @@ from your_library.schema import Get_countries, CountryFilterInput, StringQueryOp
 
 variables = Get_countries.Arguments(filter=CountryFilterInput(code=StringQueryOperatorInput(eq="DE"))))
 
-t = client.post(Get_countries.Meta.document, variables.json())
+t = client.post(Get_countries.Meta.document, variables.model_dump_json())
 countries = Get_countries(**t)
 
 for i in countries.countries:

@@ -1,3 +1,4 @@
+import pytest
 import ast
 
 from .utils import build_relative_glob, unit_test_with
@@ -11,6 +12,7 @@ from turms.stylers.default import DefaultStyler
 from turms.run import generate_ast
 
 
+@pytest.mark.network
 def test_complex_operations(countries_schema):
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/countries/**.graphql"),

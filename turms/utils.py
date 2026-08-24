@@ -12,16 +12,19 @@ from graphql import (
     GraphQLList,
     GraphQLNamedOutputType,
     GraphQLNonNull,
-    GraphQLNullableType,
     GraphQLObjectType,
     GraphQLOutputType,
     GraphQLScalarType,
     GraphQLUnionType,
+    EnumValueNode,
+    InlineFragmentNode,
     IntValueNode,
     ListTypeNode,
+    ListValueNode,
     NamedTypeNode,
     NonNullTypeNode,
     NullValueNode,
+    ObjectValueNode,
     OperationDefinitionNode,
     SelectionNode,
     SelectionSetNode,
@@ -37,34 +40,30 @@ from graphql.error.graphql_error import GraphQLError
 from graphql.language.ast import DocumentNode, FieldNode, NameNode
 from graphql import GraphQLSchema
 
+from turms.annotations import list_label, optional_label
 from turms.config import GeneratorConfig
-from turms.errors import (
+from turms.errors import (  # noqa: F401  (re-exported: see note below)
     GenerationError,
     NoEnumFound,
     NoInputTypeFound,
     NoScalarFound,
+    # These four live in turms.errors alongside the rest of the hierarchy, but
+    # stay importable from here because plugins have always imported them from
+    # turms.utils.
+    FragmentNotFoundError,
+    InvalidDocuments,
+    NoDocumentsFoundError,
+    NoScalarEquivalentDefined,
 )
 from turms.registry import ClassRegistry
 
 from .config import GraphQLTypes
 
 commentline_regex = re.compile(r"^.*#(.*)")
-
-
-class FragmentNotFoundError(GenerationError):
-    pass
-
-
-class NoDocumentsFoundError(GenerationError):
-    pass
-
-
-class InvalidDocuments(GenerationError):
-    pass
-
-
-class NoScalarEquivalentDefined(GenerationError):
-    pass
+#: A line that is *only* a comment. Used to walk back over the block of `#` lines above an
+#: operation: graphql-core puts the operation's `loc.start` on the last of them, so slicing
+#: forward from there would keep that line alone and drop the rest of the block.
+comment_only_regex = re.compile(r"^\s*#")
 
 
 def merge_body_sequences(
@@ -96,10 +95,62 @@ def target_from_node(node: FieldNode) -> str:
     )
 
 
+def capitalize_first(name: str) -> str:
+    """Upper-case the first character, leaving the rest alone.
+
+    ``str.capitalize`` also lower-cases the remainder, which turned a field
+    ``myField`` into the class ``Myfield`` instead of ``MyField``.
+    """
+    if not name:
+        return name
+    return name[0].upper() + name[1:]
+
+
+def field_is_conditional(node: Union[FieldNode, InlineFragmentNode]) -> bool:
+    """Whether ``@skip`` / ``@include`` can make this selection absent.
+
+    Accepts a field or an inline fragment: a directive on the fragment applies
+    to every field inside it.
+
+    A conditionally-included field must be generated as ``Optional[...] = None``
+    regardless of the schema's nullability: when the directive excludes it, the
+    server simply omits the key and a required field would fail validation.
+
+    Literal conditions that can never exclude the field (``@skip(if: false)``,
+    ``@include(if: true)``) are recognised so they do not widen the type
+    needlessly.
+    """
+    for directive in node.directives:
+        name = directive.name.value
+        if name not in ("skip", "include"):
+            continue
+
+        condition = next(
+            (arg.value for arg in directive.arguments if arg.name.value == "if"),
+            None,
+        )
+        if isinstance(condition, BooleanValueNode):
+            always_present = (
+                condition.value is False if name == "skip" else condition.value is True
+            )
+            if always_present:
+                continue
+
+        return True
+
+    return False
+
+
 def non_typename_fields(
-    node: FieldNode | FragmentDefinitionNode,
+    node: FieldNode | FragmentDefinitionNode | OperationDefinitionNode,
 ) -> List[FieldNode | SelectionNode]:
-    """Returns all fields in a FieldNode that are not __typename"""
+    """Returns all selections on a node that are not __typename.
+
+    ``__typename`` is re-emitted separately as a ``Literal`` discriminator
+    (see ``generate_typename_field``), so it must never reach the ordinary
+    field path -- as a class attribute the leading double underscore would be
+    name-mangled and silently dropped by pydantic.
+    """
     if not node.selection_set:
         return []
     return [
@@ -128,10 +179,19 @@ def inspect_operation_for_documentation(operation: OperationDefinitionNode):
             "Could not find loc for first operation. This should not happen"
         )
 
-    definition = operation.loc.source.body.splitlines()[
-        operation.loc.source.get_location(operation.loc.start).line
-        - 1 : operation.loc.source.get_location(first_operation.loc.start).line - 1
-    ]
+    lines = operation.loc.source.body.splitlines()
+    end = operation.loc.source.get_location(first_operation.loc.start).line - 1
+    start = operation.loc.source.get_location(operation.loc.start).line - 1
+
+    # Comments *above* the operation are part of its documentation, but `loc.start` lands on
+    # the last comment token rather than on the `query`/`mutation` keyword, so starting there
+    # keeps only the block's final line. Walk back over the contiguous block instead. Any
+    # non-comment line stops the walk -- a blank line, or the previous operation's closing
+    # brace -- so a neighbouring block can never be absorbed into this one.
+    while start > 0 and comment_only_regex.match(lines[start - 1]):
+        start -= 1
+
+    definition = lines[start:end]
     doc: list[str] = []
     for line in definition:
         if line and line != "":
@@ -174,6 +234,52 @@ def generate_typename_field(
     )
 
 
+def generate_alias_keywords(
+    field_name: str,
+    graphql_name: str,
+    config: GeneratorConfig,
+    registry: ClassRegistry,
+) -> List[ast.keyword]:
+    """The ``Field(...)`` keywords that carry a field's GraphQL name.
+
+    Only called when the python name and the GraphQL name actually differ.
+
+    Under ``alias_mode="split"`` the single ``alias=`` becomes a
+    ``validation_alias``/``serialization_alias`` pair. Both spellings still
+    validate (the python name is the first ``AliasChoices`` entry) and
+    ``model_dump(by_alias=True)`` still emits the GraphQL name, so the wire
+    format is unchanged -- but with no ``alias=`` field specifier present, a type
+    checker synthesizes ``__init__`` from the python name instead of the GraphQL
+    one. That is the whole point: ``populate_by_name`` is a runtime-only setting
+    that type checkers do not read, so under ``"single"`` the snake_case spelling
+    works but does not type-check.
+
+    Never use this for a discriminated-union tag field: pydantic rejects a
+    non-string alias on one ("Alias [...] is not supported in a discriminated
+    union"). Tag fields carry no alias at all, so they never reach this helper.
+    """
+    if config.options.alias_mode == "split":
+        registry.register_import("pydantic.AliasChoices")
+        return [
+            ast.keyword(
+                arg="validation_alias",
+                value=ast.Call(
+                    func=ast.Name(id="AliasChoices", ctx=ast.Load()),
+                    args=[
+                        ast.Constant(value=field_name),
+                        ast.Constant(value=graphql_name),
+                    ],
+                    keywords=[],
+                ),
+            ),
+            ast.keyword(
+                arg="serialization_alias", value=ast.Constant(value=graphql_name)
+            ),
+        ]
+
+    return [ast.keyword(arg="alias", value=ast.Constant(value=graphql_name))]
+
+
 def generate_generic_typename_field(registry: ClassRegistry, config: GeneratorConfig):
     """Generates the typename field a specific type, this will be used to determine the type of the object in the response"""
 
@@ -199,13 +305,13 @@ def generate_generic_typename_field(registry: ClassRegistry, config: GeneratorCo
     )
 
 
-def generate_config_dict(
+def generate_pydantic_config(
     graphQLType: GraphQLTypes,
     config: GeneratorConfig,
-    registy: ClassRegistry,
+    registry: ClassRegistry,
     typename: Optional[str] = None,
 ) -> list[ast.Assign]:
-    """Generates the config class for a specific type version 2
+    """Generates the ``model_config`` assignment for a specific type
 
     It will append the config class to the registry, and set the frozen
     attribute for the class to True, if the freeze config is enabled and
@@ -236,14 +342,6 @@ def generate_config_dict(
             elif config.options.include and typename not in config.options.include:
                 pass
             else:
-                if config.options.allow_mutation is not None:
-                    config_keywords.append(
-                        ast.keyword(
-                            arg="allow_mutation",
-                            value=ast.Constant(value=config.options.allow_mutation),
-                        )
-                    )
-
                 if config.options.extra is not None:
                     config_keywords.append(
                         ast.keyword(
@@ -261,21 +359,23 @@ def generate_config_dict(
                         )
                     )
 
-                if config.options.allow_population_by_field_name is not None:
+                if config.options.populate_by_name is not None:
                     config_keywords.append(
                         ast.keyword(
                             arg="populate_by_name",
                             value=ast.Constant(
-                                value=config.options.allow_population_by_field_name
+                                value=config.options.populate_by_name
                             ),
                         )
                     )
 
-                if config.options.orm_mode is not None:
+                if config.options.from_attributes is not None:
                     config_keywords.append(
                         ast.keyword(
-                            arg="orm_mode",
-                            value=ast.Constant(value=config.options.orm_mode),
+                            arg="from_attributes",
+                            value=ast.Constant(
+                                value=config.options.from_attributes
+                            ),
                         )
                     )
 
@@ -295,7 +395,7 @@ def generate_config_dict(
                 )
 
     if len(config_keywords) > 0:
-        registy.register_import("pydantic.ConfigDict")
+        registry.register_import("pydantic.ConfigDict")
         return [
             ast.Assign(
                 targets=[ast.Name(id="model_config", ctx=ast.Store())],
@@ -308,145 +408,6 @@ def generate_config_dict(
         ]
     else:
         return []
-
-
-def generate_config_class_pydantic(
-    graphQLType: GraphQLTypes, config: GeneratorConfig, typename: str | None = None
-) -> list[ast.ClassDef]:
-    """Generates the config class for a specific type
-
-    It will append the config class to the registry, and set the frozen
-    attribute for the class to True, if the freeze config is enabled and
-    the type appears in the freeze list.
-
-    It will also add config attributes to the class, if the type appears in
-    'additional_config' in the config file.
-
-    """
-
-    config_fields: list[ast.stmt] = []
-
-    if config.freeze.enabled:
-        if graphQLType in config.freeze.types:
-            if config.freeze.exclude and typename in config.freeze.exclude:
-                pass
-            elif config.freeze.include and typename not in config.freeze.include:
-                pass
-            else:
-                config_fields.append(
-                    ast.Assign(
-                        targets=[ast.Name(id="frozen", ctx=ast.Store())],
-                        value=ast.Constant(value=True),
-                    )
-                )
-
-    if config.options.enabled:
-        if graphQLType in config.options.types:
-            if config.options.exclude and typename in config.options.exclude:
-                pass
-            elif config.options.include and typename not in config.options.include:
-                pass
-            else:
-                if config.options.allow_mutation is not None:
-                    config_fields.append(
-                        ast.Assign(
-                            targets=[ast.Name(id="allow_mutation", ctx=ast.Store())],
-                            value=ast.Constant(value=config.options.allow_mutation),
-                        )
-                    )
-
-                if config.options.extra is not None:
-                    config_fields.append(
-                        ast.Assign(
-                            targets=[ast.Name(id="extra", ctx=ast.Store())],
-                            value=ast.Constant(value=config.options.extra),
-                        )
-                    )
-
-                if config.options.validate_assignment is not None:
-                    config_fields.append(
-                        ast.Assign(
-                            targets=[
-                                ast.Name(id="validate_assignment", ctx=ast.Store())
-                            ],
-                            value=ast.Constant(
-                                value=config.options.validate_assignment
-                            ),
-                        )
-                    )
-
-                if config.options.allow_population_by_field_name is not None:
-                    config_fields.append(
-                        ast.Assign(
-                            targets=[
-                                ast.Name(
-                                    id="allow_population_by_field_name", ctx=ast.Store()
-                                )
-                            ],
-                            value=ast.Constant(
-                                value=config.options.allow_population_by_field_name
-                            ),
-                        )
-                    )
-
-                if config.options.orm_mode is not None:
-                    config_fields.append(
-                        ast.Assign(
-                            targets=[ast.Name(id="orm_mode", ctx=ast.Store())],
-                            value=ast.Constant(value=config.options.orm_mode),
-                        )
-                    )
-
-                if config.options.use_enum_values is not None:
-                    config_fields.append(
-                        ast.Assign(
-                            targets=[ast.Name(id="use_enum_values", ctx=ast.Store())],
-                            value=ast.Constant(value=config.options.use_enum_values),
-                        )
-                    )
-
-    if typename:
-        if typename in config.additional_config:
-            for key, value in config.additional_config[typename].items():
-                config_fields.append(
-                    ast.Assign(
-                        targets=[ast.Name(id=key, ctx=ast.Store())],
-                        value=ast.Constant(value=value),
-                    )
-                )
-
-    if len(config_fields) > 0:
-        config_fields.insert(
-            0,
-            ast.Expr(
-                value=ast.Constant(value="A config class"),
-            ),
-        )
-    if len(config_fields) > 0:
-        return [
-            ast.ClassDef(
-                name="Config",
-                bases=[],
-                keywords=[],
-                body=config_fields,
-                decorator_list=[],
-                type_params=[],
-            )
-        ]
-    else:
-        return []
-
-
-def generate_pydantic_config(
-    graphQLType: GraphQLTypes,
-    config: GeneratorConfig,
-    registry: ClassRegistry,
-    typename: str | None = None,
-) -> Union[List[ast.Assign], List[ast.ClassDef]]:
-    if config.pydantic_version == "v2":
-        return generate_config_dict(graphQLType, config, registry, typename)
-    else:
-        return generate_config_class_pydantic(graphQLType, config, typename)
 
 
 def add_typename_recursively(
@@ -805,47 +766,29 @@ def recurse_outputtype_label(
         )
 
     if isinstance(type, GraphQLList):
-        if optional:
-            return (
-                "Optional[List["
-                + recurse_outputtype_label(
-                    type.of_type, registry, overwrite_final=overwrite_final
-                )
-                + "]]"
-            )
-
-        return (
-            "List["
-            + recurse_outputtype_label(
+        inner = list_label(
+            recurse_outputtype_label(
                 type.of_type, registry, overwrite_final=overwrite_final
-            )
-            + "]"
+            ),
+            registry.config,
         )
+        return optional_label(inner, registry.config) if optional else inner
 
     if isinstance(type, GraphQLEnumType):
-        if optional:
-            return (
-                "Optional["
-                + registry.reference_enum(type.name, "", allow_forward=False).id
-                + "]"
-            )
-
-        return registry.reference_enum(type.name, "", allow_forward=False).id
+        inner = registry.reference_enum(type.name, "", allow_forward=False).id
+        return optional_label(inner, registry.config) if optional else inner
 
     if isinstance(type, GraphQLScalarType):
-        if optional:
-            return "Optional[" + registry.reference_scalar(type.name).id + "]"
-
-        else:
-            return registry.reference_scalar(type.name).id
+        inner = registry.reference_scalar(type.name).id
+        return optional_label(inner, registry.config) if optional else inner
 
     if isinstance(type, (GraphQLObjectType, GraphQLInterfaceType, GraphQLUnionType)):
         assert overwrite_final, "Needs to be set"
-        if optional:
-            return "Optional[" + overwrite_final + "]"
-
-        else:
-            return overwrite_final
+        return (
+            optional_label(overwrite_final, registry.config)
+            if optional
+            else overwrite_final
+        )
 
     raise NotImplementedError("oisnosin")
 
@@ -862,20 +805,11 @@ def recurse_type_label(
         )
 
     if isinstance(type, ListTypeNode):
-        if optional:
-            return (
-                "Optional[List["
-                + recurse_type_label(
-                    type.type, registry, overwrite_final=overwrite_final
-                )
-                + "]]"
-            )
-
-        return (
-            "List["
-            + recurse_type_label(type.type, registry, overwrite_final=overwrite_final)
-            + "]"
+        inner = list_label(
+            recurse_type_label(type.type, registry, overwrite_final=overwrite_final),
+            registry.config,
         )
+        return optional_label(inner, registry.config) if optional else inner
 
     if isinstance(type, NamedTypeNode):
         if overwrite_final is not None:
@@ -899,17 +833,16 @@ def recurse_type_label(
                         )
 
         label = x.id if isinstance(x, ast.Name) else x.value
-        if optional:
-            return "Optional[" + label + "]"
-
-        return label
+        return optional_label(label, registry.config) if optional else label
 
     raise NotImplementedError("Not implemented for this type")
 
 
-def parse_value_node(value_node: ValueNode) -> Union[None, str, int, float, bool]:
-    """Parses a Value Node into a Python value
-    using standard types
+ParsedValue = Union[None, str, int, float, bool, List["ParsedValue"], dict]
+
+
+def parse_value_node(value_node: ValueNode) -> ParsedValue:
+    """Parses a Value Node into a Python value using standard types.
 
     Args:
         value_node (ValueNode): The Argument Value Node
@@ -918,7 +851,7 @@ def parse_value_node(value_node: ValueNode) -> Union[None, str, int, float, bool
         NotImplementedError: If the Value Node is not supported
 
     Returns:
-        Union[None, str, int, float, bool]: The parsed value
+        ParsedValue: The parsed value
     """
     if isinstance(value_node, IntValueNode):
         return int(value_node.value)
@@ -927,11 +860,25 @@ def parse_value_node(value_node: ValueNode) -> Union[None, str, int, float, bool
     elif isinstance(value_node, StringValueNode):
         return value_node.value
     elif isinstance(value_node, BooleanValueNode):
-        return value_node.value == "true"
+        # graphql-core already gives us a bool here; comparing it to the string
+        # "true" silently made every literal `true` come out as False.
+        return bool(value_node.value)
+    elif isinstance(value_node, EnumValueNode):
+        # The member name, which is what the generated Enum is keyed by.
+        return value_node.value
+    elif isinstance(value_node, ListValueNode):
+        return [parse_value_node(item) for item in value_node.values]
+    elif isinstance(value_node, ObjectValueNode):
+        return {
+            field.name.value: parse_value_node(field.value)
+            for field in value_node.fields
+        }
     elif isinstance(value_node, NullValueNode):
         return None
     else:
-        raise NotImplementedError(f"Cannot parse {value_node}")
+        raise NotImplementedError(
+            f"Cannot parse {type(value_node).__name__}: {print_ast(value_node)}"
+        )
 
 
 def convert_default_value_to_ast(value):

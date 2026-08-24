@@ -42,7 +42,7 @@ turms is a **development-time tool only**: the generated code depends on Pydanti
 ## Features
 
 - **Fully typed, fully documented** code generation — GraphQL descriptions become docstrings, deprecations become warnings
-- **Client-side generation** from documents: enums, inputs, fragments and operations as Pydantic models (v2 and v1)
+- **Client-side generation** from documents: enums, inputs, fragments and operations as Pydantic v2 models
 - **Server-side generation** from SDL schemas: typed [Strawberry](https://strawberry.rocks/) scaffolds with resolver stubs
 - **Operation functions** — call `get_capsules()` instead of assembling query strings (sync and async, via the funcs plugin)
 - **Transport agnostic** — works with [rath](https://github.com/jhnnsrs/rath), [gql](https://github.com/graphql-python/gql), or any HTTP client you like
@@ -83,7 +83,7 @@ and run it with `uv run turms gen` (or plain `turms gen` in an activated environ
 | `ruff` | `RuffProcessor` |
 | `merge` | `MergeProcessor` (libcst) |
 
-Python 3.10 or higher is required.
+Python 3.10 or higher is required. Turms is tested on 3.10, 3.11, 3.12, 3.13 and 3.14.
 
 ## Quickstart
 
@@ -166,7 +166,7 @@ GraphQL schema + documents
    │ Plugins │   (enums, inputs, fragments, operations, funcs, strawberry…)
    └────┬────┘
    ┌────▼────┐   transform the AST
-   │ Parsers │   (e.g. polyfill typing imports for older Python)
+   │ Parsers │   (your own AST transforms; none ship with turms)
    └────┬────┘
    ┌────▼────┐   style class/field names as they are generated
    │ Stylers │   (snake_case, capitalize, suffix appending…)
@@ -232,9 +232,11 @@ Processors run over the rendered source before it is written to disk.
 
 ### Parsers
 
-| Parser | Purpose |
-| --- | --- |
-| `turms.parsers.polyfill.PolyfillPlugin` | Rewrites typing constructs for an older target `python_version` |
+No parsers ship with turms — the stage is an extension point. Point `type` at any importable
+subclass of `turms.parsers.base.Parser` to transform the generated AST before it is unparsed.
+
+(`turms.parsers.polyfill.PolyfillPlugin` was removed in turms 2.0: it only ever backported
+`Literal` for python 3.7, which pydantic v2 does not support.)
 
 ## Configuration
 
@@ -255,8 +257,9 @@ turms complies with [graphql-config](https://www.graphql-config.com/docs/user/us
 | `always_resolve_interfaces` | `true` | Resolve interfaces to concrete implementation unions |
 | `create_catchall` | `true` | Add a catch-all model for unknown interface implementations |
 | `skip_forwards` | `false` | Skip generating forward-reference updates |
-| `pydantic_version` | `"v2"` | Target Pydantic major version (`"v1"` or `"v2"`) |
-| `omited_document_rules` | `[]` | GraphQL validation rules to skip for documents |
+| `type_annotation_style` | `"auto"` | How annotations are spelled: `auto` (derived from `min_python_version`), `modern` (`list[X] | None`), or `legacy` (`Optional[List[X]]`) |
+| `min_python_version` | `"3.10"` | Oldest Python the generated code must run on — drives `type_annotation_style: auto` |
+| `omitted_document_rules` | `[]` | GraphQL validation rules to skip for documents |
 | `dump_schema` / `dump_configuration` | `false` | Also write the resolved schema / project config next to the output |
 
 Every option can also be supplied through environment variables with the `TURMS_` prefix (e.g. `TURMS_OUT_DIR=generated`), courtesy of Pydantic settings.
@@ -271,6 +274,33 @@ schema:
 ```
 
 See the [documentation website](https://jhnnsrs.github.io/turms) for the full configuration reference, including all per-plugin options.
+
+### Modern type annotations
+
+turms writes annotations in the modern spelling — [PEP 585](https://peps.python.org/pep-0585/) builtin generics and [PEP 604](https://peps.python.org/pep-0604/) unions — whenever `min_python_version` allows it, which the default of `3.10` does:
+
+```python
+# legacy                                    # modern (default)
+tags: Optional[List[str]] = None            tags: list[str] | None = None
+extra: Optional[Dict] = None                extra: dict | None = None
+nested: Optional["Filter"] = None           nested: "Filter | None" = None
+```
+
+The obsolete `typing` imports are dropped from the generated file. Forward references are emitted as whole string annotations, because `"Filter" | None` would raise a `TypeError` while the class body is evaluated — Pydantic resolves them on `model_rebuild()` exactly as before.
+
+Lower the floor and `auto` steps back accordingly — useful when the generated client is published for a range of interpreters:
+
+```yaml
+min_python_version: "3.9"   # builtin generics, but Optional[...] instead of X | None
+```
+
+Set the style explicitly to ignore `min_python_version` altogether — `modern` forces both on, `legacy` restores the classic `typing` spelling everywhere:
+
+```yaml
+type_annotation_style: legacy
+```
+
+Only two thresholds change what turms emits: builtin generics (`list[X]`) from 3.9, and unions (`X | None`) from 3.10. The typing features added in 3.11 and later (`Self`, `NotRequired`, PEP 695 `type`) never appear in generated code, so `auto` on 3.11+ produces the same output as on 3.10.
 
 ### Custom scalars
 
@@ -406,9 +436,16 @@ turms uses [uv](https://github.com/astral-sh/uv) for project management:
 
 ```bash
 uv sync --all-extras --dev   # install everything
-uv run pytest                # run the test suite
+uv run pytest                     # run the test suite
+uv run pytest -m "not network"    # skip the tests that make outbound requests
+uv run pytest -m network          # only those tests
 uv run pytest --snapshot-update   # update generation snapshots after intentional changes
 ```
+
+A handful of tests make outbound requests, mostly introspecting the
+`countries.trevorblades.com` schema instead of reading one from disk. That API rate
+limits by IP, so they are marked `network`: the CI matrix runs with
+`-m "not network"` and the coverage job runs the full suite.
 
 The architecture is plugin-first: to add your own plugin, subclass `turms.plugins.base.Plugin` and implement `generate_ast(client_schema, config, registry)`; to add a processor, subclass `turms.processors.base.Processor` and implement `run(gen_file, config)`. Any importable class can be referenced from the config by its dotted path — no registration step needed.
 

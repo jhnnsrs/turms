@@ -39,7 +39,7 @@ pip install turms       # pip
 ```
 
 :::tip
-Turms requires python 3.10 or higher (as we rely on ast unparsing).
+Turms requires python 3.10 or higher (as we rely on ast unparsing), and is tested on 3.10, 3.11, 3.12, 3.13 and 3.14.
 :::
 
 ### Configuration

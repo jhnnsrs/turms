@@ -7,7 +7,6 @@ and the old `DEPRECATED:` prefix is dropped. Both marker classes are generated i
 the module by default, or imported from a user override via config.
 """
 
-import pytest
 from graphql import build_ast_schema, parse
 
 from turms.config import GeneratorConfig
@@ -44,11 +43,10 @@ query GetCountries($filter: FilterInput, $page: Int = 1) {
 """
 
 
-def _generate(tmp_path, pydantic_version="v2", **config_kwargs):
+def _generate(tmp_path, **config_kwargs):
     doc = tmp_path / "ops.graphql"
     doc.write_text(operation)
     config = GeneratorConfig(
-        pydantic_version=pydantic_version,
         documents=str(tmp_path / "**/*.graphql"),
         **config_kwargs,
     )
@@ -72,7 +70,7 @@ def test_input_default_marker(tmp_path):
     # The Field description stays the plain GraphQL description; the default is a
     # string on the marker and folded into the inline comment instead.
     assert (
-        "limit: Annotated[Optional[int], GraphQLDefault('10')] = Field(default=None, description='the limit')"
+        "limit: Annotated[int | None, GraphQLDefault('10')] = Field(default=None, description='the limit')"
         in generated
     )
     assert "'the limit\\nDefault: 10'" in generated
@@ -82,20 +80,20 @@ def test_input_deprecation_marker(tmp_path):
     generated = parse_to_code(_generate(tmp_path))
     # Marker carries the reason; the DEPRECATED warning is in the inline comment.
     assert (
-        "old: Annotated[Optional[str], Deprecated('use limit')] = None" in generated
+        "old: Annotated[str | None, Deprecated('use limit')] = None" in generated
     )
     assert "'DEPRECATED: use limit'" in generated
 
 
 def test_object_field_deprecation_marker(tmp_path):
     generated = parse_to_code(_generate(tmp_path))
-    assert "name: Annotated[Optional[str], Deprecated('renamed')]" in generated
+    assert "name: Annotated[str | None, Deprecated('renamed')]" in generated
 
 
 def test_operation_variable_default_marker(tmp_path):
     generated = parse_to_code(_generate(tmp_path))
     # $page: Int = 1 -> the Arguments field carries the GraphQLDefault marker.
-    assert "Annotated[Optional[int], GraphQLDefault('1')]" in generated
+    assert "Annotated[int | None, GraphQLDefault('1')]" in generated
 
 
 def test_null_and_absent_defaults_have_no_marker(tmp_path):
@@ -121,10 +119,10 @@ def test_null_and_absent_defaults_have_no_marker(tmp_path):
             plugins=[InputsPlugin(config=InputsPluginConfig(skip_unreferenced=False))],
         )
     )
-    assert "with_default: Annotated[Optional[int], GraphQLDefault('5')]" in generated
+    assert "with_default: Annotated[int | None, GraphQLDefault('5')]" in generated
     # null / absent defaults: plain optional, no marker.
-    assert "null_default: Optional[int] = Field(alias='nullDefault', default=None)" in generated
-    assert "plain: Optional[int] = None" in generated
+    assert "null_default: int | None = Field(alias='nullDefault', default=None)" in generated
+    assert "plain: int | None = None" in generated
 
 
 def test_opt_out_of_documentation(tmp_path):
@@ -139,10 +137,9 @@ def test_opt_out_of_documentation(tmp_path):
     assert "Default: 10" not in generated
 
 
-@pytest.mark.parametrize("pydantic_version", ["v1", "v2"])
-def test_generated_code_executes(tmp_path, pydantic_version):
-    """pydantic must accept the Annotated metadata at runtime (both versions)."""
-    generated_ast = _generate(tmp_path, pydantic_version=pydantic_version)
+def test_generated_code_executes(tmp_path):
+    """pydantic must accept the Annotated metadata at runtime."""
+    generated_ast = _generate(tmp_path)
     unit_test_with(
         generated_ast,
         """

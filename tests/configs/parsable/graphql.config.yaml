@@ -4,9 +4,6 @@ projects:
     extensions:
       turms:
         out_dir: examples/api
-        parsers:
-        - python_version: 3.7
-          type: turms.parsers.polyfill.PolyfillParser
         plugins:
         - type: turms.plugins.enums.EnumsPlugin
         - type: turms.plugins.inputs.InputsPlugin

@@ -2,7 +2,6 @@ import shlex
 import subprocess
 from typing import List, Union
 
-from pydantic import Field
 from turms.processors.base import Processor, ProcessorConfig
 from turms.config import GeneratorConfig
 

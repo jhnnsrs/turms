@@ -1,6 +1,8 @@
+import warnings
 import builtins
 from graphql import ASTValidationRule
 from pydantic import (
+    AliasChoices,
     AnyHttpUrl,
     BaseModel,
     Field,
@@ -80,14 +82,6 @@ class GraphQLTypes(str, Enum):
     DIRECTIVE = "directive"
 
 
-class LogLevel(str, Enum):
-    DEBUG = "DEBUG"
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-    CRITICAL = "CRITICAL"
-
-
 @runtime_checkable
 class LogFunction(Protocol):
     def __call__(
@@ -98,7 +92,15 @@ class LogFunction(Protocol):
         pass
 
 
-class FreezeConfig(BaseSettings):
+def print_logger(
+    message: str,
+    level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO",
+) -> None:
+    """The default LogFunction: writes to stdout."""
+    print(f"[{level}] {message}")
+
+
+class FreezeConfig(BaseModel):
     """Configuration for freezing the generated pydantic
     models
 
@@ -128,22 +130,29 @@ class FreezeConfig(BaseSettings):
         default=None, description="List of types to include in freezing"
     )
     """The types to freeze"""
-    exclude_fields: Optional[List[str]] = Field(
-        default_factory=list, description="List of fields to exclude from freezing"
-    )
-    include_fields: Optional[List[str]] = Field(
-        default_factory=list, description="List of fields to include in freezing"
-    )
     convert_list_to_tuple: bool = Field(
         default=True, description="Convert GraphQL List to tuple (with varying length"
     )
     """Convert GraphQL List to tuple (with varying length)"""
 
 
-ExtraOptions = Optional[Union[Literal["ignore"], Literal["allow"], Literal["forbid"]]]
+ExtraOptions = Optional[Literal["ignore", "allow", "forbid"]]
+
+AliasMode = Literal["single", "split"]
+"""How a field whose python name differs from its GraphQL name carries that name.
+
+- ``single`` (default): one ``Field(alias="graphQLName")``. pydantic uses it for
+  both validation and serialization. Type checkers synthesize ``__init__`` from
+  the alias and do **not** read ``populate_by_name``, so the python (snake_case)
+  spelling is reported as an unknown argument even though it works at runtime.
+- ``split``: ``validation_alias=AliasChoices("python_name", "graphQLName")`` plus
+  ``serialization_alias="graphQLName"``. Both spellings still validate, the wire
+  format is unchanged, and type checkers now see the python name -- because no
+  ``alias=`` specifier is present, they fall back to the field name.
+"""
 
 
-class OptionsConfig(BaseSettings):
+class OptionsConfig(BaseModel):
     """Configuration for freezing the generated pydantic
     models
 
@@ -160,17 +169,57 @@ class OptionsConfig(BaseSettings):
     """Enabling this, will freeze the schema"""
     extra: ExtraOptions = None
     """Extra options for pydantic"""
-    allow_mutation: Optional[bool] = None
-    """Allow mutation"""
-    allow_population_by_field_name: Optional[bool] = None
-    """Allow population by field name"""
-    orm_mode: Optional[bool] = None
-    """ORM mode"""
+    populate_by_name: Optional[bool] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "populate_by_name", "allow_population_by_field_name"
+        ),
+    )
+    """Emit ``populate_by_name`` on the generated models.
+
+    ``allow_population_by_field_name`` -- the pydantic v1 spelling of this key --
+    is still accepted as a deprecated alias."""
+    from_attributes: Optional[bool] = None
+    """Let the generated models validate from arbitrary class instances"""
     use_enum_values: Optional[bool] = None
     """Use enum values"""
 
     validate_assignment: Optional[bool] = None
     """Validate assignment"""
+
+    alias_mode: AliasMode = "single"
+    """Whether aliases are emitted as one ``alias=`` or split into
+    ``validation_alias``/``serialization_alias``. See :data:`AliasMode`.
+
+    Applies to input types and operation ``Arguments`` only -- the types a caller
+    constructs. Output types (fragments, objects, operation results) are parsed
+    from the wire and keep a single ``alias=``.
+
+    Deliberately independent of ``enabled``, ``types``, ``include`` and
+    ``exclude``: those select which models receive a generated ``model_config``,
+    whereas ``alias_mode`` chooses how an individual ``Field(...)`` specifier
+    spells its alias. The two are unrelated concerns, and gating the field
+    specifier on ``types`` would be ambiguous anyway -- ``Arguments`` is an
+    OPERATION-scoped model whose aliasing must follow the INPUT policy, because
+    the generated functions construct it the same way a caller constructs an
+    input."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_pydantic_v1_options(cls, values: Any) -> Any:
+        if isinstance(values, dict):
+            if "orm_mode" in values:
+                raise ValueError(
+                    "'orm_mode' is a pydantic v1 config key and was removed in "
+                    "turms 2.0. Use 'from_attributes' instead."
+                )
+            if "allow_mutation" in values:
+                raise ValueError(
+                    "'allow_mutation' is a pydantic v1 config key and was "
+                    "removed in turms 2.0. Use the 'freeze' section to generate "
+                    "immutable models."
+                )
+        return values
 
     types: List[GraphQLTypes] = Field(
         default=[GraphQLTypes.INPUT, GraphQLTypes.FRAGMENT, GraphQLTypes.OBJECT],
@@ -188,7 +237,42 @@ class OptionsConfig(BaseSettings):
     """The types to freeze"""
 
 
-PydanticVersion = Literal["v1", "v2"]
+PythonVersion = Literal["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+"""A python version the generated code can be targeted at."""
+
+TypeAnnotationStyle = Literal["legacy", "modern", "auto"]
+"""How type annotations are spelled in the generated code.
+
+- ``auto``: pick the most modern spelling that ``min_python_version`` supports (the default)
+- ``modern``: always ``list[X] | None`` (PEP 585 builtin generics + PEP 604 unions)
+- ``legacy``: always ``typing.Optional[typing.List[X]]``, whatever the target version
+"""
+
+#: The python version each modern-annotation feature became available in.
+BUILTIN_GENERICS_SINCE = (3, 9)  # PEP 585: list[int] instead of typing.List[int]
+UNION_OPERATOR_SINCE = (3, 10)  # PEP 604: int | None instead of typing.Optional[int]
+
+
+def parse_python_version(version: str) -> tuple:
+    """Turns a ``"3.10"`` style version string into a comparable tuple."""
+    return tuple(int(part) for part in version.split("."))
+
+
+
+#: Components removed in turms 2.0, mapped to the error a config still naming one gets.
+#: Without this they would fail as an opaque "Invalid import".
+REMOVED_COMPONENTS = {
+    "turms.parsers.polyfill.PolyfillParser": (
+        "'turms.parsers.polyfill.PolyfillParser' was removed in turms 2.0. It only "
+        "backported 'Literal' to typing_extensions for a python 3.7 target, and "
+        "pydantic v2 -- the only target turms generates for -- has never supported "
+        "python 3.7. Drop the parser from your configuration."
+    ),
+    "turms.parsers.polyfill.PolyfillPlugin": (
+        "'turms.parsers.polyfill.PolyfillPlugin' was removed in turms 2.0. Drop the "
+        "parser from your configuration."
+    ),
+}
 
 
 class GeneratorConfig(BaseSettings):
@@ -206,7 +290,48 @@ class GeneratorConfig(BaseSettings):
         env_prefix="TURMS_",
         extra="forbid",
     )
-    pydantic_version: PydanticVersion = "v2"
+    @model_validator(mode="before")
+    @classmethod
+    def _rename_omited_document_rules(cls, values: Any) -> Any:
+        """``omited_document_rules`` was a typo; accept it with a warning.
+
+        Done here rather than with a validation alias because an alias on a
+        ``BaseSettings`` field replaces the ``TURMS_`` env-var name too.
+        """
+        if isinstance(values, dict) and "omited_document_rules" in values:
+            if "omitted_document_rules" in values:
+                raise ValueError(
+                    "Set either 'omitted_document_rules' or its deprecated "
+                    "spelling 'omited_document_rules', not both."
+                )
+            warnings.warn(
+                "'omited_document_rules' is a misspelling and is deprecated; "
+                "rename it to 'omitted_document_rules'.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            values["omitted_document_rules"] = values.pop("omited_document_rules")
+        return values
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_pydantic_version(cls, values: Any) -> Any:
+        """``pydantic_version`` is a dead key: turms only targets pydantic v2.
+
+        Configurations saying ``pydantic_version: v2`` keep loading -- the key
+        is accepted and discarded, so it carries forward into neither
+        ``model_dump()`` nor ``model_json_schema()`` nor a dumped
+        ``project.json``. Asking for v1 is an error.
+        """
+        if isinstance(values, dict) and "pydantic_version" in values:
+            if values.pop("pydantic_version") in ("v1", "1", 1):
+                raise ValueError(
+                    "pydantic v1 targets were removed in turms 2.0. The generated "
+                    "code now always targets pydantic v2 — drop the "
+                    "'pydantic_version' key from your configuration and upgrade "
+                    "the consuming project to pydantic>=2."
+                )
+        return values
 
     domain: Optional[str] = None
     """The domain of the GraphQL API ( will be set as a config variable)"""
@@ -306,6 +431,18 @@ class GeneratorConfig(BaseSettings):
     skip_forwards: bool = False
     """Skip generating automatic forwards reference for the generated models"""
 
+    min_python_version: PythonVersion = Field(
+        default="3.10",
+        description="The oldest python version the generated code has to run on. Drives the annotation spelling while type_annotation_style is 'auto'.",
+    )
+    """The oldest python version the generated code has to run on (drives `type_annotation_style: auto`)"""
+
+    type_annotation_style: TypeAnnotationStyle = Field(
+        default="auto",
+        description="How type annotations are spelled: 'auto' picks the most modern spelling min_python_version supports, 'modern' always uses PEP 585 builtin generics and PEP 604 unions (list[X] | None), 'legacy' always uses typing.Optional/typing.List.",
+    )
+    """How type annotations are spelled: auto (derived from min_python_version), modern, or legacy"""
+
     additional_bases: Dict[str, List[str]] = Field(
         default_factory=dict,
         description="Additional bases for the generated models as map of GraphQL Type to importable base class (e.g. module.package.Class)",
@@ -320,7 +457,7 @@ class GeneratorConfig(BaseSettings):
     force_plugin_order: bool = True
     "Should the plugins be forced to run in the order they are defined"
 
-    omited_document_rules: List[str] = Field(
+    omitted_document_rules: List[str] = Field(
         default_factory=list,
         description="List of rules to omit from the document validation. This is useful if you want to skip certain rules that are not relevant for your use case.",
     )
@@ -348,6 +485,29 @@ class GeneratorConfig(BaseSettings):
     )
     "List of stylers to use. Style are used to enforce specific styles on the generaded class or fieldnames. "
 
+    @property
+    def _target_python_version(self) -> tuple:
+        """The python version the annotation style is resolved against."""
+        if self.type_annotation_style == "modern":
+            # An explicit `modern` opts into every modern spelling turms knows,
+            # regardless of the declared floor.
+            return UNION_OPERATOR_SINCE
+        return parse_python_version(self.min_python_version)
+
+    @property
+    def use_builtin_generics(self) -> bool:
+        """Emit PEP 585 builtin generics (``list[X]``) instead of ``typing.List[X]``."""
+        if self.type_annotation_style == "legacy":
+            return False
+        return self._target_python_version >= BUILTIN_GENERICS_SINCE
+
+    @property
+    def use_union_operator(self) -> bool:
+        """Emit PEP 604 unions (``X | None``) instead of ``typing.Optional[X]``."""
+        if self.type_annotation_style == "legacy":
+            return False
+        return self._target_python_version >= UNION_OPERATOR_SINCE
+
     @model_validator(mode="after")
     def validate_unset_override(self):
         """The UNSET sentinel type and instance must be overridden together (the
@@ -364,6 +524,8 @@ class GeneratorConfig(BaseSettings):
         """Validate that the importable is a valid importable function or class"""
 
         for parser in v:
+            if parser.type in REMOVED_COMPONENTS:
+                raise ValueError(REMOVED_COMPONENTS[parser.type])
             try:
                 import_string(parser.type)
             except Exception as e:
@@ -371,9 +533,9 @@ class GeneratorConfig(BaseSettings):
 
         return v
 
-    @field_validator("omited_document_rules", mode="after")
-    def validate_omited_document_rules(cls, v: List[str]) -> List[str]:
-        """Validate that the omited document rules are valid"""
+    @field_validator("omitted_document_rules", mode="after")
+    def validate_omitted_document_rules(cls, v: List[str]) -> List[str]:
+        """Validate that the omitted document rules are valid"""
         for rule in v:
             if rule not in specified_rules_map:
                 raise ValueError(
@@ -402,7 +564,7 @@ class GeneratorConfig(BaseSettings):
         """Get the schema rules to use for validation"""
         rules = []
         for key, rule in specified_rules_map.items():
-            if key in self.omited_document_rules:
+            if key in self.omitted_document_rules:
                 continue
             rules.append(rule)
         return rules
@@ -439,7 +601,10 @@ class GraphQLProject(BaseSettings):
         extra="allow",
     )
 
-    schema_url: SchemaType = Field(alias="schema")
+    schema_url: SchemaType = Field(
+        validation_alias=AliasChoices("schema", "schema_url"),
+        serialization_alias="schema",
+    )
     """The schema url or path to the schema file"""
     documents: Optional[str] = None
     """The documents (operations,fragments) to parse"""
@@ -447,13 +612,13 @@ class GraphQLProject(BaseSettings):
     """The extensions configuration for the project (here resides the turms configuration)"""
 
 
-class GraphQLConfigMultiple(BaseSettings):
+class GraphQLConfigMultiple(BaseModel):
     """Configuration for multiple GraphQL projects
 
     This is the main configuration for multiple GraphQL projects. It is compliant with
     the graphql-config specification for multiple projec."""
 
-    model_config = SettingsConfigDict(
+    model_config = ConfigDict(
         extra="allow",
     )
 

@@ -1,0 +1,11 @@
+query ComplexDefaults(
+  $color: Color = BLUE
+  $filter: Filter = { name: "x", shades: [RED, GREEN] }
+  $counts: [Int!] = [1, 2, 3]
+  $flag: Boolean = true
+) {
+  swatches(color: $color, filter: $filter, counts: $counts, flag: $flag) {
+    name
+    color
+  }
+}

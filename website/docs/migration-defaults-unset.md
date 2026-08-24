@@ -154,10 +154,10 @@ where your proxy dumps the arguments and add `exclude_unset=True`:
 
 ```python
 # BEFORE
-operation.Arguments(**variables).dict(by_alias=True)
+operation.Arguments(**variables).model_dump(by_alias=True)
 
 # AFTER
-operation.Arguments(**variables).dict(by_alias=True, exclude_unset=True)
+operation.Arguments(**variables).model_dump(by_alias=True, exclude_unset=True)
 ```
 
 If you skip this step, the `= None` defaults will be sent as explicit `null`s and
@@ -217,7 +217,7 @@ input type** following the same UNSET model. See its
 
 ```python
 user = user_input(name="alice")          # optionals omitted (unset)
-user.dict(by_alias=True, exclude_unset=True)  # -> {"name": "alice"}
+user.model_dump(by_alias=True, exclude_unset=True)  # -> {"name": "alice"}
 ```
 
 Add it after the `inputs` plugin:

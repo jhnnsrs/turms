@@ -1,30 +1,31 @@
 import ast
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic_settings import SettingsConfigDict
 from turms.config import GeneratorConfig
-from graphql import GraphQLSchema, InputObjectTypeDefinitionNode
+from graphql import GraphQLSchema
 from graphql.language.ast import OperationDefinitionNode, OperationType
 from turms.recurse import type_field_node
 from turms.plugins.base import Plugin, PluginConfig
-from pydantic import Field
+from pydantic import Field, model_validator
 from graphql.language.ast import (
     FieldNode,
-    OperationDefinitionNode,
-    OperationType,
 )
 from graphql.utilities.get_operation_root_type import get_operation_root_type
 from graphql.utilities.type_info import get_field_def
 
 import re
-from graphql import NonNullTypeNode, VariableDefinitionNode, language
+from graphql import NonNullTypeNode, language
 from turms.registry import ClassRegistry
 from turms.utils import (
     annotate_field_metadata,
+    generate_alias_keywords,
     generate_pydantic_config,
+    generate_typename_field,
     inspect_operation_for_documentation,
     merge_bases_sequences,
     merge_body_sequences,
+    non_typename_fields,
     parse_documents,
     parse_value_node,
     recurse_type_annotation,
@@ -47,7 +48,24 @@ class OperationsPluginConfig(PluginConfig):
     operations_glob: Optional[str] = None
     create_arguments: bool = True
     extract_documentation: bool = True
-    arguments_allow_population_by_field_name: bool = False
+    arguments_populate_by_name: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def _rename_v1_spelling(cls, values: Any) -> Any:
+        """Accept ``arguments_allow_population_by_field_name``, the pydantic v1
+        spelling, as a deprecated alias.
+
+        Done here rather than with ``validation_alias`` because a validation alias
+        on a ``BaseSettings`` field replaces the ``TURMS_PLUGINS_OPERATIONS_``
+        env-var lookup instead of adding to it.
+        """
+        if isinstance(values, dict) and "arguments_allow_population_by_field_name" in values:
+            values.setdefault(
+                "arguments_populate_by_name",
+                values.pop("arguments_allow_population_by_field_name"),
+            )
+        return values
 
 
 def get_query_bases(
@@ -102,64 +120,30 @@ def generate_arguments_config(
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
 ):
-    if config.pydantic_version == "1":
-        config_fields = []
+    config_keywords = []
 
-        if plugin_config.arguments_allow_population_by_field_name:
-            config_fields.append(
-                ast.Assign(
-                    targets=[
-                        ast.Name(id="allow_population_by_field_name", ctx=ast.Store())
-                    ],
-                    value=ast.Constant(value=True),
-                )
+    if plugin_config.arguments_populate_by_name:
+        config_keywords.append(
+            ast.keyword(
+                arg="populate_by_name",
+                value=ast.Constant(value=True),
             )
+        )
 
-        if len(config_fields) > 0:
-            return [
-                ast.ClassDef(
-                    name="Config",
-                    bases=[],
-                    keywords=[],
-                    body=[
-                        ast.Expr(
-                            value=ast.Constant(value=" Arguments config class"),
-                        )
-                    ]
-                    + config_fields,
-                    decorator_list=[],
-                )
-            ]
-        else:
-            return []
+    if len(config_keywords) == 0:
+        return []
 
-    else:
-        config_keywords = []
-
-        if plugin_config.arguments_allow_population_by_field_name is not None:
-            config_keywords.append(
-                ast.keyword(
-                    arg="populate_by_name",
-                    value=ast.Constant(
-                        value=config.options.allow_population_by_field_name
-                    ),
-                )
-            )
-
-        if len(config_keywords) > 0:
-            registry.register_import("pydantic.ConfigDict")
-            return [
-                ast.Assign(
-                    targets=[ast.Name(id="model_config", ctx=ast.Store())],
-                    value=ast.Call(
-                        func=ast.Name(id="ConfigDict", ctx=ast.Load()),
-                        args=[],
-                        keywords=config_keywords,
-                    ),
-                )
-            ]
-        else:
-            return []
+    registry.register_import("pydantic.ConfigDict")
+    return [
+        ast.Assign(
+            targets=[ast.Name(id="model_config", ctx=ast.Store())],
+            value=ast.Call(
+                func=ast.Name(id="ConfigDict", ctx=ast.Load()),
+                args=[],
+                keywords=config_keywords,
+            ),
+        )
+    ]
 
 
 def get_arguments_bases(
@@ -257,9 +241,19 @@ def generate_operation(
             )
         )
 
+    # A ``__typename`` selected at the operation root gets the same Literal
+    # discriminator treatment as a nested object's. Letting it through the
+    # ordinary field path below would emit a literal ``__typename`` attribute,
+    # which python name-mangles and pydantic then drops as a private attribute.
+    if any(
+        isinstance(selection, FieldNode) and selection.name.value == "__typename"
+        for selection in o.selection_set.selections
+    ):
+        class_body_fields.append(generate_typename_field(x.name, registry, config))
+
     operation_annotations: list[ast.AnnAssign] = []
 
-    for field_node in o.selection_set.selections:
+    for field_node in non_typename_fields(o):
         if isinstance(field_node, FieldNode):
             field_definition = get_field_def(client_schema, x, field_node)
             assert field_definition, "Couldn't find field definition"
@@ -333,6 +327,12 @@ def generate_operation(
 
             if target != field_name:
                 registry.register_import("pydantic.Field")
+                # Arguments is a type the caller constructs (the generated funcs
+                # build it from a dict), so it follows the same alias policy as
+                # input types.
+                alias_keywords = generate_alias_keywords(
+                    field_name, target, config, registry
+                )
                 if is_optional:
                     assign = ast.AnnAssign(
                         target=ast.Name(field_name, ctx=ast.Store()),
@@ -340,10 +340,8 @@ def generate_operation(
                         value=ast.Call(
                             func=ast.Name(id="Field", ctx=ast.Load()),
                             args=[],
-                            keywords=[
-                                ast.keyword(
-                                    arg="alias", value=ast.Constant(value=target)
-                                ),
+                            keywords=alias_keywords
+                            + [
                                 ast.keyword(
                                     arg="default",
                                     value=ast.Constant(value=None),
@@ -359,11 +357,7 @@ def generate_operation(
                         value=ast.Call(
                             func=ast.Name(id="Field", ctx=ast.Load()),
                             args=[],
-                            keywords=[
-                                ast.keyword(
-                                    arg="alias", value=ast.Constant(value=target)
-                                )
-                            ],
+                            keywords=alias_keywords,
                         ),
                         simple=1,
                     )

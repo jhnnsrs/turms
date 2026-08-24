@@ -19,8 +19,7 @@
     {
       "items": [
         "reference/parsers/__init__",
-        "reference/parsers/base",
-        "reference/parsers/polyfill"
+        "reference/parsers/base"
       ],
       "label": "parsers",
       "type": "category"

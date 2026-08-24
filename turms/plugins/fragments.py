@@ -1,7 +1,7 @@
 import ast
 import logging
 from collections import defaultdict, deque
-from typing import DefaultDict, Dict, List, Literal, Optional, Sequence, Set
+from typing import Any, DefaultDict, Dict, List, Literal, Optional, Sequence, Set
 
 from graphql import (
     DocumentNode,
@@ -18,13 +18,15 @@ from graphql import (
 )
 
 from graphql.utilities.type_info import get_field_def
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import SettingsConfigDict
 from turms.config import GeneratorConfig, GraphQLTypes
-from turms.plugins.base import Plugin, PluginConfig
+from turms.plugins.base import Plugin, PluginConfig, rename_deprecated_keys
 from turms.recurse import type_field_node
 from turms.registry import ClassRegistry
+from turms.errors import GenerationError
 from turms.utils import (
+    field_is_conditional,
     generate_generic_typename_field,
     generate_pydantic_config,
     generate_typename_field,
@@ -132,8 +134,15 @@ class FragmentsPluginConfig(PluginConfig):
     fragment_bases: List[str] = []
     object_bases: List[str] = []
     fragments_glob: Optional[str] = None
-    add_documentation: bool = True
+    extract_documentation: bool = True
     generate_meta_class: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def _rename_deprecated(cls, values: Any) -> Any:
+        return rename_deprecated_keys(
+            values, {"add_documentation": "extract_documentation"}
+        )
 
 
 def get_fragment_bases(
@@ -204,7 +213,7 @@ def generate_fragment(
         base_fragment_name = registry.style_fragment_class(f.name.value)
         additional_bases = get_additional_bases_for_type(type.name, config, registry)
 
-        if type.description and plugin_config.add_documentation:
+        if type.description and plugin_config.extract_documentation:
             mother_class_fields.append(
                 ast.Expr(value=ast.Constant(value=type.description))
             )
@@ -262,6 +271,42 @@ def generate_fragment(
                 inline_fields = []
 
                 for field in sub_node.selection_set.selections:
+                    if isinstance(field, FragmentSpreadNode):
+                        # Narrowed to this one implementation, so the spread
+                        # becomes a base class of that implementation only.
+                        # Dropping it emitted a model missing every field the
+                        # document still asks the server for.
+                        try:
+                            implementation_map = (
+                                registry.get_interface_fragment_implementations(
+                                    field.name.value
+                                )
+                            )
+                        except KeyError:
+                            implementing_class_base_classes.setdefault(
+                                on_type_name, []
+                            ).append(registry.inherit_fragment(field.name.value))
+                        else:
+                            implementation = implementation_map.get(on_type_name)
+                            if implementation is None:
+                                raise GenerationError(
+                                    f"Fragment '{field.name.value}' spread inside "
+                                    f"'... on {on_type_name}' has no implementation "
+                                    f"for {on_type_name}. Known: "
+                                    f"{sorted(implementation_map)}."
+                                )
+                            implementing_class_base_classes.setdefault(
+                                on_type_name, []
+                            ).append(implementation)
+                        continue
+
+                    if isinstance(field, InlineFragmentNode):
+                        raise GenerationError(
+                            "Nested inline fragments are not supported "
+                            f"(inside '... on {on_type_name}'). Please flatten them "
+                            "or use a named fragment."
+                        )
+
                     if isinstance(field, FieldNode):
                         if field.name.value == "__typename":
                             continue
@@ -282,9 +327,12 @@ def generate_fragment(
                             config,
                             tree,
                             registry,
+                            force_optional=field_is_conditional(sub_node),
                         )
 
-                inline_fragment_fields.setdefault(on_type_name, []).append(
+                # .extend, not .append: merge_body_sequences expects statements,
+                # and appending the list itself nested it one level too deep.
+                inline_fragment_fields.setdefault(on_type_name, []).extend(
                     inline_fields
                 )
 
@@ -381,7 +429,7 @@ def generate_fragment(
             f.type_condition.name.value, config, registry
         )
 
-        if type.description and plugin_config.add_documentation:
+        if type.description and plugin_config.extract_documentation:
             fields.append(ast.Expr(value=ast.Constant(value=type.description)))
         else:
             fields.append(ast.Expr(value=ast.Constant(value="No documentation")))
@@ -551,6 +599,7 @@ def generate_fragment(
                             config,
                             tree,
                             registry,
+                            force_optional=field_is_conditional(sub_node),
                         )
 
                 inline_fragment_fields.setdefault(on_type_name, []).extend(fields)
@@ -605,7 +654,7 @@ def generate_fragment(
 
         tree.append(mother_class)
 
-        if type.description and plugin_config.add_documentation:
+        if type.description and plugin_config.extract_documentation:
             tree.append(ast.Expr(value=ast.Constant(value=type.description)))
 
         return tree

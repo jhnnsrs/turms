@@ -34,6 +34,7 @@ from turms.config import GeneratorConfig, PythonType
 from turms.plugins.base import Plugin, PluginConfig
 from turms.registry import ClassRegistry
 from turms.utils import (
+    capitalize_first,
     inspect_operation_for_documentation,
     is_oneof_input_type,
     non_typename_fields,
@@ -45,7 +46,6 @@ from turms.utils import (
     target_from_node,
 )
 from graphql import (
-    GraphQLInputObjectType,
     GraphQLList,
     GraphQLNonNull,
     GraphQLScalarType,
@@ -82,12 +82,10 @@ class FuncsPluginConfig(PluginConfig):
     prepend_sync: str = ""
     prepend_async: str = "a"
     collapse_lonely: bool = True
-    generate_protocol: bool = False
     global_args: List[Arg] = []
     global_kwargs: List[Kwarg] = []
     definitions: List[FunctionDefinition] = []
     extract_documentation: bool = True
-    argument_key_is_styled: bool = False
     expand_input_types: List[str] = []
     coercible_scalars: dict[str, PythonType] = {}
     coercible_inputs: dict[str, PythonType] = {}
@@ -310,8 +308,6 @@ def generate_input_type_descriptions(
     description = ""
 
     for value_key, value in input_type.fields.items():
-        field_name = registry.generate_node_name(value_key)
-
         description += f"    {registry.generate_parameter_name(value_key)}: {value.description or generate_input_description(value.type, registry)}\n"
 
     return description
@@ -538,6 +534,7 @@ def generate_parameters(
         if kwarg.default is None:
             # if we set the default to None, we need to make the annotation optional
             # complies with PEP 484
+            registry.register_import("typing.Optional")
             annotation = ast.Subscript(
                 value=ast.Name(id="Optional", ctx=ast.Load()),
                 slice=annotation,
@@ -767,7 +764,7 @@ def get_return_type_annotation(
         return recurse_outputtype_annotation(
             field_definition.type,
             registry,
-            overwrite_final=f"{o_name}{field_name.capitalize()}",
+            overwrite_final=f"{o_name}{capitalize_first(field_name)}",
         )
 
     return ast.Name(
@@ -825,7 +822,7 @@ def get_return_type_string(
         return recurse_outputtype_label(
             potential_return_type.type,
             registry,
-            overwrite_final=f"{o_name}{potential_return_field.name.value.capitalize()}",
+            overwrite_final=f"{o_name}{capitalize_first(potential_return_field.name.value)}",
         )
 
     else:
@@ -880,7 +877,6 @@ def generate_query_doc(
     collapse=False,
 ):
     x = get_operation_root_type(client_schema, o)
-    o.__annotations__
 
     get_operation_class_name(o, registry)
 
@@ -1369,7 +1365,7 @@ class FuncsPlugin(Plugin):
         x = await client.aquery(
             # exclude_unset omits arguments the caller never set, letting the
             # server apply its own defaults while still sending explicit nulls.
-            operation.Meta.document, operation.Arguments(**variables).dict(by_alias=True, exclude_unset=True)
+            operation.Meta.document, operation.Arguments(**variables).model_dump(by_alias=True, exclude_unset=True)
         )# is the proxy function that will be called (u can validate the variables here)
         return operation(**x.data) # Serialize the result
 

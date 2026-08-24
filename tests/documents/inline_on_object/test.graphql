@@ -1,0 +1,14 @@
+fragment SwatchName on Swatch {
+  name
+}
+
+query InlineOnObject($detailed: Boolean!) {
+  swatches {
+    ... on Swatch {
+      color
+    }
+    ... on Swatch @include(if: $detailed) {
+      ...SwatchName
+    }
+  }
+}

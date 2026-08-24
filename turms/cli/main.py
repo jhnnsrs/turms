@@ -1,11 +1,16 @@
-from enum import Enum
 import importlib.util
 import os
 from typing import Any, Callable, Dict
 
 import yaml
 from turms.config import GraphQLProject
-from turms.run import generate, write_code_to_file, write_project, write_schema_to_file
+from turms.run import (
+    generate,
+    load_raw_dsl_from_schema_type,
+    write_code_to_file,
+    write_project,
+    write_schema_to_file,
+)
 from rich import get_console
 from rich.panel import Panel
 from rich.live import Live
@@ -24,13 +29,6 @@ from functools import wraps
 click.rich_click.USE_RICH_MARKUP = True
 
 directory = os.getcwd()
-
-
-class TurmsOptions(str, Enum):
-    GEN = "gen"
-    INIT = "init"
-    DOWNLOAD = "download"
-    WATCH = "watch"
 
 
 logo = r"""
@@ -220,7 +218,7 @@ def generate_projects(projects: Dict[str, GraphQLProject], title: str = "Turms")
             live.update(panel)
 
             def log(message: str, level: str = "INFO"):
-                if level == "WARN":
+                if level == "WARNING":
                     project_tree.add(Tree(message, style="yellow"))
 
             try:
@@ -240,6 +238,7 @@ def generate_projects(projects: Dict[str, GraphQLProject], title: str = "Turms")
                         schema,
                         project.extensions.turms.out_dir,
                         project.extensions.turms.schema_name,
+                        raw_dsl=load_raw_dsl_from_schema_type(project.schema_url),
                     )
 
                 if project.extensions.turms.dump_configuration:

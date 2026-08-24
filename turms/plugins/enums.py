@@ -11,9 +11,10 @@ from graphql.type.definition import (
 from turms.referencer import create_reference_registry_from_documents
 from turms.utils import parse_documents
 from turms.registry import ClassRegistry
+from turms.errors import GenerationError
 
 
-class EnumsPluginsError(Exception):
+class EnumsPluginsError(GenerationError):
     pass
 
 
@@ -91,6 +92,24 @@ def generate_enums(
 
             else:
                 fields += [assign]
+
+        # `class X(str, Enum)` inherits Enum.__str__, so `str(X.A)` is "X.A" and
+        # f"{X.A}" renders "X.A" rather than the value -- the wart that
+        # enum.StrEnum was added to fix. Restoring str's own __str__ gives
+        # StrEnum semantics on every supported python version, and matters
+        # because a value that reaches a log line, an f-string or a dict key
+        # should read as the wire value the enum stands for.
+        fields.append(
+            ast.Assign(
+                targets=[ast.Name(id="__str__", ctx=ast.Store())],
+                value=ast.Attribute(
+                    value=ast.Name(id="str", ctx=ast.Load()),
+                    attr="__str__",
+                    ctx=ast.Load(),
+                ),
+                lineno=1,
+            )
+        )
 
         tree.append(
             ast.ClassDef(

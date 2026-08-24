@@ -1,0 +1,10 @@
+query CondUnion($detail: Boolean!) {
+  hallo {
+    ... on Foo @include(if: $detail) {
+      forward
+    }
+    ... on Bar {
+      nana
+    }
+  }
+}

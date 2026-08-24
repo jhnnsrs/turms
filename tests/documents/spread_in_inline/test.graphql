@@ -1,0 +1,30 @@
+fragment ArkitektExtras on ArkitektNode {
+  package
+  kind
+}
+
+query FlowWithSpreadInInline($id: ID) {
+  flow(id: $id) {
+    id
+    nodes {
+      id
+      ... on ArkitektNode {
+        ...ArkitektExtras
+        name
+      }
+    }
+  }
+}
+
+# A @include on the inline fragment itself must make every field inside it
+# optional -- the server omits the whole group when the condition is false.
+query ConditionalInlineFragment($detail: Boolean!) {
+  flow(id: "1") {
+    nodes {
+      id
+      ... on ArkitektNode @include(if: $detail) {
+        kind
+      }
+    }
+  }
+}

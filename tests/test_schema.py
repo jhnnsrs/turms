@@ -10,6 +10,7 @@ from turms.run import generate_ast
 from .utils import unit_test_with, ExecuteError
 
 
+@pytest.mark.network
 def test_countries_schema(countries_schema):
     config = GeneratorConfig()
 

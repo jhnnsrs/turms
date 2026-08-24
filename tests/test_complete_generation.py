@@ -84,7 +84,7 @@ def test_beast_operations(beast_schema):
     generated = ast.unparse(ast.fix_missing_locations(md))
     assert "from enum import Enum" in generated, "EnumPlugin not working"
     assert "class Get_beasts(BaseModel):" in generated, "OpertiationsPlugin not working"
-    assert "common_name: Optional[str]" in generated, "SnakeNodeName not working"
+    assert "common_name: str | None" in generated, "SnakeNodeName not working"
 
 
 def test_arkitekt_operations(arkitekt_schema):

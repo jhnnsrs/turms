@@ -5,9 +5,6 @@ projects:
     extensions:
       turms:
         out_dir: examples/api
-        parsers:
-          - type: turms.parsers.polyfill.PolyfillParser
-            python_version: 3.7
         stylers:
           - type: turms.stylers.capitalize.CapitalizeStyler
           - type: turms.stylers.snake_case.SnakeCaseStyler
@@ -15,7 +12,7 @@ projects:
           - type: turms.plugins.fauly_import.ImportFault
           - type: turms.plugins.inputs.InputsPlugin
           - type: turms.plugins.fragments.FragmentsPlugin
-          - type: turms.plugins.operation.OperationsPlugin
+          - type: turms.plugins.operations.OperationsPlugin
           - type: turms.plugins.funcs.FuncsPlugin
             global_kwargs:
               - type: mikro.mikro.MikroRath

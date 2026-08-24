@@ -1,4 +1,4 @@
-from typing import Dict, Tuple, Type
+from typing import Dict, Type
 
 from graphql.validation.rules import ASTValidationRule
 
@@ -129,9 +129,13 @@ specified_rules_map: Dict[str, Type[ASTValidationRule]] = {
     "known_directives": KnownDirectivesRule,
     "unique_directives_per_location": UniqueDirectivesPerLocationRule,
     "known_argument_names": KnownArgumentNamesRule,
+    "known_argument_names_on_directives": KnownArgumentNamesOnDirectivesRule,
     "unique_argument_names": UniqueArgumentNamesRule,
     "values_of_correct_type": ValuesOfCorrectTypeRule,
     "provided_required_arguments": ProvidedRequiredArgumentsRule,
+    "provided_required_arguments_on_directives": (
+        ProvidedRequiredArgumentsOnDirectivesRule
+    ),
     "variables_in_allowed_position": VariablesInAllowedPositionRule,
     "overlapping_fields_can_be_merged": OverlappingFieldsCanBeMergedRule,
     "unique_input_field_names": UniqueInputFieldNamesRule,

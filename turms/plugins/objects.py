@@ -11,12 +11,12 @@ from graphql import (
 )
 from pydantic_settings import SettingsConfigDict
 from turms.errors import GenerationError
-from turms.plugins.base import Plugin, PluginConfig
+from turms.plugins.base import Plugin, PluginConfig, rename_deprecated_keys
 import ast
-from typing import Dict, List
+from typing import Any, Dict, List
 from turms.config import GeneratorConfig
 from graphql.utilities.build_client_schema import GraphQLSchema
-from pydantic import Field
+from pydantic import Field, model_validator
 from graphql.type.definition import (
     GraphQLEnumType,
 )
@@ -34,9 +34,14 @@ from turms.config import GraphQLTypes
 class ObjectsPluginConfig(PluginConfig):
     model_config = SettingsConfigDict(env_prefix="TURMS_PLUGINS_OBJECTS_")
     type: str = "turms.plugins.objects.ObjectsPlugin"
-    types_bases: List[str] = ["pydantic.BaseModel"]
+    object_bases: List[str] = ["pydantic.BaseModel"]
     skip_underscore: bool = False
     skip_double_underscore: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def _rename_deprecated(cls, values: Any) -> Any:
+        return rename_deprecated_keys(values, {"types_bases": "object_bases"})
 
 
 def generate_object_field_annotation(
@@ -240,7 +245,7 @@ def generate_types(
         {}
     )  # A list of interfaces with its respective base
 
-    for base in plugin_config.types_bases:
+    for base in plugin_config.object_bases:
         registry.register_import(base)
 
     for key, object_type in sorted_objects.items():
@@ -364,7 +369,7 @@ def generate_types(
                 bases=additional_bases
                 + [
                     ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                    for base in plugin_config.types_bases
+                    for base in plugin_config.object_bases
                 ],
                 decorator_list=[],
                 keywords=[],

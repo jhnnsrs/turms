@@ -2,5 +2,5 @@ class X(BaseModel):
     """No documentation"""
     mandatory: str
     other_mandatory: str = Field(alias='otherMandatory')
-    optional: Optional[str] = None
-    other_optional: Optional[str] = Field(alias='otherOptional', default=None)
+    optional: str | None = None
+    other_optional: str | None = Field(alias='otherOptional', default=None)

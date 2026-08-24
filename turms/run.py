@@ -20,6 +20,7 @@ from turms.config import (
     GraphQLProject,
     SchemaType,
     LogFunction,
+    print_logger,
 )
 from turms.helpers import (
     load_introspection_from_glob,
@@ -28,29 +29,37 @@ from turms.helpers import (
     load_dsl_from_url,
     import_string,
 )
+from turms.annotations import modernize_annotations
 from turms.plugins.base import Plugin
 from turms.parsers.base import Parser
 from turms.processors.base import Processor
 from turms.registry import ClassRegistry
 from turms.stylers.base import Styler
-from pydantic import ValidationError
 
 from .errors import GenerationError
 import json
-import os
 
 
 try:
-    # If toml is installed, use it to load the config file
-    import toml
+    # Python 3.11+ ships a TOML parser; older versions get it from the `tomli`
+    # backport that turms depends on there.
+    import tomllib as _tomllib
+except ImportError:  # pragma: no cover - only taken on python 3.10
+    try:
+        import tomli as _tomllib
+    except ImportError:
+        _tomllib = None
+
+
+if _tomllib is not None:
 
     def toml_loader(file):
-        return toml.loads(file.read())
+        return _tomllib.loads(file.read())
 
-except ImportError:
+else:  # pragma: no cover - only reachable without the 3.10 backport installed
 
     def toml_loader(file):
-        raise NotImplementedError("TOML not supported. Please install `toml`")
+        raise NotImplementedError("TOML not supported. Please install `tomli`")
 
 
 def json_loader(file):
@@ -181,7 +190,23 @@ def write_code_to_file(code: str, outdir: str, filepath: str):
     return generated_file
 
 
-def write_schema_to_file(schema: GraphQLSchema, outdir: str, filepath: str):
+def write_schema_to_file(
+    schema: GraphQLSchema,
+    outdir: str,
+    filepath: str,
+    raw_dsl: Optional[str] = None,
+):
+    """Dumps the schema next to the generated code.
+
+    ``raw_dsl`` is the SDL exactly as the source served it. It is preferred over
+    ``print_schema`` because graphql-core drops *custom directive applications*
+    when it re-prints a schema: a ``@unionElementOf(...)`` sitting on an input
+    type survives ``build_ast_schema`` but not ``print_schema``. Dumping the
+    round-tripped form therefore produces an SDL that silently generates less
+    code than the schema it came from, which makes the dump useless as an
+    offline regeneration source. Only introspection-derived schemas (which never
+    carry directive applications in the first place) fall back to printing.
+    """
     if not os.path.isdir(outdir):  # pragma: no cover
         os.makedirs(outdir)
 
@@ -195,7 +220,7 @@ def write_schema_to_file(schema: GraphQLSchema, outdir: str, filepath: str):
         "w",
         encoding="utf-8",
     ) as file:
-        file.write(print_schema(schema))
+        file.write(raw_dsl if raw_dsl is not None else print_schema(schema))
 
     return generated_file
 
@@ -214,7 +239,7 @@ def write_project(project: GraphQLProject, outdir: str, filepath: str):
         "w",
         encoding="utf-8",
     ) as file:
-        file.write(project.model_dump_json(indent=4))
+        file.write(project.model_dump_json(indent=4, by_alias=True))
 
     return generated_file
 
@@ -243,7 +268,7 @@ def gen(
                 f"-------------- Generating project: {key} --------------"
             )
 
-            generated_code = generate(project)
+            generated_code, schema = generate(project)
 
             write_code_to_file(
                 generated_code,
@@ -252,15 +277,11 @@ def gen(
             )
 
             if project.extensions.turms.dump_schema:
-                schema = build_schema_from_schema_type(
-                    project.schema_url,
-                    allow_introspection=project.extensions.turms.allow_introspection,
-                )
-
                 write_schema_to_file(
                     schema,
                     project.extensions.turms.out_dir,
                     project.extensions.turms.schema_name,
+                    raw_dsl=load_raw_dsl_from_schema_type(project.schema_url),
                 )
 
             if project.extensions.turms.dump_configuration:
@@ -296,6 +317,50 @@ def instantiate(module_path: str, **kwargs):
 
 def is_url(url: str) -> bool:
     return url.startswith("http") or url.startswith("https")
+
+
+def load_raw_dsl_from_schema_type(schema: SchemaType) -> Optional[str]:
+    """Returns the SDL exactly as the source served it, or None.
+
+    Mirrors the branches of :func:`build_schema_from_schema_type`, but keeps the
+    raw string instead of building a schema from it. ``None`` means the source
+    could only be read through introspection, which carries no custom directive
+    applications anyway -- the caller then has nothing better than
+    ``print_schema``.
+    """
+    try:
+        if isinstance(schema, dict):
+            return " ".join(
+                load_dsl_from_url(key, value.headers) for key, value in schema.items()
+            )
+
+        if isinstance(schema, list):
+            if len(schema) == 1:
+                return load_raw_dsl_from_schema_type(schema[0])
+
+            substrings = []
+            for item in schema:
+                if isinstance(item, dict):
+                    for key, value in item.items():
+                        substrings.append(load_dsl_from_url(key, value.headers))
+                elif isinstance(item, str):
+                    substrings.append(
+                        load_dsl_from_url(item)
+                        if is_url(item)
+                        else load_dsl_from_glob(item)
+                    )
+            return " ".join(substrings) if substrings else None
+
+        if isinstance(schema, str):
+            return load_dsl_from_url(schema) if is_url(schema) else load_dsl_from_glob(
+                schema
+            )
+    except Exception:
+        # An introspection-only endpoint (or an unreadable glob) is not an error
+        # here; the caller falls back to print_schema.
+        return None
+
+    return None
 
 
 def build_schema_from_schema_type(
@@ -398,9 +463,7 @@ def generate(
         str: The generated code
     """
     if not log:
-
-        def log(x, **kwargs):
-            return print(x)
+        log = print_logger
 
     gen_config = project.extensions.turms
 
@@ -471,7 +534,7 @@ def generate_ast(
     plugins: Optional[List[Plugin]] = None,
     stylers: Optional[List[Styler]] = None,
     skip_forwards: bool = False,
-    log: LogFunction = lambda *args, **kwargs: print,
+    log: LogFunction = print_logger,
 ) -> List[ast.AST]:
     """Generates the ast from the schema
 
@@ -502,6 +565,8 @@ def generate_ast(
                 f"{plugin.__class__.__name__} failed!\n {str(e)}"
             ) from e
 
+    global_tree = modernize_annotations(global_tree, config, registry)
+
     global_tree = (
         registry.generate_imports() + registry.generate_builtins() + global_tree
     )
@@ -515,7 +580,7 @@ def parse_ast(
     config: GeneratorConfig,
     ast: List[ast.AST],
     parsers: Optional[List[Parser]] = None,
-    log: LogFunction = lambda *args, **kwargs: print,
+    log: LogFunction = print_logger,
 ) -> List[ast.AST]:
     """Parses the ast with the plugins
 
@@ -548,7 +613,7 @@ def process_code(
     config: GeneratorConfig,
     code: List[ast.AST],
     processors: Optional[List[Processor]] = None,
-    log: LogFunction = lambda *args, **kwargs: print,
+    log: LogFunction = print_logger,
 ) -> List[ast.AST]:
     """Parses the ast with the plugins
 
@@ -584,7 +649,7 @@ def generate_code(
     stylers: Optional[List[Styler]] = None,
     parsers: Optional[List[Parser]] = None,
     processors: Optional[List[Processor]] = None,
-    log: LogFunction = lambda *args, **kwargs: print,
+    log: LogFunction = print_logger,
 ) -> str:
     generated_ast = generate_ast(
         config,
