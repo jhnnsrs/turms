@@ -1,6 +1,96 @@
 # CHANGELOG
 
 
+## v2.0.0 (2026-08-24)
+
+### Bug Fixes
+
+- Description
+  ([`2b8a5d3`](https://github.com/jhnnsrs/turms/commit/2b8a5d394a3c5049f7e7380237f58595da0eca86))
+
+- Newer python support
+  ([`697c8a5`](https://github.com/jhnnsrs/turms/commit/697c8a5214b9f33d1a06ceb7c7133779b60f4879))
+
+- Removal of faulty examples
+  ([`6349936`](https://github.com/jhnnsrs/turms/commit/6349936179a8d7144f0a1623c81a95da06629635))
+
+### Features
+
+- Input types have now validation aliases and serialization aliases
+  ([`ed1c155`](https://github.com/jhnnsrs/turms/commit/ed1c155adb122d9d5b9fbcabc2a9e7047c7330d5))
+
+- More spec compliance (skip include etc)
+  ([`b69090e`](https://github.com/jhnnsrs/turms/commit/b69090e658171a113c0bbbd35d390c5489bf3aaf))
+
+- New annotation modes
+  ([`bbd2ca7`](https://github.com/jhnnsrs/turms/commit/bbd2ca74c7de39232f2578aee31fb3f1b9c27c23))
+
+- Rewritten for pydantic v2
+  ([`fbd6eca`](https://github.com/jhnnsrs/turms/commit/fbd6ecaf494bd5f62996b6431e70a5d97b1d18d9))
+
+### Refactoring
+
+- Drop the pydantic v1 option spellings
+  ([`a8b5b17`](https://github.com/jhnnsrs/turms/commit/a8b5b17e4ca241d78d5b241437c430c995ac1a14))
+
+`OptionsConfig` could still emit `allow_mutation` and `orm_mode` into the generated `model_config`.
+  Both are pydantic v1 keys that v2 rejects, so every consuming project importing such a module got
+  a `UserWarning` ("'allow_mutation' has been removed" / "'orm_mode' has been renamed to
+  'from_attributes'") and the option silently did nothing.
+
+- `orm_mode` is replaced by `from_attributes`, which is what actually reaches the generated
+  `ConfigDict`. - `allow_mutation` has no v2 equivalent here; immutable models are the `freeze`
+  section's job, so the key is gone rather than silently translated.
+
+Both spellings are intercepted by a before-validator that names the replacement — `OptionsConfig`
+  forbids extras, so otherwise they would have failed as an anonymous "extra inputs are not
+  permitted".
+
+`unit_test_with` gains `strict_warnings`, which runs the generated module under `-W
+  error::UserWarning`. The generated code executes in a subprocess, so a filter set by the test
+  process never reached it; without this the new regression test passes even with a v1 key
+  re-introduced.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+- Normalize the deprecated pydantic_version key away
+  ([`336cf7f`](https://github.com/jhnnsrs/turms/commit/336cf7f5c9389ff90e783da2b2c1524866c5a7ee))
+
+Storing the accepted "v2" value meant a dumped configuration carried the dead key forward into
+  generated project.json files. The validator now returns None once the v1 check has passed.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+- Remove the pydantic v1 generation target
+  ([`388e3ee`](https://github.com/jhnnsrs/turms/commit/388e3eec60e3e4ee09ffadec2497699f5cbefbe2))
+
+Turms now only emits pydantic v2 code. The forked generation paths are gone and the v2 arm is
+  unconditional:
+
+- `generate_config_class_pydantic` (the v1 `class Config:` emitter) and the
+  `generate_pydantic_config` dispatcher are deleted; the former `generate_config_dict` takes over
+  the `generate_pydantic_config` name. - forward references always resolve via `model_rebuild()`
+  (was `update_forward_refs()` on v1). - discriminated unions and direct `@oneOf` unions are no
+  longer gated behind a version check, so they lose their degraded wrapper-class fallback.
+
+`pydantic_version` stays accepted as a no-op so existing configurations that say `pydantic_version:
+  v2` keep loading; `v1` now raises a validation error naming the release and the migration.
+
+Also fixes the surviving v2 arm of `generate_arguments_config`, which gated on
+  `plugin_config.arguments_allow_population_by_field_name is not None` (a bool, so always true) and
+  then read the unrelated `config.options.allow_population_by_field_name`. Every generated
+  `Arguments` class carried a junk `model_config = ConfigDict(populate_by_name=None)` and the plugin
+  flag did nothing. It now emits `populate_by_name=True` only when the flag is set, and nothing
+  otherwise.
+
+The four `*_v1.py` test modules are removed; the tests parametrized over `["v1", "v2"]` keep their
+  v2 case. `test_multiple_forward_references` asserted on the v1 `update_forward_refs` spelling and
+  so matched nothing under the v2 default — it now asserts on `model_rebuild` and that the calls are
+  actually present.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+
 ## v1.2.1 (2026-08-02)
 
 ### Bug Fixes
