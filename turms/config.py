@@ -142,6 +142,19 @@ class FreezeConfig(BaseSettings):
 
 ExtraOptions = Optional[Union[Literal["ignore"], Literal["allow"], Literal["forbid"]]]
 
+AliasMode = Literal["single", "split"]
+"""How a field whose python name differs from its GraphQL name carries that name.
+
+- ``single`` (default): one ``Field(alias="graphQLName")``. pydantic uses it for
+  both validation and serialization. Type checkers synthesize ``__init__`` from
+  the alias and do **not** read ``populate_by_name``, so the python (snake_case)
+  spelling is reported as an unknown argument even though it works at runtime.
+- ``split``: ``validation_alias=AliasChoices("python_name", "graphQLName")`` plus
+  ``serialization_alias="graphQLName"``. Both spellings still validate, the wire
+  format is unchanged, and type checkers now see the python name -- because no
+  ``alias=`` specifier is present, they fall back to the field name.
+"""
+
 
 class OptionsConfig(BaseSettings):
     """Configuration for freezing the generated pydantic
@@ -169,6 +182,23 @@ class OptionsConfig(BaseSettings):
 
     validate_assignment: Optional[bool] = None
     """Validate assignment"""
+
+    alias_mode: AliasMode = "single"
+    """Whether aliases are emitted as one ``alias=`` or split into
+    ``validation_alias``/``serialization_alias``. See :data:`AliasMode`.
+
+    Applies to input types and operation ``Arguments`` only -- the types a caller
+    constructs. Output types (fragments, objects, operation results) are parsed
+    from the wire and keep a single ``alias=``.
+
+    Deliberately independent of ``enabled``, ``types``, ``include`` and
+    ``exclude``: those select which models receive a generated ``model_config``,
+    whereas ``alias_mode`` chooses how an individual ``Field(...)`` specifier
+    spells its alias. The two are unrelated concerns, and gating the field
+    specifier on ``types`` would be ambiguous anyway -- ``Arguments`` is an
+    OPERATION-scoped model whose aliasing must follow the INPUT policy, because
+    the generated functions construct it the same way a caller constructs an
+    input."""
 
     @model_validator(mode="before")
     @classmethod

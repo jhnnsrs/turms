@@ -56,6 +56,9 @@ dev-dependencies = [
     "pytest-snapshot>=0.9.0,<0.10",
     "python-semantic-release>=9.21.1",
     "ruff>=0.15.17",
+    # The alias_mode guarantee is a static one: only a type checker can observe
+    # that the python spelling type-checks. See tests/test_alias_mode.py.
+    "basedpyright>=1.39.0",
 ]
 
 [tool.pytest.ini_options]

@@ -26,6 +26,7 @@ from turms.registry import ClassRegistry
 from turms.utils import (
     annotate_field_metadata,
     compose_field_documentation,
+    generate_alias_keywords,
     generate_pydantic_config,
     get_additional_bases_for_type,
     is_oneof_input_type,
@@ -172,11 +173,16 @@ def generate_input_field_value(
     omittable: bool,
     description: Optional[str],
     registry: ClassRegistry,
+    config: GeneratorConfig,
 ):
     """Builds the AnnAssign value for an input field. Emits a ``Field(...)`` call
     carrying the alias, the ``None`` default (for omittable fields) and the GraphQL
     field description; falls back to a bare ``None``/required value when no
-    ``Field`` metadata is needed."""
+    ``Field`` metadata is needed.
+
+    Never called for a discriminated-union tag field -- those are emitted by the
+    ``discriminators`` loop in :func:`generate_input_type` and skipped here, which
+    matters because pydantic rejects a split alias on a discriminator."""
     has_alias = field_name != value_key
     # A bare ``= None`` suffices for a plain optional field; only reach for a
     # ``Field(...)`` call when there is real metadata (an alias or a description)
@@ -186,7 +192,9 @@ def generate_input_field_value(
 
     keywords = []
     if has_alias:
-        keywords.append(ast.keyword(arg="alias", value=ast.Constant(value=value_key)))
+        keywords.extend(
+            generate_alias_keywords(field_name, value_key, config, registry)
+        )
     if omittable:
         keywords.append(ast.keyword(arg="default", value=ast.Constant(value=None)))
     if description:
@@ -254,6 +262,22 @@ def generate_input_type(
     # wire. The Literal emitted above is the same field, narrowed to the one
     # value this member answers to, so emitting it again here would shadow the
     # Literal with the open enum and leave pydantic unable to discriminate.
+    #
+    # The Literal is emitted under the *raw GraphQL* name, while the loop below
+    # styles each field first, so a multi-word discriminator (`elementKind`)
+    # would fail to match and be emitted twice. It also must never pick up an
+    # alias: pydantic rejects a split alias on a discriminator ("Alias [...] is
+    # not supported in a discriminated union"). Refuse rather than mis-emit.
+    for _d in discriminators or []:
+        _styled = registry.generate_node_name(_d.discriminator)
+        if _styled != _d.discriminator:
+            raise GenerationError(
+                f"Discriminator '{_d.discriminator}' on '{type.name}' is styled to "
+                f"'{_styled}', so it would need an alias -- which pydantic forbids "
+                "on a discriminated-union tag field. Rename the field in the schema "
+                "or use a styler that leaves it unchanged."
+            )
+
     discriminator_names = {d.discriminator for d in discriminators or []}
 
     for value_key, value in type.fields.items():
@@ -300,7 +324,7 @@ def generate_input_type(
             target=ast.Name(field_name, ctx=ast.Store()),
             annotation=annotation,
             value=generate_input_field_value(
-                field_name, value_key, omittable, value.description, registry
+                field_name, value_key, omittable, value.description, registry, config
             ),
             simple=1,
         )
@@ -459,7 +483,7 @@ def generate_oneof_wrapper_input(
                         target=ast.Name(field_name, ctx=ast.Store()),
                         annotation=annotation,
                         value=generate_input_field_value(
-                            field_name, value_key, False, value.description, registry
+                            field_name, value_key, False, value.description, registry, config
                         ),
                         simple=1,
                     ),
@@ -758,7 +782,7 @@ def generate_inputs(
                 target=ast.Name(field_name, ctx=ast.Store()),
                 annotation=annotation,
                 value=generate_input_field_value(
-                    field_name, value_key, omittable, value.description, registry
+                    field_name, value_key, omittable, value.description, registry, config
                 ),
                 simple=1,
             )

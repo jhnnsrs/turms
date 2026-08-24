@@ -656,14 +656,18 @@ class ClassRegistry(object):
                     name.split(".")[-1]
                 )
 
-        for lone_top_import in lone_top_imports:
+        # Sorted, like the forward references below: `_imports` and the per-module
+        # name sets are sets, so unsorted iteration reorders the import block on
+        # every run (PYTHONHASHSEED). That turns any regeneration into an
+        # unreviewable diff even when no generated code actually changed.
+        for lone_top_import in sorted(lone_top_imports):
             imports.append(ast.Import(names=[ast.alias(name=lone_top_import)]))
 
-        for top_level_name, sub_level_names in top_level.items():
+        for top_level_name in sorted(top_level):
             imports.append(
                 ast.ImportFrom(
                     module=top_level_name,
-                    names=[ast.alias(name=name) for name in sub_level_names],
+                    names=[ast.alias(name=name) for name in sorted(top_level[top_level_name])],
                     level=0,
                 )
             )
@@ -674,7 +678,8 @@ class ClassRegistry(object):
         """Generate the builtins for the generated code. This is used to generate the"""
         builtins: list[ast.AST] = []
 
-        for built_in in self._builtins:
+        # Sorted for the same reason as the imports above: `_builtins` is a set.
+        for built_in in sorted(self._builtins):
             node = built_in_map[built_in]
             if isinstance(node, list):
                 builtins.extend(node)

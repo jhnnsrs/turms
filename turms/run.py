@@ -191,7 +191,23 @@ def write_code_to_file(code: str, outdir: str, filepath: str):
     return generated_file
 
 
-def write_schema_to_file(schema: GraphQLSchema, outdir: str, filepath: str):
+def write_schema_to_file(
+    schema: GraphQLSchema,
+    outdir: str,
+    filepath: str,
+    raw_dsl: Optional[str] = None,
+):
+    """Dumps the schema next to the generated code.
+
+    ``raw_dsl`` is the SDL exactly as the source served it. It is preferred over
+    ``print_schema`` because graphql-core drops *custom directive applications*
+    when it re-prints a schema: a ``@unionElementOf(...)`` sitting on an input
+    type survives ``build_ast_schema`` but not ``print_schema``. Dumping the
+    round-tripped form therefore produces an SDL that silently generates less
+    code than the schema it came from, which makes the dump useless as an
+    offline regeneration source. Only introspection-derived schemas (which never
+    carry directive applications in the first place) fall back to printing.
+    """
     if not os.path.isdir(outdir):  # pragma: no cover
         os.makedirs(outdir)
 
@@ -205,7 +221,7 @@ def write_schema_to_file(schema: GraphQLSchema, outdir: str, filepath: str):
         "w",
         encoding="utf-8",
     ) as file:
-        file.write(print_schema(schema))
+        file.write(raw_dsl if raw_dsl is not None else print_schema(schema))
 
     return generated_file
 
@@ -271,6 +287,7 @@ def gen(
                     schema,
                     project.extensions.turms.out_dir,
                     project.extensions.turms.schema_name,
+                    raw_dsl=load_raw_dsl_from_schema_type(project.schema_url),
                 )
 
             if project.extensions.turms.dump_configuration:
@@ -306,6 +323,50 @@ def instantiate(module_path: str, **kwargs):
 
 def is_url(url: str) -> bool:
     return url.startswith("http") or url.startswith("https")
+
+
+def load_raw_dsl_from_schema_type(schema: SchemaType) -> Optional[str]:
+    """Returns the SDL exactly as the source served it, or None.
+
+    Mirrors the branches of :func:`build_schema_from_schema_type`, but keeps the
+    raw string instead of building a schema from it. ``None`` means the source
+    could only be read through introspection, which carries no custom directive
+    applications anyway -- the caller then has nothing better than
+    ``print_schema``.
+    """
+    try:
+        if isinstance(schema, dict):
+            return " ".join(
+                load_dsl_from_url(key, value.headers) for key, value in schema.items()
+            )
+
+        if isinstance(schema, list):
+            if len(schema) == 1:
+                return load_raw_dsl_from_schema_type(schema[0])
+
+            substrings = []
+            for item in schema:
+                if isinstance(item, dict):
+                    for key, value in item.items():
+                        substrings.append(load_dsl_from_url(key, value.headers))
+                elif isinstance(item, str):
+                    substrings.append(
+                        load_dsl_from_url(item)
+                        if is_url(item)
+                        else load_dsl_from_glob(item)
+                    )
+            return " ".join(substrings) if substrings else None
+
+        if isinstance(schema, str):
+            return load_dsl_from_url(schema) if is_url(schema) else load_dsl_from_glob(
+                schema
+            )
+    except Exception:
+        # An introspection-only endpoint (or an unreadable glob) is not an error
+        # here; the caller falls back to print_schema.
+        return None
+
+    return None
 
 
 def build_schema_from_schema_type(

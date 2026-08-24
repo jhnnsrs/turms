@@ -21,6 +21,7 @@ from graphql import NonNullTypeNode, VariableDefinitionNode, language
 from turms.registry import ClassRegistry
 from turms.utils import (
     annotate_field_metadata,
+    generate_alias_keywords,
     generate_pydantic_config,
     inspect_operation_for_documentation,
     merge_bases_sequences,
@@ -299,6 +300,12 @@ def generate_operation(
 
             if target != field_name:
                 registry.register_import("pydantic.Field")
+                # Arguments is a type the caller constructs (the generated funcs
+                # build it from a dict), so it follows the same alias policy as
+                # input types.
+                alias_keywords = generate_alias_keywords(
+                    field_name, target, config, registry
+                )
                 if is_optional:
                     assign = ast.AnnAssign(
                         target=ast.Name(field_name, ctx=ast.Store()),
@@ -306,10 +313,8 @@ def generate_operation(
                         value=ast.Call(
                             func=ast.Name(id="Field", ctx=ast.Load()),
                             args=[],
-                            keywords=[
-                                ast.keyword(
-                                    arg="alias", value=ast.Constant(value=target)
-                                ),
+                            keywords=alias_keywords
+                            + [
                                 ast.keyword(
                                     arg="default",
                                     value=ast.Constant(value=None),
@@ -325,11 +330,7 @@ def generate_operation(
                         value=ast.Call(
                             func=ast.Name(id="Field", ctx=ast.Load()),
                             args=[],
-                            keywords=[
-                                ast.keyword(
-                                    arg="alias", value=ast.Constant(value=target)
-                                )
-                            ],
+                            keywords=alias_keywords,
                         ),
                         simple=1,
                     )

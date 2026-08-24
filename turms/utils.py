@@ -188,6 +188,52 @@ def generate_typename_field(
     )
 
 
+def generate_alias_keywords(
+    field_name: str,
+    graphql_name: str,
+    config: GeneratorConfig,
+    registry: ClassRegistry,
+) -> List[ast.keyword]:
+    """The ``Field(...)`` keywords that carry a field's GraphQL name.
+
+    Only called when the python name and the GraphQL name actually differ.
+
+    Under ``alias_mode="split"`` the single ``alias=`` becomes a
+    ``validation_alias``/``serialization_alias`` pair. Both spellings still
+    validate (the python name is the first ``AliasChoices`` entry) and
+    ``model_dump(by_alias=True)`` still emits the GraphQL name, so the wire
+    format is unchanged -- but with no ``alias=`` field specifier present, a type
+    checker synthesizes ``__init__`` from the python name instead of the GraphQL
+    one. That is the whole point: ``populate_by_name`` is a runtime-only setting
+    that type checkers do not read, so under ``"single"`` the snake_case spelling
+    works but does not type-check.
+
+    Never use this for a discriminated-union tag field: pydantic rejects a
+    non-string alias on one ("Alias [...] is not supported in a discriminated
+    union"). Tag fields carry no alias at all, so they never reach this helper.
+    """
+    if config.options.alias_mode == "split":
+        registry.register_import("pydantic.AliasChoices")
+        return [
+            ast.keyword(
+                arg="validation_alias",
+                value=ast.Call(
+                    func=ast.Name(id="AliasChoices", ctx=ast.Load()),
+                    args=[
+                        ast.Constant(value=field_name),
+                        ast.Constant(value=graphql_name),
+                    ],
+                    keywords=[],
+                ),
+            ),
+            ast.keyword(
+                arg="serialization_alias", value=ast.Constant(value=graphql_name)
+            ),
+        ]
+
+    return [ast.keyword(arg="alias", value=ast.Constant(value=graphql_name))]
+
+
 def generate_generic_typename_field(registry: ClassRegistry, config: GeneratorConfig):
     """Generates the typename field a specific type, this will be used to determine the type of the object in the response"""
 
