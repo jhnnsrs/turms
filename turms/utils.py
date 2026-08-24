@@ -12,16 +12,19 @@ from graphql import (
     GraphQLList,
     GraphQLNamedOutputType,
     GraphQLNonNull,
-    GraphQLNullableType,
     GraphQLObjectType,
     GraphQLOutputType,
     GraphQLScalarType,
     GraphQLUnionType,
+    EnumValueNode,
+    InlineFragmentNode,
     IntValueNode,
     ListTypeNode,
+    ListValueNode,
     NamedTypeNode,
     NonNullTypeNode,
     NullValueNode,
+    ObjectValueNode,
     OperationDefinitionNode,
     SelectionNode,
     SelectionSetNode,
@@ -39,11 +42,18 @@ from graphql import GraphQLSchema
 
 from turms.annotations import list_label, optional_label
 from turms.config import GeneratorConfig
-from turms.errors import (
+from turms.errors import (  # noqa: F401  (re-exported: see note below)
     GenerationError,
     NoEnumFound,
     NoInputTypeFound,
     NoScalarFound,
+    # These four live in turms.errors alongside the rest of the hierarchy, but
+    # stay importable from here because plugins have always imported them from
+    # turms.utils.
+    FragmentNotFoundError,
+    InvalidDocuments,
+    NoDocumentsFoundError,
+    NoScalarEquivalentDefined,
 )
 from turms.registry import ClassRegistry
 
@@ -54,22 +64,6 @@ commentline_regex = re.compile(r"^.*#(.*)")
 #: operation: graphql-core puts the operation's `loc.start` on the last of them, so slicing
 #: forward from there would keep that line alone and drop the rest of the block.
 comment_only_regex = re.compile(r"^\s*#")
-
-
-class FragmentNotFoundError(GenerationError):
-    pass
-
-
-class NoDocumentsFoundError(GenerationError):
-    pass
-
-
-class InvalidDocuments(GenerationError):
-    pass
-
-
-class NoScalarEquivalentDefined(GenerationError):
-    pass
 
 
 def merge_body_sequences(
@@ -101,10 +95,62 @@ def target_from_node(node: FieldNode) -> str:
     )
 
 
+def capitalize_first(name: str) -> str:
+    """Upper-case the first character, leaving the rest alone.
+
+    ``str.capitalize`` also lower-cases the remainder, which turned a field
+    ``myField`` into the class ``Myfield`` instead of ``MyField``.
+    """
+    if not name:
+        return name
+    return name[0].upper() + name[1:]
+
+
+def field_is_conditional(node: Union[FieldNode, InlineFragmentNode]) -> bool:
+    """Whether ``@skip`` / ``@include`` can make this selection absent.
+
+    Accepts a field or an inline fragment: a directive on the fragment applies
+    to every field inside it.
+
+    A conditionally-included field must be generated as ``Optional[...] = None``
+    regardless of the schema's nullability: when the directive excludes it, the
+    server simply omits the key and a required field would fail validation.
+
+    Literal conditions that can never exclude the field (``@skip(if: false)``,
+    ``@include(if: true)``) are recognised so they do not widen the type
+    needlessly.
+    """
+    for directive in node.directives:
+        name = directive.name.value
+        if name not in ("skip", "include"):
+            continue
+
+        condition = next(
+            (arg.value for arg in directive.arguments if arg.name.value == "if"),
+            None,
+        )
+        if isinstance(condition, BooleanValueNode):
+            always_present = (
+                condition.value is False if name == "skip" else condition.value is True
+            )
+            if always_present:
+                continue
+
+        return True
+
+    return False
+
+
 def non_typename_fields(
-    node: FieldNode | FragmentDefinitionNode,
+    node: FieldNode | FragmentDefinitionNode | OperationDefinitionNode,
 ) -> List[FieldNode | SelectionNode]:
-    """Returns all fields in a FieldNode that are not __typename"""
+    """Returns all selections on a node that are not __typename.
+
+    ``__typename`` is re-emitted separately as a ``Literal`` discriminator
+    (see ``generate_typename_field``), so it must never reach the ordinary
+    field path -- as a class attribute the leading double underscore would be
+    name-mangled and silently dropped by pydantic.
+    """
     if not node.selection_set:
         return []
     return [
@@ -792,9 +838,11 @@ def recurse_type_label(
     raise NotImplementedError("Not implemented for this type")
 
 
-def parse_value_node(value_node: ValueNode) -> Union[None, str, int, float, bool]:
-    """Parses a Value Node into a Python value
-    using standard types
+ParsedValue = Union[None, str, int, float, bool, List["ParsedValue"], dict]
+
+
+def parse_value_node(value_node: ValueNode) -> ParsedValue:
+    """Parses a Value Node into a Python value using standard types.
 
     Args:
         value_node (ValueNode): The Argument Value Node
@@ -803,7 +851,7 @@ def parse_value_node(value_node: ValueNode) -> Union[None, str, int, float, bool
         NotImplementedError: If the Value Node is not supported
 
     Returns:
-        Union[None, str, int, float, bool]: The parsed value
+        ParsedValue: The parsed value
     """
     if isinstance(value_node, IntValueNode):
         return int(value_node.value)
@@ -812,11 +860,25 @@ def parse_value_node(value_node: ValueNode) -> Union[None, str, int, float, bool
     elif isinstance(value_node, StringValueNode):
         return value_node.value
     elif isinstance(value_node, BooleanValueNode):
-        return value_node.value == "true"
+        # graphql-core already gives us a bool here; comparing it to the string
+        # "true" silently made every literal `true` come out as False.
+        return bool(value_node.value)
+    elif isinstance(value_node, EnumValueNode):
+        # The member name, which is what the generated Enum is keyed by.
+        return value_node.value
+    elif isinstance(value_node, ListValueNode):
+        return [parse_value_node(item) for item in value_node.values]
+    elif isinstance(value_node, ObjectValueNode):
+        return {
+            field.name.value: parse_value_node(field.value)
+            for field in value_node.fields
+        }
     elif isinstance(value_node, NullValueNode):
         return None
     else:
-        raise NotImplementedError(f"Cannot parse {value_node}")
+        raise NotImplementedError(
+            f"Cannot parse {type(value_node).__name__}: {print_ast(value_node)}"
+        )
 
 
 def convert_default_value_to_ast(value):

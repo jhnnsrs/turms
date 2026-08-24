@@ -42,7 +42,7 @@ turms is a **development-time tool only**: the generated code depends on Pydanti
 ## Features
 
 - **Fully typed, fully documented** code generation — GraphQL descriptions become docstrings, deprecations become warnings
-- **Client-side generation** from documents: enums, inputs, fragments and operations as Pydantic models (v2 and v1)
+- **Client-side generation** from documents: enums, inputs, fragments and operations as Pydantic v2 models
 - **Server-side generation** from SDL schemas: typed [Strawberry](https://strawberry.rocks/) scaffolds with resolver stubs
 - **Operation functions** — call `get_capsules()` instead of assembling query strings (sync and async, via the funcs plugin)
 - **Transport agnostic** — works with [rath](https://github.com/jhnnsrs/rath), [gql](https://github.com/graphql-python/gql), or any HTTP client you like
@@ -259,7 +259,7 @@ turms complies with [graphql-config](https://www.graphql-config.com/docs/user/us
 | `skip_forwards` | `false` | Skip generating forward-reference updates |
 | `type_annotation_style` | `"auto"` | How annotations are spelled: `auto` (derived from `min_python_version`), `modern` (`list[X] | None`), or `legacy` (`Optional[List[X]]`) |
 | `min_python_version` | `"3.10"` | Oldest Python the generated code must run on — drives `type_annotation_style: auto` |
-| `omited_document_rules` | `[]` | GraphQL validation rules to skip for documents |
+| `omitted_document_rules` | `[]` | GraphQL validation rules to skip for documents |
 | `dump_schema` / `dump_configuration` | `false` | Also write the resolved schema / project config next to the output |
 
 Every option can also be supplied through environment variables with the `TURMS_` prefix (e.g. `TURMS_OUT_DIR=generated`), courtesy of Pydantic settings.

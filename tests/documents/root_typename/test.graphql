@@ -1,0 +1,6 @@
+query RootTypename($order: HelloWorldOrder!) {
+  __typename
+  hello(orderBy: $order) {
+    message
+  }
+}

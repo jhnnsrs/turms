@@ -36,8 +36,7 @@ project:
             generate_enums: True # should we generate enums
             generate_types: True # should we generate types (objects, queries, mutations, subscriptiosn)
             generate_inputs: True # should we generate input types
-            types_bases: [] # additional type bases
-            inputtype_bases: [] # additional inputtype bases
+            input_bases: [] # additional input type bases
             skip_underscore: False # skip generated underscored types
             skip_double_underscore: True # skip generatind double underscored types
 ```

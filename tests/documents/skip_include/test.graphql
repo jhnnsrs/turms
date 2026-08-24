@@ -1,0 +1,13 @@
+query Conditional($hide: Boolean!, $show: Boolean!) {
+  hello(orderBy: ASC) {
+    skipped: message @skip(if: $hide)
+    included: message @include(if: $show)
+    always: message
+  }
+}
+
+query LiteralAlwaysPresent {
+  hello(orderBy: ASC) {
+    message @skip(if: false)
+  }
+}

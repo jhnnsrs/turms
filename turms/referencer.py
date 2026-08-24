@@ -29,15 +29,11 @@ from graphql import GraphQLSchema
 
 class ReferenceRegistry:
     def __init__(self):
-        self.objects: Set[str] = set()
         self.fragments: Set[str] = set()
         self.enums: Set[str] = set()
         self.inputs: Set[str] = set()
         self.scalars: Set[str] = set()
         self.operations: Set[str] = set()
-
-    def register_type(self, type_name: str):
-        self.objects.add(type_name)
 
     def register_fragment(self, type_name: str):
         self.fragments.add(type_name)
@@ -76,6 +72,14 @@ def recurse_find_references(
 
             elif isinstance(sub_node, InlineFragmentNode):
                 for sub_sub_node in sub_node.selection_set.selections:
+                    if isinstance(sub_sub_node, FragmentSpreadNode):
+                        # Without this the fragment looks unreferenced, and
+                        # skip_unreferenced (on by default) prunes the enums and
+                        # inputs only it reaches -- leaving the generated module
+                        # referencing classes that were never emitted.
+                        registry.register_fragment(sub_sub_node.name.value)
+                        continue
+
                     if isinstance(sub_sub_node, FieldNode):
                         sub_sub_node_type = client_schema.get_type(
                             sub_node.type_condition.name.value
@@ -223,6 +227,10 @@ def create_reference_registry_from_documents(
     for fragment in fragments.values():
         type = schema.get_type(fragment.type_condition.name.value)
         for selection in fragment.selection_set.selections:
+            if isinstance(selection, FragmentSpreadNode):
+                registry.register_fragment(selection.name.value)
+                continue
+
             if isinstance(selection, FieldNode):
                 # definition
                 if selection.name.value == "__typename":
@@ -238,6 +246,10 @@ def create_reference_registry_from_documents(
             elif isinstance(selection, InlineFragmentNode):
                 sub_type = schema.get_type(selection.type_condition.name.value)
                 for sub_selection in selection.selection_set.selections:
+                    if isinstance(sub_selection, FragmentSpreadNode):
+                        registry.register_fragment(sub_selection.name.value)
+                        continue
+
                     if isinstance(sub_selection, FieldNode):
                         if sub_selection.name.value == "__typename":
                             continue
@@ -256,6 +268,10 @@ def create_reference_registry_from_documents(
             recurse_type_annotation(argument, argument.type, schema, registry)
 
         for selection in operation.selection_set.selections:
+            if isinstance(selection, FragmentSpreadNode):
+                registry.register_fragment(selection.name.value)
+                continue
+
             if isinstance(selection, FieldNode):
                 # definition
                 if selection.name.value == "__typename":

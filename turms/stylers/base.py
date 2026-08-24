@@ -1,7 +1,9 @@
 from abc import abstractmethod
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from turms.config import LogFunction, print_logger
 
 
 class StylerConfig(BaseSettings):
@@ -19,7 +21,14 @@ class Styler(BaseModel):
     style the fieldname in the generated python code and an alias will be added to the field.
     """
 
+    # LogFunction is a Protocol, so pydantic needs this to accept it as a field.
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     config: StylerConfig
+
+    #: turms passes this to every component it constructs (see turms.run);
+    #: without the field pydantic would silently drop it.
+    log: LogFunction = Field(default=print_logger)
 
     @abstractmethod
     def style_subscription_name(self, name: str) -> str:

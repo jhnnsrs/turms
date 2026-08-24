@@ -34,6 +34,7 @@ from turms.config import GeneratorConfig, PythonType
 from turms.plugins.base import Plugin, PluginConfig
 from turms.registry import ClassRegistry
 from turms.utils import (
+    capitalize_first,
     inspect_operation_for_documentation,
     is_oneof_input_type,
     non_typename_fields,
@@ -45,7 +46,6 @@ from turms.utils import (
     target_from_node,
 )
 from graphql import (
-    GraphQLInputObjectType,
     GraphQLList,
     GraphQLNonNull,
     GraphQLScalarType,
@@ -82,7 +82,6 @@ class FuncsPluginConfig(PluginConfig):
     prepend_sync: str = ""
     prepend_async: str = "a"
     collapse_lonely: bool = True
-    generate_protocol: bool = False
     global_args: List[Arg] = []
     global_kwargs: List[Kwarg] = []
     definitions: List[FunctionDefinition] = []
@@ -309,8 +308,6 @@ def generate_input_type_descriptions(
     description = ""
 
     for value_key, value in input_type.fields.items():
-        field_name = registry.generate_node_name(value_key)
-
         description += f"    {registry.generate_parameter_name(value_key)}: {value.description or generate_input_description(value.type, registry)}\n"
 
     return description
@@ -767,7 +764,7 @@ def get_return_type_annotation(
         return recurse_outputtype_annotation(
             field_definition.type,
             registry,
-            overwrite_final=f"{o_name}{field_name.capitalize()}",
+            overwrite_final=f"{o_name}{capitalize_first(field_name)}",
         )
 
     return ast.Name(
@@ -825,7 +822,7 @@ def get_return_type_string(
         return recurse_outputtype_label(
             potential_return_type.type,
             registry,
-            overwrite_final=f"{o_name}{potential_return_field.name.value.capitalize()}",
+            overwrite_final=f"{o_name}{capitalize_first(potential_return_field.name.value)}",
         )
 
     else:

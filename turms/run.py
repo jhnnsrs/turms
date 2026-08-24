@@ -20,6 +20,7 @@ from turms.config import (
     GraphQLProject,
     SchemaType,
     LogFunction,
+    print_logger,
 )
 from turms.helpers import (
     load_introspection_from_glob,
@@ -34,11 +35,9 @@ from turms.parsers.base import Parser
 from turms.processors.base import Processor
 from turms.registry import ClassRegistry
 from turms.stylers.base import Styler
-from pydantic import ValidationError
 
 from .errors import GenerationError
 import json
-import os
 
 
 try:
@@ -269,7 +268,7 @@ def gen(
                 f"-------------- Generating project: {key} --------------"
             )
 
-            generated_code = generate(project)
+            generated_code, schema = generate(project)
 
             write_code_to_file(
                 generated_code,
@@ -278,11 +277,6 @@ def gen(
             )
 
             if project.extensions.turms.dump_schema:
-                schema = build_schema_from_schema_type(
-                    project.schema_url,
-                    allow_introspection=project.extensions.turms.allow_introspection,
-                )
-
                 write_schema_to_file(
                     schema,
                     project.extensions.turms.out_dir,
@@ -469,9 +463,7 @@ def generate(
         str: The generated code
     """
     if not log:
-
-        def log(x, **kwargs):
-            return print(x)
+        log = print_logger
 
     gen_config = project.extensions.turms
 
@@ -542,7 +534,7 @@ def generate_ast(
     plugins: Optional[List[Plugin]] = None,
     stylers: Optional[List[Styler]] = None,
     skip_forwards: bool = False,
-    log: LogFunction = lambda *args, **kwargs: print,
+    log: LogFunction = print_logger,
 ) -> List[ast.AST]:
     """Generates the ast from the schema
 
@@ -588,7 +580,7 @@ def parse_ast(
     config: GeneratorConfig,
     ast: List[ast.AST],
     parsers: Optional[List[Parser]] = None,
-    log: LogFunction = lambda *args, **kwargs: print,
+    log: LogFunction = print_logger,
 ) -> List[ast.AST]:
     """Parses the ast with the plugins
 
@@ -621,7 +613,7 @@ def process_code(
     config: GeneratorConfig,
     code: List[ast.AST],
     processors: Optional[List[Processor]] = None,
-    log: LogFunction = lambda *args, **kwargs: print,
+    log: LogFunction = print_logger,
 ) -> List[ast.AST]:
     """Parses the ast with the plugins
 
@@ -657,7 +649,7 @@ def generate_code(
     stylers: Optional[List[Styler]] = None,
     parsers: Optional[List[Parser]] = None,
     processors: Optional[List[Processor]] = None,
-    log: LogFunction = lambda *args, **kwargs: print,
+    log: LogFunction = print_logger,
 ) -> str:
     generated_ast = generate_ast(
         config,

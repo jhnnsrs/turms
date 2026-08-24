@@ -17,7 +17,7 @@ project:
       turms:
         plugins:
           - type: turms.plugins.inputs.InputsPlugin
-            inputtype_bases: #List[str] = ["pydantic.BaseModel"]
+            input_bases: #List[str] = ["pydantic.BaseModel"]
             skip_underscore: #bool = True
 ```
 

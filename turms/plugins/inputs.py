@@ -11,12 +11,11 @@ from graphql import (
 )
 from turms.errors import GenerationError
 from pydantic_settings import SettingsConfigDict
-from turms.plugins.base import Plugin, PluginConfig
+from turms.plugins.base import Plugin, PluginConfig, rename_deprecated_keys
 import ast
 from typing import Any, Dict, List, Optional
 from turms.config import GeneratorConfig
 from graphql import GraphQLSchema
-from turms.plugins.base import Plugin
 from pydantic import Field, model_validator
 from graphql.type.definition import (
     GraphQLEnumType,
@@ -40,9 +39,14 @@ class InputsPluginConfig(PluginConfig):
         extra="forbid", env_prefix="TURMS_PLUGINS_INPUTS_"
     )
     type: str = "turms.plugins.inputs.InputsPlugin"
-    inputtype_bases: List[str] = ["pydantic.BaseModel"]
+    input_bases: List[str] = ["pydantic.BaseModel"]
     skip_underscore: bool = True
     skip_unreferenced: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def _rename_deprecated(cls, values: Any) -> Any:
+        return rename_deprecated_keys(values, {"inputtype_bases": "input_bases"})
 
     @model_validator(mode="before")
     @classmethod
@@ -364,7 +368,7 @@ def generate_input_type(
         bases=additional_bases
         + [
             ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-            for base in plugin_config.inputtype_bases
+            for base in plugin_config.input_bases
         ],
         decorator_list=[],
         keywords=[],
@@ -483,7 +487,7 @@ def generate_oneof_wrapper_input(
                 bases=additional_bases
                 + [
                     ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                    for base in plugin_config.inputtype_bases
+                    for base in plugin_config.input_bases
                 ],
                 decorator_list=[],
                 keywords=[],
@@ -584,7 +588,7 @@ def generate_inputs(
     else:
         ref_registry = None
 
-    for base in plugin_config.inputtype_bases:
+    for base in plugin_config.input_bases:
         registry.register_import(base)
 
     union_input_types = {}
@@ -815,7 +819,7 @@ def generate_inputs(
                 bases=additional_bases
                 + [
                     ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                    for base in plugin_config.inputtype_bases
+                    for base in plugin_config.input_bases
                 ],
                 decorator_list=[],
                 keywords=[],
@@ -848,7 +852,7 @@ class InputsPlugin(Plugin):
         config: GeneratorConfig,
         registry: ClassRegistry,
     ) -> List[ast.AST]:
-        for base in self.config.inputtype_bases:
+        for base in self.config.input_bases:
             registry.register_import(base)
 
         return generate_inputs(client_schema, config, self.config, registry)

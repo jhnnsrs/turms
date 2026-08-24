@@ -11,9 +11,10 @@ from graphql.type.definition import (
 from turms.referencer import create_reference_registry_from_documents
 from turms.utils import parse_documents
 from turms.registry import ClassRegistry
+from turms.errors import GenerationError
 
 
-class EnumsPluginsError(Exception):
+class EnumsPluginsError(GenerationError):
     pass
 
 

@@ -272,3 +272,29 @@ def test_removed_polyfill_parser_names_itself():
 def test_eol_python_targets_are_rejected(version):
     with pytest.raises(ValidationError):
         GeneratorConfig(min_python_version=version)
+
+
+def test_omited_document_rules_is_a_deprecated_alias():
+    """The public key was misspelled; the old spelling still loads, with a warning."""
+    import warnings
+
+    from turms.config import GeneratorConfig
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        config = GeneratorConfig(omited_document_rules=["known_directives"])
+
+    assert config.omitted_document_rules == ["known_directives"]
+    assert any(issubclass(w.category, DeprecationWarning) for w in caught)
+
+
+def test_omited_and_omitted_together_is_an_error():
+    import pytest as _pytest
+
+    from turms.config import GeneratorConfig
+
+    with _pytest.raises(ValueError, match="not both"):
+        GeneratorConfig(
+            omited_document_rules=["known_directives"],
+            omitted_document_rules=["scalar_leafs"],
+        )

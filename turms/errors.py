@@ -4,7 +4,7 @@ class TurmsError(Exception):
     pass
 
 
-class RegistryError(Exception):
+class RegistryError(TurmsError):
     """Base class for all registry errors"""
 
     pass
@@ -32,5 +32,29 @@ class NoEnumFound(RegistryError):
 
 class GenerationError(TurmsError):
     """Base class for all generation errors"""
+
+    pass
+
+
+class FragmentNotFoundError(GenerationError):
+    """Raised when a document spreads a fragment that was never defined."""
+
+    pass
+
+
+class NoDocumentsFoundError(GenerationError):
+    """Raised when a documents glob matches no files."""
+
+    pass
+
+
+class InvalidDocuments(GenerationError):
+    """Raised when the documents fail GraphQL validation against the schema."""
+
+    pass
+
+
+class NoScalarEquivalentDefined(GenerationError):
+    """Raised when a scalar has no python equivalent in ``scalar_definitions``."""
 
     pass

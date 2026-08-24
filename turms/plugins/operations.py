@@ -3,29 +3,29 @@ from typing import Any, List, Optional
 
 from pydantic_settings import SettingsConfigDict
 from turms.config import GeneratorConfig
-from graphql import GraphQLSchema, InputObjectTypeDefinitionNode
+from graphql import GraphQLSchema
 from graphql.language.ast import OperationDefinitionNode, OperationType
 from turms.recurse import type_field_node
 from turms.plugins.base import Plugin, PluginConfig
 from pydantic import Field, model_validator
 from graphql.language.ast import (
     FieldNode,
-    OperationDefinitionNode,
-    OperationType,
 )
 from graphql.utilities.get_operation_root_type import get_operation_root_type
 from graphql.utilities.type_info import get_field_def
 
 import re
-from graphql import NonNullTypeNode, VariableDefinitionNode, language
+from graphql import NonNullTypeNode, language
 from turms.registry import ClassRegistry
 from turms.utils import (
     annotate_field_metadata,
     generate_alias_keywords,
     generate_pydantic_config,
+    generate_typename_field,
     inspect_operation_for_documentation,
     merge_bases_sequences,
     merge_body_sequences,
+    non_typename_fields,
     parse_documents,
     parse_value_node,
     recurse_type_annotation,
@@ -241,9 +241,19 @@ def generate_operation(
             )
         )
 
+    # A ``__typename`` selected at the operation root gets the same Literal
+    # discriminator treatment as a nested object's. Letting it through the
+    # ordinary field path below would emit a literal ``__typename`` attribute,
+    # which python name-mangles and pydantic then drops as a private attribute.
+    if any(
+        isinstance(selection, FieldNode) and selection.name.value == "__typename"
+        for selection in o.selection_set.selections
+    ):
+        class_body_fields.append(generate_typename_field(x.name, registry, config))
+
     operation_annotations: list[ast.AnnAssign] = []
 
-    for field_node in o.selection_set.selections:
+    for field_node in non_typename_fields(o):
         if isinstance(field_node, FieldNode):
             field_definition = get_field_def(client_schema, x, field_node)
             assert field_definition, "Couldn't find field definition"

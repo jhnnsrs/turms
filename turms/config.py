@@ -1,3 +1,4 @@
+import warnings
 import builtins
 from graphql import ASTValidationRule
 from pydantic import (
@@ -81,14 +82,6 @@ class GraphQLTypes(str, Enum):
     DIRECTIVE = "directive"
 
 
-class LogLevel(str, Enum):
-    DEBUG = "DEBUG"
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-    CRITICAL = "CRITICAL"
-
-
 @runtime_checkable
 class LogFunction(Protocol):
     def __call__(
@@ -97,6 +90,14 @@ class LogFunction(Protocol):
         level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO",
     ) -> None:
         pass
+
+
+def print_logger(
+    message: str,
+    level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO",
+) -> None:
+    """The default LogFunction: writes to stdout."""
+    print(f"[{level}] {message}")
 
 
 class FreezeConfig(BaseModel):
@@ -291,6 +292,29 @@ class GeneratorConfig(BaseSettings):
     )
     @model_validator(mode="before")
     @classmethod
+    def _rename_omited_document_rules(cls, values: Any) -> Any:
+        """``omited_document_rules`` was a typo; accept it with a warning.
+
+        Done here rather than with a validation alias because an alias on a
+        ``BaseSettings`` field replaces the ``TURMS_`` env-var name too.
+        """
+        if isinstance(values, dict) and "omited_document_rules" in values:
+            if "omitted_document_rules" in values:
+                raise ValueError(
+                    "Set either 'omitted_document_rules' or its deprecated "
+                    "spelling 'omited_document_rules', not both."
+                )
+            warnings.warn(
+                "'omited_document_rules' is a misspelling and is deprecated; "
+                "rename it to 'omitted_document_rules'.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            values["omitted_document_rules"] = values.pop("omited_document_rules")
+        return values
+
+    @model_validator(mode="before")
+    @classmethod
     def _drop_pydantic_version(cls, values: Any) -> Any:
         """``pydantic_version`` is a dead key: turms only targets pydantic v2.
 
@@ -433,7 +457,7 @@ class GeneratorConfig(BaseSettings):
     force_plugin_order: bool = True
     "Should the plugins be forced to run in the order they are defined"
 
-    omited_document_rules: List[str] = Field(
+    omitted_document_rules: List[str] = Field(
         default_factory=list,
         description="List of rules to omit from the document validation. This is useful if you want to skip certain rules that are not relevant for your use case.",
     )
@@ -509,9 +533,9 @@ class GeneratorConfig(BaseSettings):
 
         return v
 
-    @field_validator("omited_document_rules", mode="after")
-    def validate_omited_document_rules(cls, v: List[str]) -> List[str]:
-        """Validate that the omited document rules are valid"""
+    @field_validator("omitted_document_rules", mode="after")
+    def validate_omitted_document_rules(cls, v: List[str]) -> List[str]:
+        """Validate that the omitted document rules are valid"""
         for rule in v:
             if rule not in specified_rules_map:
                 raise ValueError(
@@ -540,7 +564,7 @@ class GeneratorConfig(BaseSettings):
         """Get the schema rules to use for validation"""
         rules = []
         for key, rule in specified_rules_map.items():
-            if key in self.omited_document_rules:
+            if key in self.omitted_document_rules:
                 continue
             rules.append(rule)
         return rules

@@ -98,7 +98,7 @@ validated by pydantic — unknown keys are rejected, so typos fail loudly.
 | `additional_bases` | `Dict[str, List[str]]` | `{}` | Extra base classes per GraphQL type name (dotted import paths) |
 | `additional_config` | `Dict[str, Dict]` | `{}` | Extra pydantic config attributes per GraphQL type name |
 | `force_plugin_order` | `bool` | `true` | Run plugins strictly in their configured order |
-| `omited_document_rules` | `List[str]` | `[]` | GraphQL document validation rules to skip |
+| `omitted_document_rules` | `List[str]` | `[]` | GraphQL document validation rules to skip |
 
 ### Scalar definitions
 
@@ -202,7 +202,6 @@ freeze:
 | `enabled` | `false` | Enable freezing |
 | `types` | `[input, fragment, object]` | Which GraphQL kinds to freeze |
 | `include` / `exclude` | – | Explicit type-name allow/deny lists |
-| `include_fields` / `exclude_fields` | `[]` | Field-level allow/deny lists |
 | `convert_list_to_tuple` | `true` | Convert `List[...]` annotations to `Tuple[..., ...]` |
 
 ### Pydantic options (`options`)
@@ -282,9 +281,9 @@ Because components are resolved by import path, **your own classes work the same
 | Plugin | Key options (default) |
 | --- | --- |
 | `turms.plugins.enums.EnumsPlugin` | `skip_underscore` (false), `skip_double_underscore` (true), `skip_unreferenced` (true), `prepend`/`append` ("") |
-| `turms.plugins.inputs.InputsPlugin` | `inputtype_bases` (["pydantic.BaseModel"]), `skip_underscore` (true), `skip_unreferenced` (true) |
-| `turms.plugins.objects.ObjectsPlugin` | `types_bases` (["pydantic.BaseModel"]), `skip_underscore` (false), `skip_double_underscore` (true) |
-| `turms.plugins.fragments.FragmentsPlugin` | `fragment_bases` ([]), `fragments_glob`, `add_documentation` (true), `generate_meta_class` (true) |
+| `turms.plugins.inputs.InputsPlugin` | `input_bases` (["pydantic.BaseModel"]), `skip_underscore` (true), `skip_unreferenced` (true) |
+| `turms.plugins.objects.ObjectsPlugin` | `object_bases` (["pydantic.BaseModel"]), `skip_underscore` (false), `skip_double_underscore` (true) |
+| `turms.plugins.fragments.FragmentsPlugin` | `fragment_bases` ([]), `fragments_glob`, `extract_documentation` (true), `generate_meta_class` (true) |
 | `turms.plugins.operations.OperationsPlugin` | `query_bases`/`mutation_bases`/`subscription_bases` ([]), `operations_glob`, `create_arguments` (true), `extract_documentation` (true), `arguments_populate_by_name` (false) |
 | `turms.plugins.funcs.FuncsPlugin` | `definitions` ([]), `global_args`/`global_kwargs` ([]), `prepend_sync` (""), `prepend_async` ("a"), `collapse_lonely` (true), `expand_input_types` ([]), `coercible_scalars` (\{\}) |
 | `turms.plugins.input_funcs.InputFuncsPlugin` | `coercible_scalars` (\{\}), `skip_underscore` (true), `skip_unreferenced` (true), `prepend` (""), `extract_documentation` (true) — see [Input Funcs](plugins/inputfuncs) |

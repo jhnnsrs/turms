@@ -113,13 +113,13 @@ def test_interface_fragment_with_extra_field_inherits_implementation(
     for node in generated_ast:
         if (
             isinstance(node, ast.ClassDef)
-            and node.name == "CreateLayerWithStatusCreatelayer"
+            and node.name == "CreateLayerWithStatusCreateLayer"
         ):
             base_names = {b.id for b in node.bases if isinstance(b, ast.Name)}
             assert "LayerImageLayer" in base_names
             break
     else:
-        raise AssertionError("CreateLayerWithStatusCreatelayer not generated")
+        raise AssertionError("CreateLayerWithStatusCreateLayer not generated")
 
 
 def test_interface_field_still_produces_union(interface_fragment_collapse_schema):
@@ -129,3 +129,19 @@ def test_interface_field_still_produces_union(interface_fragment_collapse_schema
     annotation = _class_field_annotation(generated_ast, "GetLayer", "layer")
     assert "|" in annotation
     assert "discriminator" in annotation
+
+
+def test_generated_class_names_preserve_inner_capitals():
+    """``str.capitalize`` also lower-cased the remainder of the name.
+
+    A field ``createLayer`` produced the class ``...Createlayer`` rather than
+    ``...CreateLayer``. Both recurse.py and funcs.py build these names, and they
+    must agree or the generated functions reference classes that do not exist.
+    """
+    from turms.utils import capitalize_first
+
+    assert capitalize_first("createLayer") == "CreateLayer"
+    assert capitalize_first("flowNodes") == "FlowNodes"
+    assert capitalize_first("URLField") == "URLField"
+    assert capitalize_first("message") == "Message"
+    assert capitalize_first("") == ""

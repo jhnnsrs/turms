@@ -1,10 +1,10 @@
 import ast
 from keyword import iskeyword
-from typing import Callable, Dict, List, Optional, Set, Type
+from typing import Callable, Dict, List, Optional, Set
 
-from graphql import DocumentNode, GraphQLNamedType
+from graphql import GraphQLNamedType
 
-from turms.config import GeneratorConfig, LogFunction, PythonType
+from turms.config import GeneratorConfig, LogFunction
 from turms.errors import (
     NoEnumFound,
     NoInputTypeFound,
@@ -246,7 +246,6 @@ class ClassRegistry(object):
         self.subscription_class_map: Dict[str, str] = {}
         self.mutation_class_map: Dict[str, str] = {}
 
-        self.registered_interfaces_fragments: Dict[str, ast.AST] = {}
         self.registered_union_fragments: Dict[str, str] = {}
         self.forward_references: Set[str] = set()
         self.fragment_type_map: Dict[str, GraphQLNamedType] = {}
@@ -321,8 +320,6 @@ class ClassRegistry(object):
         the top of the generated module. Deduplicated via the builtins set."""
         self._builtins.add(typename)
 
-    def get_enum_class(self, typename: str) -> str:
-        return self.enum_class_map[typename]
 
     def reference_enum(
         self, typename: str, parent: str, allow_forward: bool = True
@@ -510,17 +507,6 @@ class ClassRegistry(object):
             f"{list(implementation_map)}."
         )
 
-    def is_interface_fragment(self, typename: str):
-        return typename in self.registered_interfaces_fragments
-
-    def reference_interface_fragment(
-        self, typename: str, parent: str, allow_forward: bool = True
-    ) -> ast.AST:
-        return self.registered_interfaces_fragments[typename]
-
-    def register_interface_fragment(self, typename: str, ast: ast.AST):
-        self.registered_interfaces_fragments[typename] = ast
-
     def inherit_fragment(self, typename: str, allow_forward: bool = True) -> str:
         if typename not in self.fragment_class_map:
             raise RegistryError(
@@ -561,17 +547,6 @@ class ClassRegistry(object):
         self.query_class_map[typename] = classname
         return classname
 
-    def reference_query(
-        self, typename: str, parent: str, allow_forward: bool = True
-    ) -> ast.AST:
-        return self._reference_generic(
-            typename,
-            parent,
-            self.style_query_class,
-            self.query_class_map,
-            "Query",
-            allow_forward,
-        )
 
     def style_mutation_class(self, typename: str):
         for styler in self.stylers:
@@ -588,17 +563,6 @@ class ClassRegistry(object):
         self.mutation_class_map[typename] = classname
         return classname
 
-    def reference_mutation(
-        self, typename: str, parent: str, allow_forward: bool = True
-    ) -> ast.AST:
-        return self._reference_generic(
-            typename,
-            parent,
-            self.style_mutation_class,
-            self.mutation_class_map,
-            "Mutation",
-            allow_forward,
-        )
 
     def style_subscription_class(self, typename: str):
         for styler in self.stylers:
@@ -615,17 +579,6 @@ class ClassRegistry(object):
         self.subscription_class_map[typename] = classname
         return classname
 
-    def reference_subscription(
-        self, typename: str, parent: str, allow_forward: bool = True
-    ) -> ast.AST:
-        return self._reference_generic(
-            typename,
-            parent,
-            self.style_subscription_class,
-            self.subscription_class_map,
-            "Subscription",
-            allow_forward,
-        )
 
     def register_import(self, name: str) -> None:
         if name in ("bool", "str", "int", "float", "dict", "list", "tuple"):
@@ -779,4 +732,4 @@ class ClassRegistry(object):
         )
 
     def warn(self, message: str) -> None:
-        self.log(message, level="WARN")
+        self.log(message, level="WARNING")

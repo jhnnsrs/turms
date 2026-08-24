@@ -16,7 +16,7 @@ project:
     extensions:
       turms:
         plugins:
-          - type: turms.plugins.inputs.InputsPlugin
+          - type: turms.plugins.fragments.FragmentsPlugin
             fragment_bases: #List[str] = None
             fragments_glob: #Optional[str] a glob for fragments
 ```

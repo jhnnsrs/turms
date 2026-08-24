@@ -27,7 +27,7 @@ project:
     extensions:
       turms:
         plugins:
-          - type: turms.plugins.operations.OperationsPlugin
+          - type: turms.plugins.funcs.FuncsPlugin
             prepend_sync: ""
             prepend_async: "a"
             collapse_lonely: True #bool = True Collapses one operation query and return the collapsed type

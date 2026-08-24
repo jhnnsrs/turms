@@ -1,4 +1,3 @@
-from enum import Enum
 import importlib.util
 import os
 from typing import Any, Callable, Dict
@@ -30,13 +29,6 @@ from functools import wraps
 click.rich_click.USE_RICH_MARKUP = True
 
 directory = os.getcwd()
-
-
-class TurmsOptions(str, Enum):
-    GEN = "gen"
-    INIT = "init"
-    DOWNLOAD = "download"
-    WATCH = "watch"
 
 
 logo = r"""
@@ -226,7 +218,7 @@ def generate_projects(projects: Dict[str, GraphQLProject], title: str = "Turms")
             live.update(panel)
 
             def log(message: str, level: str = "INFO"):
-                if level == "WARN":
+                if level == "WARNING":
                     project_tree.add(Tree(message, style="yellow"))
 
             try:

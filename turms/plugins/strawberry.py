@@ -1,7 +1,5 @@
 from graphql import (
     BooleanValueNode,
-    ConstListValueNode,
-    ConstObjectValueNode,
     ConstValueNode,
     EnumValueNode,
     FloatValueNode,
@@ -25,12 +23,12 @@ from graphql import (
 )
 from pydantic_settings import SettingsConfigDict
 
-from turms.plugins.base import Plugin, PluginConfig
+from turms.plugins.base import Plugin, PluginConfig, rename_deprecated_keys
 import ast
-from typing import Dict, List, Protocol, runtime_checkable
+from typing import Any, Dict, List, Protocol, runtime_checkable
 from turms.config import GeneratorConfig, ImportableFunctionMixin
 from graphql.utilities.build_client_schema import GraphQLSchema
-from pydantic import Field
+from pydantic import Field, model_validator
 from graphql.type.definition import (
     GraphQLEnumType,
 )
@@ -361,7 +359,7 @@ def default_generate_enums(
 
 class StrawberryPluginConfig(PluginConfig):
     model_config = SettingsConfigDict(env_prefix="TURMS_PLUGINS_STRAWBERRY_")
-    type: str = "turms.plugins.strawberry.Strawberry"
+    type: str = "turms.plugins.strawberry.StrawberryPlugin"
     generate_directives: bool = True
     generate_scalars: bool = True
     builtin_directives: List[str] = [
@@ -375,8 +373,12 @@ class StrawberryPluginConfig(PluginConfig):
     generate_enums: bool = True
     generate_types: bool = True
     generate_inputs: bool = True
-    types_bases: List[str] = []
-    inputtype_bases: List[str] = []
+    input_bases: List[str] = []
+
+    @model_validator(mode="before")
+    @classmethod
+    def _rename_deprecated(cls, values: Any) -> Any:
+        return rename_deprecated_keys(values, {"inputtype_bases": "input_bases"})
     skip_underscore: bool = False
     skip_double_underscore: bool = True
 
@@ -814,7 +816,7 @@ def generate_inputs(
                 bases=additional_bases
                 + [
                     ast.Name(id=base.split(".")[-1], ctx=ast.Load())
-                    for base in plugin_config.inputtype_bases
+                    for base in plugin_config.input_bases
                 ],
                 decorator_list=[decorator],
                 keywords=[],
