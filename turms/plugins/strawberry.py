@@ -780,6 +780,33 @@ def generate_inputs(
                     )
                 )
 
+            # A caller may omit this field when it is nullable or carries a
+            # schema default; either way the generated dataclass needs a
+            # Python default so the field isn't a required constructor
+            # argument the caller is forced to pass.
+            has_default = value.default_value is not Undefined
+            omittable = has_default or not isinstance(value.type, GraphQLNonNull)
+
+            if omittable:
+                default = (
+                    convert_default_value_to_ast(value.default_value)
+                    if has_default
+                    else ast.Constant(value=None)
+                )
+
+                needs_factory = isinstance(default, (ast.List, ast.Dict))
+
+                keywords.append(
+                    ast.keyword(
+                        arg="default_factory" if needs_factory else "default",
+                        value=(
+                            ast.Lambda(args=[], body=default)
+                            if needs_factory
+                            else default
+                        ),
+                    )
+                )
+
             if keywords:
                 assign_value = ast.Call(
                     func=ast.Name(
