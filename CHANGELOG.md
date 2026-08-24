@@ -1,6 +1,26 @@
 # CHANGELOG
 
 
+## v2.0.1 (2026-08-24)
+
+### Bug Fixes
+
+- **strawberry**: Give omittable input fields a Python default
+  ([`f389cf9`](https://github.com/jhnnsrs/turms/commit/f389cf9416eeb66f47d5066b2a287d15bc948751))
+
+StrawberryPlugin.generate_inputs() only ever passed description/ deprecation_reason to
+  strawberry.field(...), never reading a field's GraphQL default_value. An input field a caller is
+  allowed to omit - because it's nullable, or because the schema gives it a default - was still
+  generated as a required keyword-only argument on the dataclass. Any client omitting the field
+  crashed construction with a "missing required keyword-only argument" TypeError instead of falling
+  back to null/the schema default.
+
+InputsPlugin (used for client-side codegen) already computes this correctly via
+  has_default/omittable; this mirrors that logic for the server-side StrawberryPlugin, reusing the
+  existing default/default_factory convention from default_generate_directives for mutable
+  (list/dict) defaults.
+
+
 ## v2.0.0 (2026-08-24)
 
 ### Bug Fixes
