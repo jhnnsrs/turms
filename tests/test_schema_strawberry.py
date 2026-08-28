@@ -5,7 +5,7 @@ from turms.run import generate_ast
 from turms.plugins.strawberry import StrawberryPlugin, StrawberryPluginConfig
 from turms.stylers.default import DefaultStyler
 from turms.run import generate_ast
-from .utils import unit_test_with
+from .utils import parse_to_code, unit_test_with
 
 
 @pytest.mark.network
@@ -129,6 +129,35 @@ def test_custom_scalar_generation(scalar_schema):
         ],
         skip_forwards=True,
     )
+
+    unit_test_with(generated_ast, "")
+
+
+def test_resolver_info_argument(arkitekt_schema):
+    config = GeneratorConfig(
+        scalar_definitions={
+            "QString": "str",
+            "Any": "str",
+            "UUID": "pydantic.UUID4",
+            "Callback": "str",
+        }
+    )
+
+    generated_ast = generate_ast(
+        config,
+        arkitekt_schema,
+        stylers=[DefaultStyler()],
+        plugins=[
+            StrawberryPlugin(
+                config=StrawberryPluginConfig(resolver_info_argument=True)
+            ),
+        ],
+        skip_forwards=True,
+    )
+
+    source = parse_to_code(generated_ast)
+    assert "from strawberry.types import Info" in source
+    assert "info: Info" in source
 
     unit_test_with(generated_ast, "")
 
