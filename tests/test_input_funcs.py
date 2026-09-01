@@ -158,3 +158,57 @@ def test_unset_optionals_not_in_dump():
         assert dumped == {'name': 'alice'}, dumped
         """,
     )
+
+
+union_schema_sdl = """
+directive @unionElementOf(union: String!, discriminator: String!, key: String!) repeatable on INPUT_OBJECT
+
+input CpuInput @unionElementOf(union: "MachineInput", discriminator: "kind", key: "cpu") {
+    cores: Int
+}
+
+input GpuInput @unionElementOf(union: "MachineInput", discriminator: "kind", key: "gpu") {
+    vram: Int
+}
+
+input MachineInput {
+    kind: String!
+    cores: Int
+    vram: Int
+}
+
+type Query {
+    hello(machine: MachineInput): String
+}
+"""
+
+
+def test_union_target_factory_validates_through_pydantic():
+    """A ``@unionElementOf`` target is generated as an Annotated union, which
+    is not callable — its factory must validate the collected data through
+    pydantic instead, dispatching to the member class by discriminator."""
+    config = GeneratorConfig()
+    generated = generate_ast(
+        config,
+        build_ast_schema(parse(union_schema_sdl)),
+        stylers=[CapitalizeStyler(), SnakeCaseStyler()],
+        plugins=[
+            InputsPlugin(config=InputsPluginConfig(skip_unreferenced=False)),
+            InputFuncsPlugin(config=InputFuncsPluginConfig(skip_unreferenced=False)),
+        ],
+    )
+    code = parse_to_code(generated)
+    assert "TypeAdapter(MachineInput).validate_python(data)" in code
+    # Member factories stay plain constructions.
+    assert "return CpuInput(**data)" in code
+
+    unit_test_with(
+        generated,
+        """
+        cpu = machine_input(kind="cpu", cores=4)
+        assert type(cpu).__name__ == "CpuInput"
+        assert cpu.cores == 4
+        gpu = machine_input(kind="gpu", vram=8)
+        assert type(gpu).__name__ == "GpuInput"
+        """,
+    )
