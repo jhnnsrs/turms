@@ -54,8 +54,16 @@ def generate_input_func(
     config: GeneratorConfig,
     plugin_config: InputFuncsPluginConfig,
     registry: ClassRegistry,
+    is_union_target: bool = False,
 ) -> ast.FunctionDef:
-    """Builds a factory function that constructs and returns the input model."""
+    """Builds a factory function that constructs and returns the input model.
+
+    ``is_union_target`` marks an input that the InputsPlugin turned into an
+    ``Annotated[... | ..., Field(discriminator=...)]`` union (via
+    ``@unionElementOf`` members). A union alias is not callable, so the
+    factory validates the collected data through pydantic instead — which
+    also dispatches to the right member class by discriminator.
+    """
     class_name = registry.get_inputtype_class(typename)
 
     func_name = plugin_config.prepend + registry.generate_parameter_name(typename)
@@ -120,18 +128,39 @@ def generate_input_func(
                 )
             )
 
-    # return ClassName(**data)
-    body.append(
-        ast.Return(
-            value=ast.Call(
-                func=ast.Name(id=class_name, ctx=ast.Load()),
-                args=[],
-                keywords=[
-                    ast.keyword(arg=None, value=ast.Name(id="data", ctx=ast.Load()))
-                ],
+    if is_union_target:
+        # return TypeAdapter(ClassName).validate_python(data)
+        registry.register_import("pydantic.TypeAdapter")
+        body.append(
+            ast.Return(
+                value=ast.Call(
+                    func=ast.Attribute(
+                        value=ast.Call(
+                            func=ast.Name(id="TypeAdapter", ctx=ast.Load()),
+                            args=[ast.Name(id=class_name, ctx=ast.Load())],
+                            keywords=[],
+                        ),
+                        attr="validate_python",
+                        ctx=ast.Load(),
+                    ),
+                    args=[ast.Name(id="data", ctx=ast.Load())],
+                    keywords=[],
+                )
             )
         )
-    )
+    else:
+        # return ClassName(**data)
+        body.append(
+            ast.Return(
+                value=ast.Call(
+                    func=ast.Name(id=class_name, ctx=ast.Load()),
+                    args=[],
+                    keywords=[
+                        ast.keyword(arg=None, value=ast.Name(id="data", ctx=ast.Load()))
+                    ],
+                )
+            )
+        )
 
     return ast.FunctionDef(
         name=func_name,
@@ -169,6 +198,18 @@ def generate_input_funcs(
     else:
         ref_registry = None
 
+    # Inputs the InputsPlugin turns into discriminated unions (targets of a
+    # member's @unionElementOf directive) are not callable classes; their
+    # factories must validate through pydantic instead. Mirror the detection.
+    union_targets = set()
+    for type in inputobjects_type.values():
+        for directive in type.ast_node.directives if type.ast_node else []:
+            if directive.name.value != "unionElementOf":
+                continue
+            for arg in directive.arguments:
+                if arg.name.value == "union":
+                    union_targets.add(arg.value.value)
+
     for key, type in inputobjects_type.items():
         if ref_registry and key not in ref_registry.inputs:
             continue
@@ -182,7 +223,14 @@ def generate_input_funcs(
             continue
 
         tree.append(
-            generate_input_func(key, type, config, plugin_config, registry)
+            generate_input_func(
+                key,
+                type,
+                config,
+                plugin_config,
+                registry,
+                is_union_target=key in union_targets,
+            )
         )
 
     return tree

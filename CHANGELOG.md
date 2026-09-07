@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v2.0.2 (2026-09-01)
+
+### Bug Fixes
+
+- Input funcs respects is union_targert
+  ([`c9b05cd`](https://github.com/jhnnsrs/turms/commit/c9b05cd670cd2ab4a8bbf6361510dd073d4845a1))
+
+
 ## v2.0.1 (2026-08-24)
 
 ### Bug Fixes
