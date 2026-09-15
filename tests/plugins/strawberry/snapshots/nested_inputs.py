@@ -7,8 +7,8 @@ class RemoveItemFromPlaylistTrackInput:
 
 @strawberry.input
 class RemoveItemFromPlaylistInput:
-    playlistId: str
-    snapshotId: str | None = strawberry.field(default=None)
+    playlistId: strawberry.ID
+    snapshotId: strawberry.ID | None = strawberry.field(default=None)
     tracks: list[RemoveItemFromPlaylistTrackInput]
 
 @strawberry.type
