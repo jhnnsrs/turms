@@ -25,8 +25,9 @@ from pydantic_settings import SettingsConfigDict
 
 from turms.plugins.base import Plugin, PluginConfig, rename_deprecated_keys
 import ast
-from typing import Any, Callable, Dict, List, Protocol, runtime_checkable
+from typing import Any, Callable, Dict, List, Optional, Protocol, runtime_checkable
 from turms.config import GeneratorConfig, ImportableFunctionMixin
+from turms.errors import GenerationError
 from graphql.utilities.build_client_schema import GraphQLSchema
 from pydantic import Field, model_validator
 from graphql.type.definition import (
@@ -375,6 +376,27 @@ class StrawberryPluginConfig(PluginConfig):
     # schema to `String`. The Strawberry plugin therefore resolves scalars itself.
     # An explicit `scalar_definitions` entry still wins over these defaults.
     scalar_overrides: Dict[str, str] = {"ID": "strawberry.ID"}
+    # Enforcement for `@secured(requires: "...")` directives.
+    #
+    # Maps each `requires` expression to the dotted path of a strawberry
+    # permission instance, for example:
+    #   {"@authService.hasRole(#authentication, 'ADMIN')": "vissoma.permissions.admin_only"}
+    # Fields carrying a mapped directive get
+    # `extensions=[PermissionExtension(permissions=[admin_only])]`, so the rule is
+    # checked at resolve time and the resolver never runs when it fails.
+    #
+    # The plugin keeps emitting the directive itself, so the printed schema still
+    # carries `@secured(requires: ...)` and the contract with generated clients is
+    # unchanged.
+    #
+    # Once set, a `@secured` the plugin cannot enforce is a generation error
+    # rather than a silently unprotected field.
+    secured_permissions: Dict[str, str] = {}
+    secured_directive: str = "secured"
+    # Strawberry permissions run per resolved field, so a `@secured` on an input
+    # field, argument, or object type has no enforcement point. Listing such a
+    # location here accepts that those declarations stay unenforced.
+    secured_unenforced_locations: List[str] = []
     generate_enums: bool = True
     generate_types: bool = True
     generate_inputs: bool = True
@@ -799,6 +821,131 @@ def generate_directive_keywords(
     return []
 
 
+SECURED_REQUIRES_ATTR = "requires"
+
+
+def secured_requires(
+    ast_node: Any, plugin_config: StrawberryPluginConfig
+) -> Optional[str]:
+    """Return the ``requires`` value of the configured secured directive.
+
+    ``None`` means the node does not carry the directive at all, which is the
+    common case and not an error.
+    """
+    directives = getattr(ast_node, "directives", None) or []
+    directive = next(
+        (d for d in directives if d.name.value == plugin_config.secured_directive),
+        None,
+    )
+
+    if directive is None:
+        return None
+
+    for argument in directive.arguments or []:
+        if argument.name.value == SECURED_REQUIRES_ATTR:
+            return argument.value.value
+
+    raise GenerationError(
+        f"@{plugin_config.secured_directive} is missing its "
+        f"`{SECURED_REQUIRES_ATTR}` argument, so its rule cannot be read."
+    )
+
+
+def ensure_secured_is_enforceable(
+    ast_node: Any, location: str, plugin_config: StrawberryPluginConfig
+) -> None:
+    """Refuse a secured directive that this plugin has no way to enforce.
+
+    Strawberry permissions run per resolved field, so a declaration on an input
+    field, an argument, or an object type has no enforcement point. Passing it
+    through would ship a field that advertises protection in the schema while
+    nothing checks it.
+    """
+    if not plugin_config.secured_permissions:
+        return
+
+    if secured_requires(ast_node, plugin_config) is None:
+        return
+
+    if location in plugin_config.secured_unenforced_locations:
+        return
+
+    raise GenerationError(
+        f"@{plugin_config.secured_directive} on {location} cannot be enforced by "
+        f"strawberry permissions. Remove the directive, or list {location!r} in "
+        f"`secured_unenforced_locations` to accept it staying unenforced."
+    )
+
+
+def generate_permission_keywords(
+    ast_node: Any, plugin_config: StrawberryPluginConfig, registry: ClassRegistry
+) -> List[ast.keyword]:
+    """Build ``extensions=[PermissionExtension(...)]`` for a mapped directive.
+
+    The configured value is a dotted path to a permission instance, resolved the
+    same way as every other user-code reference in turms (``scalar_definitions``,
+    ``additional_bases``): the module is imported and the final name is used.
+
+    Returns no keyword when the feature is unconfigured or the field carries no
+    secured directive, so an unconfigured plugin behaves exactly as before.
+    """
+    if not plugin_config.secured_permissions:
+        return []
+
+    requires = secured_requires(ast_node, plugin_config)
+
+    if requires is None:
+        return []
+
+    permission = plugin_config.secured_permissions.get(requires)
+
+    if permission is None:
+        raise GenerationError(
+            f"@{plugin_config.secured_directive}(requires: {requires!r}) has no "
+            f"entry in `secured_permissions`, so it cannot be enforced. Add a "
+            f"mapping for it, or remove the directive from the schema."
+        )
+
+    registry.register_import("strawberry.permission.PermissionExtension")
+    registry.register_import(permission)
+
+    return [
+        ast.keyword(
+            arg="extensions",
+            value=ast.List(
+                elts=[
+                    ast.Call(
+                        func=ast.Name(id="PermissionExtension", ctx=ast.Load()),
+                        keywords=[
+                            ast.keyword(
+                                arg="permissions",
+                                value=ast.List(
+                                    elts=[
+                                        ast.Name(
+                                            id=permission.split(".")[-1],
+                                            ctx=ast.Load(),
+                                        )
+                                    ],
+                                    ctx=ast.Load(),
+                                ),
+                            ),
+                            # The plugin emits the directive itself, so the
+                            # permission must not append a second copy to the
+                            # field.
+                            ast.keyword(
+                                arg="use_directives",
+                                value=ast.Constant(value=False),
+                            ),
+                        ],
+                        args=[],
+                    )
+                ],
+                ctx=ast.Load(),
+            ),
+        )
+    ]
+
+
 def generate_inputs(
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
@@ -858,6 +1005,13 @@ def generate_inputs(
                         value=ast.Constant(value=value.deprecation_reason),
                     )
                 )
+
+            # Input fields cannot be guarded by a permission (there is nothing to
+            # resolve), so a configured plugin refuses rather than shipping the
+            # declaration unenforced.
+            ensure_secured_is_enforceable(
+                value.ast_node, "INPUT_FIELD_DEFINITION", plugin_config
+            )
 
             # Input fields carry directives too (an authorization directive on a
             # sensitive input field is the common case). Skipping them here made
@@ -986,6 +1140,8 @@ def generate_types(
             object_type.ast_node, plugin_config
         )
 
+        ensure_secured_is_enforceable(object_type.ast_node, "OBJECT", plugin_config)
+
         if isinstance(object_type, GraphQLObjectType):
             classname = registry.generate_objecttype(key)
             decorator_name = "strawberry.type"
@@ -1058,6 +1214,12 @@ def generate_types(
                 }
 
                 for argkey, arg in sorted_args.items():
+                    ensure_secured_is_enforceable(
+                        getattr(arg, "ast_node", None),
+                        "ARGUMENT_DEFINITION",
+                        plugin_config,
+                    )
+
                     additional_args.append(
                         ast.arg(
                             arg=registry.generate_parameter_name(argkey),
@@ -1092,6 +1254,9 @@ def generate_types(
             )
 
             keywords += generate_directive_keywords(value.ast_node, plugin_config)
+            keywords += generate_permission_keywords(
+                value.ast_node, plugin_config, registry
+            )
 
             if not additional_args and key not in ["Mutation", "Subscription", "Query"]:
                 if not keywords:
