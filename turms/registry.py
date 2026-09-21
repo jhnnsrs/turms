@@ -2,7 +2,12 @@ import ast
 from keyword import iskeyword
 from typing import Callable, Dict, List, Optional, Set
 
-from graphql import GraphQLNamedType
+from graphql import (
+    GraphQLEnumType,
+    GraphQLInputObjectType,
+    GraphQLNamedType,
+    GraphQLSchema,
+)
 
 from turms.config import GeneratorConfig, LogFunction
 from turms.errors import (
@@ -257,7 +262,69 @@ class ClassRegistry(object):
         self.operation_single_operation_map: Dict[
             str, ast.AST
         ] = {}  # This is used to store the operation name and the root operation class name if single
+
+        #: GraphQL typename -> the module another project already generated it into.
+        #: Filled by :meth:`seed_external`, read on the resolved branch of
+        #: ``reference_inputtype``/``reference_enum``.
+        self.external_module_map: Dict[str, str] = {}
+
         self.log = log
+
+    def seed_external(self, schema: GraphQLSchema) -> None:
+        """Adopt the types ``config.external_modules`` says another project owns.
+
+        Must run **before any plugin**. Left to referencing time, a missing input
+        or enum does not fail loudly: ``recurse_type_annotation`` raises an opaque
+        "did you register this scalar?", a fragment's enum field silently becomes
+        a string annotation whose ``model_rebuild()`` then fails at import, and
+        ``funcs`` forward-references the literal placeholder ``SHOULD_NOT_BE_USED``
+        into a module-level ``SHOULD_NOT_BE_USED.model_rebuild()``.
+
+        Seeding every type of the declared kinds is deliberate: an unreferenced
+        one costs nothing, because the import is registered where the type is
+        *referenced*, not here.
+        """
+        for external in self.config.external_modules:
+            for kind in external.kinds:
+                if kind == "enum":
+                    graphql_type, class_map, style = (
+                        GraphQLEnumType,
+                        self.enum_class_map,
+                        self.style_enum_class,
+                    )
+                else:
+                    graphql_type, class_map, style = (
+                        GraphQLInputObjectType,
+                        self.inputtype_class_map,
+                        self.style_inputtype_class,
+                    )
+
+                for typename, definition in schema.type_map.items():
+                    if typename.startswith("__") or not isinstance(
+                        definition, graphql_type
+                    ):
+                        continue
+                    if typename in self.external_module_map:
+                        raise RegistryError(
+                            f"{typename} is provided by both "
+                            f"{self.external_module_map[typename]} and "
+                            f"{external.module}. A type can only come from one "
+                            "external module."
+                        )
+                    class_map[typename] = external.names.get(typename) or style(
+                        typename
+                    )
+                    self.external_module_map[typename] = external.module
+
+    def _reference_external(self, typename: str, classname: str) -> None:
+        """Register the import a reference to an external type needs.
+
+        Lazily, at reference time: registering every seeded name up front would
+        put all of them in the generated import block whether used or not.
+        """
+        module = self.external_module_map.get(typename)
+        if module:
+            self.register_import(f"{module}.{classname}")
 
     def register_operation_single(self, operation_name: str, annotation_ast: ast.AST):
         self.operation_single_operation_map[operation_name] = annotation_ast
@@ -277,9 +344,16 @@ class ClassRegistry(object):
         return typename
 
     def generate_inputtype(self, typename: str):
-        assert typename not in self.inputtype_class_map, (
-            "Type was already registered, cannot register annew"
-        )
+        if typename in self.external_module_map:
+            raise RegistryError(
+                f"{typename} is generated here and also declared as coming from "
+                f"{self.external_module_map[typename]}. Drop it from "
+                "external_modules, or drop the plugin that generates it."
+            )
+        if typename in self.inputtype_class_map:
+            raise RegistryError(
+                f"{typename} was already registered; it cannot be registered anew."
+            )
         classname = self.style_inputtype_class(typename)
         self.inputtype_class_map[typename] = classname
         return classname
@@ -291,6 +365,13 @@ class ClassRegistry(object):
         self, typename: str, parent: str, allow_forward: bool = True
     ) -> ast.Name | ast.Constant:
         classname = self.style_inputtype_class(typename)
+        if typename in self.external_module_map:
+            # Another project generated it; it is imported, so it is already bound
+            # by the time this module's body runs and can never be a forward
+            # reference -- not even to a class of the same name being generated here.
+            classname = self.inputtype_class_map[typename]
+            self._reference_external(typename, classname)
+            return ast.Name(id=classname, ctx=ast.Load())
         if typename not in self.inputtype_class_map or parent == classname:
             if not allow_forward:
                 raise NoInputTypeFound(
@@ -308,9 +389,16 @@ class ClassRegistry(object):
         return typename
 
     def generate_enum(self, typename: str):
-        assert typename not in self.enum_class_map, (
-            "Type was already registered, cannot register annew"
-        )
+        if typename in self.external_module_map:
+            raise RegistryError(
+                f"{typename} is generated here and also declared as coming from "
+                f"{self.external_module_map[typename]}. Drop it from "
+                "external_modules, or drop the plugin that generates it."
+            )
+        if typename in self.enum_class_map:
+            raise RegistryError(
+                f"{typename} was already registered; it cannot be registered anew."
+            )
         classname = self.style_enum_class(typename)
         self.enum_class_map[typename] = classname
         return classname
@@ -331,6 +419,11 @@ class ClassRegistry(object):
             return ast.Constant(value=typename)
 
         classname = self.style_enum_class(typename)
+        if typename in self.external_module_map:
+            # See reference_inputtype: an imported name is never a forward reference.
+            classname = self.enum_class_map[typename]
+            self._reference_external(typename, classname)
+            return ast.Name(id=classname, ctx=ast.Load())
         if typename not in self.enum_class_map or parent == classname:
             if not allow_forward:
                 raise NoEnumFound(
@@ -338,7 +431,9 @@ class ClassRegistry(object):
                 )
             self.forward_references.add(parent)
             return ast.Constant(value=classname)
-        return ast.Name(id=classname, ctx=ast.Load())
+        # The map, not the freshly styled name: they agree unless an override
+        # renamed the class, and then the map is the one that is right.
+        return ast.Name(id=self.enum_class_map[typename], ctx=ast.Load())
 
     def style_objecttype_class(self, typename: str):
         for styler in self.stylers:

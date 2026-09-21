@@ -120,11 +120,49 @@ def load_projects_from_configpath(
             f"File {file_name} at {file_path} does not conform with turms."
         ) from err
 
+    # Before the select, so `turms gen <one-project>` is checked too.
+    _validate_external_modules(projects)
+
     if select:
         projects = {key: project for key, project in projects.items() if key == select}
         assert len(projects) >= 1, "At least one project must be selected"
 
     return projects
+
+
+def _validate_external_modules(projects: Dict[str, GraphQLProject]) -> None:
+    """Check every ``external_modules`` entry that names a ``from_project``.
+
+    The class names of an external type are derived from its GraphQL typename and
+    the styler list, so two projects only agree on them while their stylers agree.
+    Nothing reads the other project's *output*, only its configuration -- so there
+    is no ordering dependency between the two, and no artifact to go stale.
+    """
+    for name, project in projects.items():
+        for external in project.extensions.turms.external_modules:
+            if external.from_project is None:
+                continue
+
+            source = projects.get(external.from_project)
+            if source is None:
+                raise GenerationError(
+                    f"Project {name!r} says {external.module!r} comes from project "
+                    f"{external.from_project!r}, which is not in this config. "
+                    f"Known projects: {sorted(projects)}."
+                )
+
+            mine = [styler.model_dump() for styler in project.extensions.turms.stylers]
+            theirs = [
+                styler.model_dump() for styler in source.extensions.turms.stylers
+            ]
+            if mine != theirs:
+                raise GenerationError(
+                    f"Projects {name!r} and {external.from_project!r} have different "
+                    "stylers, so they would style the same GraphQL type into "
+                    f"different class names. {name!r} would then import names "
+                    f"{external.from_project!r} never exported. Give both the same "
+                    "stylers, or pin the exceptions in external_modules[].names."
+                )
 
 
 def scan_folder_for_configs(folder_path: str = None) -> List[str]:
@@ -556,6 +594,9 @@ def generate_ast(
 
     global_tree = []
     registry = ClassRegistry(config, stylers, log)
+    # Before any plugin: a type another project owns must already resolve the
+    # first time anything references it. See ClassRegistry.seed_external.
+    registry.seed_external(schema)
 
     for plugin in plugins:
         try:

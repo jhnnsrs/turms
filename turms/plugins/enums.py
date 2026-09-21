@@ -50,6 +50,10 @@ def generate_enums(
         ref_registry = None
 
     for key, type in enum_types.items():
+        if key in registry.external_module_map:
+            # Another project owns it; referencing it will import it.
+            continue
+
         if ref_registry and key not in ref_registry.enums:
             continue
 

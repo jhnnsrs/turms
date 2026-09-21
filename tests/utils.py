@@ -173,3 +173,32 @@ def unit_test_with(
         else:
             # If the supbrocess failed we can break out of the sandbox and just return the actual error
             raise ExecuteError(f"Failed with: {s.stderr.decode().strip()} Code: {parsed_code}" )
+
+
+def unit_test_with_external(
+    external_ast: List[ast.AST],
+    generated_ast: List[ast.AST],
+    test_string: str,
+    module_name: str = "external_schema",
+):
+    """Run a *pair* of generated modules, the second importing the first.
+
+    ``unit_test_with`` writes one module, so it cannot express the thing a split
+    generation produces: an api module whose import block reaches into a protocol
+    module. Here both land in the same temporary directory, so the plain
+    ``from <module_name> import X`` the generator emits resolves.
+    """
+    added_code = ast.parse(dedent(test_string)).body
+    parsed_code = parse_to_code(generated_ast + added_code)
+
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        write_code_to_file(parse_to_code(external_ast), tmpdirname, f"{module_name}.py")
+        write_code_to_file(mocks_code, tmpdirname, "mocks.py")
+        filename = write_code_to_file(parsed_code, tmpdirname, "minimal.py")
+
+        s = subprocess.run([sys.executable, filename], capture_output=True)
+        if s.returncode == 0:
+            return True
+        raise ExecuteError(
+            f"Failed with: {s.stderr.decode().strip()} Code: {parsed_code}"
+        )

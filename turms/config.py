@@ -275,6 +275,49 @@ REMOVED_COMPONENTS = {
 }
 
 
+ExternalKind = Literal["enum", "input"]
+"""What an :class:`ExternalModuleConfig` can take over from a project.
+
+Only enums and inputs. A fragment carries a selection set, so two projects'
+fragments of the same GraphQL type are not interchangeable, and an operation
+belongs to whoever generated its document."""
+
+
+class ExternalModuleConfig(BaseModel):
+    """A module that already holds generated types for this schema.
+
+    Referencing a type of one of the declared ``kinds`` emits
+    ``from <module> import <Name>`` instead of generating the type again.
+
+    The class names are **derived**, not listed: ``ClassRegistry.style_enum_class``
+    and ``style_inputtype_class`` are pure functions of the GraphQL typename and
+    the styler list, so a project that declares the same ``stylers:`` as the one
+    that generated ``module`` computes exactly the names that module exported.
+    That is why there is nothing here to keep in sync, and why ``stylers`` must
+    match -- see ``from_project``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    module: str
+    """The dotted python path of the module to import from.
+
+    The one thing turms cannot derive: an ``out_dir`` says where a file lands on
+    disk, not what it is called on the import path."""
+
+    kinds: List[ExternalKind] = Field(default_factory=lambda: ["enum", "input"])
+    """Which kinds of type that module provides."""
+
+    names: Dict[str, str] = Field(default_factory=dict)
+    """Per-type overrides, for when the styler-derived name is not the exported one."""
+
+    from_project: Optional[str] = None
+    """A sibling project in the same config whose stylers must match this one's.
+
+    Validation only: it never supplies the names. Set it and a styler mismatch is
+    a clear error instead of a wrong import."""
+
+
 class GeneratorConfig(BaseSettings):
     """Configuration for the generator
 
@@ -442,6 +485,17 @@ class GeneratorConfig(BaseSettings):
         description="How type annotations are spelled: 'auto' picks the most modern spelling min_python_version supports, 'modern' always uses PEP 585 builtin generics and PEP 604 unions (list[X] | None), 'legacy' always uses typing.Optional/typing.List.",
     )
     """How type annotations are spelled: auto (derived from min_python_version), modern, or legacy"""
+
+    external_modules: List["ExternalModuleConfig"] = Field(
+        default_factory=list,
+        description="Modules that already hold generated enums/inputs for this schema. Types of the declared kinds are imported from there instead of being generated again.",
+    )
+    """Modules that already hold generated types for this schema.
+
+    This is how one project generates the enums and inputs and a second project
+    generates the fragments, operations and client over them: the second declares
+    the first's output module here and emits ``from that.module import X`` wherever
+    it references one."""
 
     additional_bases: Dict[str, List[str]] = Field(
         default_factory=dict,

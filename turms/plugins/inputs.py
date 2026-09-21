@@ -668,6 +668,10 @@ def generate_inputs(
     deferred_oneof_unions = []
 
     for key, type in inputobjects_type.items():
+        if key in registry.external_module_map:
+            # Another project owns it; referencing it will import it.
+            continue
+
         if key in union_member_types:
             continue
 
