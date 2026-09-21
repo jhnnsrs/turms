@@ -52,26 +52,26 @@ class Get_capsules(BaseModel):
         document = "fragment Continent on Continent {\n  code\n  name\n}\n\nquery get_capsules {\n  countries {\n    code\n    name\n    continent {\n      ...Continent\n    }\n  }\n}"
 
 
-async def aget_capsules(rath: Rath = None) -> List[Get_capsulesCountries]:
+async def aget_capsules(rath: Rath) -> List[Get_capsulesCountries]:
     """get_capsules
 
 
 
     Arguments:
-        rath (rath.Rath, optional): The client we want to use (defaults to the currently active client)
+        rath (rath.Rath): The client to run the operation on
 
     Returns:
         List[Get_capsulesCountries]"""
     return (await aexecute(Get_capsules, {}, rath=rath)).countries
 
 
-def get_capsules(rath: Rath = None) -> List[Get_capsulesCountries]:
+def get_capsules(rath: Rath) -> List[Get_capsulesCountries]:
     """get_capsules
 
 
 
     Arguments:
-        rath (rath.Rath, optional): The client we want to use (defaults to the currently active client)
+        rath (rath.Rath): The client to run the operation on
 
     Returns:
         List[Get_capsulesCountries]"""

@@ -7,7 +7,6 @@ rath = Rath(link=AIOHttpLink(endpoint_url="https://countries.trevorblades.com/")
 
 with rath:
     # This here is the actual query execution with turms of the schema
-    t = get_capsules()
+    t = get_capsules(rath=rath)
     for i in t:
-        print(i.name) # Typesafe access to the data
-
+        print(i.name)  # Typesafe access to the data

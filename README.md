@@ -196,11 +196,11 @@ Plugins generate the actual code. Enable them per project; order matters (enums 
 The funcs plugin turns operations into plain function calls. With an executor proxy configured (see [`examples/rath-usage`](examples/rath-usage)):
 
 ```python
-async def aget_capsules(rath: Rath = None) -> List[GetCapsulesCountries]:
+async def aget_capsules(rath: Rath) -> List[GetCapsulesCountries]:
     """get_capsules
 
     Arguments:
-        rath (rath.Rath, optional): The client we want to use (defaults to the currently active client)
+        rath (rath.Rath): The client to run the operation on
 
     Returns:
         List[GetCapsulesCountries]"""
