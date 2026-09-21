@@ -1,17 +1,76 @@
 # CHANGELOG
 
 
-## Unreleased
+## v2.1.0 (2026-09-21)
+
+### Documentation
+
+- **examples**: Repair the rath-usage example
+  ([`65513cc`](https://github.com/jhnnsrs/turms/commit/65513cc445d15694e24936ba8bf9da11dde81bcd))
+
+`your_library/proxies.py` imported `current_rath` from `rath.rath` and used it as the fallback in
+  all four proxies. That contextvar is gone, so the module raised on import and took `main.py` with
+  it.
+
+There is no implicit client to fall back to any more, so the proxies take their rath outright and
+  `main.py` passes the one it opened. The generated `your_library/schema.py` is hand-edited to match
+  rather than regenerated -- its schema is `countries.trevorblades.com`, so regenerating needs the
+  network -- and the same two-line change appears in `README.md` here and in the root `README.md`,
+  which repeated "defaults to the currently active client" as if it still meant something.
+
+Also fixes a 9-space list item in the README's config block, which made the YAML it tells you to
+  copy invalid.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
 
 ### Features
 
-- **client**: New `turms.plugins.client.ClientPlugin` generates one class whose methods are the
-  operations, each delegating to `execute`/`aexecute`/`subscribe`/`asubscribe` of `self`. The
-  generated module imports no executor: the class the mixin is mixed into, or one of its
-  `client_bases`, implements the four delegates. `reserved_names`/`reserved_from` refuse a method
-  that would shadow the host, a delegate, or another method.
-- **funcs**: The per-operation helpers now take an `OperationFuncsConfig` (the shared base of
-  `FuncsPluginConfig` and `ClientPluginConfig`) and `OperationExtras`, so both plugins share them.
+- Client-class generation
+  ([`59d8a4a`](https://github.com/jhnnsrs/turms/commit/59d8a4ae510a943ce3e3430f79a90a1432a09cb6))
+
+Baseline commit of the in-flight `client-class` work: `FuncsPlugin` can generate one client class
+  per SDK, with `client_class`, `client_bases`, `bound_kwargs`, `reserved_names` and
+  `reserved_from`.
+
+Tests: 268 pass, 2 skipped.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+- External_modules, so one project can generate over another's types
+  ([`1235f47`](https://github.com/jhnnsrs/turms/commit/1235f477a3f39b76dc5d765ebf20f8428fcda716))
+
+Lets a package ship its wire vocabulary in one module and its fragments, operations and client in a
+  second that *imports* the first, instead of regenerating every enum and input into both.
+
+external_modules: - module: rekuest.protocol.schema kinds: [enum, input] from_project:
+  rekuest_protocol # optional
+
+Class names are **derived**, not listed: `style_enum_class` and `style_inputtype_class` are pure
+  functions of the GraphQL typename and the styler list, so a project declaring the same `stylers:`
+  computes exactly the names the other one exported. Nothing reads the other project's output, so
+  there is no ordering dependency and no artifact to go stale. `from_project` checks the two styler
+  lists agree, which is the only way they can disagree; `names:` is the override when they must.
+
+`ClassRegistry.seed_external` runs before the plugin loop, which is correctness rather than
+  tidiness. Left to reference time, a missing input or enum fails quietly: `recurse_type_annotation`
+  raises an opaque "did you register this scalar?", a fragment's enum field becomes a string
+  annotation whose `model_rebuild()` then fails at import, and `funcs` forward-references its
+  literal placeholder into a module-level `SHOULD_NOT_BE_USED.model_rebuild()`.
+
+Imports are registered where a type is *referenced*, not where it is seeded, so an unreferenced
+  external type costs nothing.
+
+Two fixes it needed on the way:
+
+- `reference_enum` returned the freshly styled name where `reference_inputtype` returns the map's.
+  Identical until a `names:` override exists, wrong the moment one does. -
+  `generate_enum`/`generate_inputtype` opened with a bare `assert`, which `run.py` wrapped into an
+  unhelpful "EnumsPlugin failed!". They raise a `RegistryError` naming the type now, and the plugins
+  skip external types outright rather than colliding.
+
+turms: 277 pass, 2 skipped (268 + 9).
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
 
 
 ## v2.0.2 (2026-09-01)
