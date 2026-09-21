@@ -39,10 +39,20 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run semantic-release version
 
+      # `semantic-release version` only builds when it actually cuts a release,
+      # so an empty `dist/` means this push carried nothing releasable (a
+      # `build:`/`chore:`/`docs:`-only change). Both steps are guarded on that:
+      # unguarded, `uv publish` fails the job on every such push.
+      - name: Check whether a release was cut
+        id: built
+        run: echo "any=${{ hashFiles('dist/**') != '' }}" >> "$GITHUB_OUTPUT"
+
       - name: Publish to Releases
+        if: steps.built.outputs.any == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run semantic-release publish
 
       - name: Publish to Pypi
+        if: steps.built.outputs.any == 'true'
         run: uv publish
