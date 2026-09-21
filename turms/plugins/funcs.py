@@ -67,24 +67,34 @@ class Arg(BaseModel):
     description: str = "Specify that in turms.plugin.funcs.OperationsFuncPlugin"
 
 
-class FunctionDefinition(BaseModel):
-    type: OperationType
-    is_async: bool = False
+class OperationExtras(BaseModel):
+    """Extra parameters a generated function takes and forwards on the call."""
+
     extra_args: List[Arg] = []
     extra_kwargs: List[Kwarg] = []
+
+
+NO_EXTRAS = OperationExtras()
+
+
+class FunctionDefinition(OperationExtras):
+    type: OperationType
+    is_async: bool = False
     use: str
 
 
-class FuncsPluginConfig(PluginConfig):
-    model_config = SettingsConfigDict(extra="forbid", env_prefix="TURMS_PLUGINS_FUNCS_")
-    type: str = "turms.plugins.funcs.FuncsPlugin"
-    funcs_glob: Optional[str] = None
+class OperationFuncsConfig(PluginConfig):
+    """What turning an operation into a typed python function needs.
+
+    Shared by the funcs plugin (free functions calling a configured proxy) and
+    the client plugin (methods of one class calling methods of ``self``).
+    """
+
     prepend_sync: str = ""
     prepend_async: str = "a"
     collapse_lonely: bool = True
     global_args: List[Arg] = []
     global_kwargs: List[Kwarg] = []
-    definitions: List[FunctionDefinition] = []
     extract_documentation: bool = True
     expand_input_types: List[str] = []
     coercible_scalars: dict[str, PythonType] = {}
@@ -95,6 +105,13 @@ class FuncsPluginConfig(PluginConfig):
     model performs the actual coercion (e.g. via a before-validator)."""
 
 
+class FuncsPluginConfig(OperationFuncsConfig):
+    model_config = SettingsConfigDict(extra="forbid", env_prefix="TURMS_PLUGINS_FUNCS_")
+    type: str = "turms.plugins.funcs.FuncsPlugin"
+    funcs_glob: Optional[str] = None
+    definitions: List[FunctionDefinition] = []
+
+
 def camel_to_snake(name: str) -> str:
     name = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
     return re.sub("([a-z0-9])([A-Z])", r"\1_\2", name).lower()
@@ -102,7 +119,7 @@ def camel_to_snake(name: str) -> str:
 
 def generate_async_func_name(
     o: OperationDefinitionNode,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     config: GeneratorConfig,
     registry: ClassRegistry,
 ):
@@ -113,7 +130,7 @@ def generate_async_func_name(
 
 def generate_sync_func_name(
     o: OperationDefinitionNode,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     config: GeneratorConfig,
     registry: ClassRegistry,
 ):
@@ -123,15 +140,15 @@ def generate_sync_func_name(
 
 
 def get_extra_args_for_onode(
-    definition: FunctionDefinition,
-    plugin_config: FuncsPluginConfig,
+    definition: OperationExtras,
+    plugin_config: OperationFuncsConfig,
 ) -> List[Arg]:
     args = plugin_config.global_args
     return args + definition.extra_args
 
 
 def generate_passing_extra_args_for_onode(
-    definition: FunctionDefinition, plugin_config: FuncsPluginConfig
+    definition: OperationExtras, plugin_config: OperationFuncsConfig
 ):
     return [
         ast.Name(id=arg.key, ctx=ast.Load())
@@ -140,7 +157,7 @@ def generate_passing_extra_args_for_onode(
 
 
 def generate_passing_extra_kwargs_for_onode(
-    definition: FunctionDefinition, plugin_config: FuncsPluginConfig
+    definition: OperationExtras, plugin_config: OperationFuncsConfig
 ):
     return [
         ast.keyword(arg=kwarg.key, value=ast.Name(id=kwarg.key, ctx=ast.Load()))
@@ -149,8 +166,8 @@ def generate_passing_extra_kwargs_for_onode(
 
 
 def get_extra_kwargs_for_onode(
-    definition: FunctionDefinition,
-    plugin_config: FuncsPluginConfig,
+    definition: OperationExtras,
+    plugin_config: OperationFuncsConfig,
 ) -> List[Kwarg]:
     kwargs = plugin_config.global_kwargs
 
@@ -184,7 +201,7 @@ def get_definitions_for_onode(
 def generate_input_annotation(
     type: GraphQLInputType,
     registry: ClassRegistry,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     is_optional: bool = True,
 ):
     if isinstance(type, GraphQLScalarType):
@@ -338,7 +355,7 @@ def coercible_input_union(
 def generate_variable_annotation(
     type_node: TypeNode,
     registry: ClassRegistry,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
 ) -> ast.expr:
     """The annotation for a non-expanded operation variable, honoring
     coercible_scalars and coercible_inputs on the final named type (the
@@ -397,7 +414,7 @@ def dict_str_any_annotation(registry: ClassRegistry) -> ast.expr:
 
 def generate_input_type_params(
     input_type: GraphQLInputObjectType,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
 ):
     pos_args = []
@@ -440,10 +457,10 @@ def generate_input_type_params(
 
 
 def generate_parameters(
-    definition: FunctionDefinition,
+    definition: OperationExtras,
     operation_definition: OperationDefinitionNode,
     config: GeneratorConfig,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
     client_schema: GraphQLSchema,
 ):
@@ -577,7 +594,7 @@ def _guarded_variable_assign(
 
 def generate_variable_assignments(
     o: OperationDefinitionNode,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
     client_schema: GraphQLSchema,
 ):
@@ -868,11 +885,11 @@ def estimate_variable_name(
 
 
 def generate_query_doc(
-    definition: FunctionDefinition,
+    definition: OperationExtras,
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
     collapse=False,
 ):
@@ -960,7 +977,7 @@ def genereate_async_call(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
     collapse=False,
 ):
@@ -1025,7 +1042,7 @@ def genereate_sync_call(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
     collapse=False,
 ):
@@ -1083,7 +1100,7 @@ def genereate_async_iterator(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
     collapse=False,
 ):
@@ -1153,7 +1170,7 @@ def genereate_sync_iterator(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
     collapse=False,
 ):
@@ -1228,7 +1245,7 @@ def generate_operation_func(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
 ):
     tree = []

@@ -50,6 +50,15 @@ class ExtraArguments(BaseModel):
     extra: Optional[str]
 
 
+class RecordingExecutor:
+    # Implements a client plugin delegate, so a generated class works alone.
+
+    def execute(self, operation, variables):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(beasts=["from base"])
+
+
 class ExtraOnOperations(BaseModel):
     extra: Optional[str]
 

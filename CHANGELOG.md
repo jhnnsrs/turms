@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Features
+
+- **client**: New `turms.plugins.client.ClientPlugin` generates one class whose methods are the
+  operations, each delegating to `execute`/`aexecute`/`subscribe`/`asubscribe` of `self`. The
+  generated module imports no executor: the class the mixin is mixed into, or one of its
+  `client_bases`, implements the four delegates. `reserved_names`/`reserved_from` refuse a method
+  that would shadow the host, a delegate, or another method.
+- **funcs**: The per-operation helpers now take an `OperationFuncsConfig` (the shared base of
+  `FuncsPluginConfig` and `ClientPluginConfig`) and `OperationExtras`, so both plugins share them.
+
+
 ## v2.0.2 (2026-09-01)
 
 ### Bug Fixes
