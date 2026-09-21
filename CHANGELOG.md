@@ -1,6 +1,24 @@
 # CHANGELOG
 
 
+## v2.1.1 (2026-09-21)
+
+### Bug Fixes
+
+- **ci**: Publish only when semantic-release actually cut a release
+  ([`5454b2f`](https://github.com/jhnnsrs/turms/commit/5454b2f61492ee874b4e8051619116d0b6e5a6e8))
+
+`uv publish` ran unconditionally. `semantic-release version` builds only when it cuts a release, so
+  any push carrying nothing releasable -- a `build:`, `chore:` or `docs:` change -- left `dist/`
+  empty and failed the job on the publish step. Both publish steps are now guarded on
+  `hashFiles('dist/**')`, which is the same shape as the guard the tag-only repos get from the
+  semantic-release action's `released` output.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01QEr4a9XNWRms96tmxUPXmz
+
+
 ## v2.1.0 (2026-09-21)
 
 ### Documentation
