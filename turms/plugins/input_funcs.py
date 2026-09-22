@@ -22,7 +22,7 @@ from pydantic_settings import SettingsConfigDict
 from turms.config import GeneratorConfig, PythonType
 from turms.plugins.base import Plugin, PluginConfig
 from turms.plugins.funcs import (
-    dict_str_any_annotation,
+    dict_str_object_annotation,
     generate_input_type_descriptions,
     generate_input_type_params,
 )
@@ -47,6 +47,10 @@ class InputFuncsPluginConfig(PluginConfig):
     """Optional prefix for the generated factory function name."""
     extract_documentation: bool = True
 
+
+#: Name of the generated argument-assembly local. Underscored so an input type with a field
+#: called ``data`` cannot shadow the generated function's own parameter of that name.
+INPUT_DATA_NAME = "_data"
 
 def generate_input_func(
     typename: str,
@@ -85,11 +89,11 @@ def generate_input_func(
         )
         body.append(ast.Expr(value=ast.Constant(value=doc)))
 
-    # data: Dict[str, Any] = {}
+    # _data: Dict[str, object] = {}
     body.append(
         ast.AnnAssign(
-            target=ast.Name(id="data", ctx=ast.Store()),
-            annotation=dict_str_any_annotation(registry),
+            target=ast.Name(id=INPUT_DATA_NAME, ctx=ast.Store()),
+            annotation=dict_str_object_annotation(registry),
             value=ast.Dict(keys=[], values=[]),
             simple=1,
         )
@@ -100,7 +104,7 @@ def generate_input_func(
         # Key by the GraphQL field name (the model's alias) so construction works
         # regardless of populate_by_name.
         subscript = ast.Subscript(
-            value=ast.Name(id="data", ctx=ast.Load()),
+            value=ast.Name(id=INPUT_DATA_NAME, ctx=ast.Load()),
             slice=ast.Constant(value=value_key),
             ctx=ast.Store(),
         )
@@ -143,21 +147,29 @@ def generate_input_func(
                         attr="validate_python",
                         ctx=ast.Load(),
                     ),
-                    args=[ast.Name(id="data", ctx=ast.Load())],
+                    args=[ast.Name(id=INPUT_DATA_NAME, ctx=ast.Load())],
                     keywords=[],
                 )
             )
         )
     else:
-        # return ClassName(**data)
+        # return ClassName.model_validate(_data)
+        #
+        # Validated rather than splatted as `ClassName(**_data)`: the buffer is keyed by GraphQL
+        # field name and typed `Dict[str, object]`, and `object` is not assignable to a typed
+        # field, so `**` would not check. `model_validate` takes the mapping whole, resolves the
+        # same aliases, and leaves `exclude_unset` reporting exactly the keys that were set --
+        # which is also what the @oneOf branch above already does.
         body.append(
             ast.Return(
                 value=ast.Call(
-                    func=ast.Name(id=class_name, ctx=ast.Load()),
-                    args=[],
-                    keywords=[
-                        ast.keyword(arg=None, value=ast.Name(id="data", ctx=ast.Load()))
-                    ],
+                    func=ast.Attribute(
+                        value=ast.Name(id=class_name, ctx=ast.Load()),
+                        attr="model_validate",
+                        ctx=ast.Load(),
+                    ),
+                    args=[ast.Name(id=INPUT_DATA_NAME, ctx=ast.Load())],
+                    keywords=[],
                 )
             )
         )

@@ -152,7 +152,7 @@ def test_funcs_build_variables_conditionally(tmp_path):
     assert "limit: int | None | UnsetType=UNSET" in generated
 
     # The variables dict is loosely typed and assembled conditionally.
-    assert "variables: dict[str, Any] = {}" in generated
+    assert "variables: dict[str, builtins.object] = {}" in generated
     assert "if filter is not UNSET:" in generated
     assert "variables['filter'] = filter" in generated
     assert "if limit is not UNSET:" in generated

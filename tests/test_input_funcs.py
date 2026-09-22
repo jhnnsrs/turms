@@ -56,15 +56,17 @@ def test_factory_signature_and_body():
         "def user_input(name: str, age: int | None | UnsetType=UNSET, address: AddressInput | None | UnsetType=UNSET, tags: Iterable[str] | None | UnsetType=UNSET) -> UserInput:"
         in generated
     )
-    # Body builds the dict conditionally and constructs the model.
-    assert "data: dict[str, Any] = {}" in generated
-    assert "data['name'] = name" in generated
+    # Body builds the buffer conditionally and validates the model out of it. The buffer is
+    # `_data`, not `data`, so an input type with a `data` field cannot shadow the parameter of
+    # that name; and it is `object`-valued, which is why it is validated rather than splatted.
+    assert "_data: dict[str, builtins.object] = {}" in generated
+    assert "_data['name'] = name" in generated
     assert "if age is not UNSET:" in generated
-    assert "data['age'] = age" in generated
-    assert "return UserInput(**data)" in generated
+    assert "_data['age'] = age" in generated
+    assert "return UserInput.model_validate(_data)" in generated
     # Nested input factory also generated.
     assert "def address_input(street: str" in generated
-    assert "return AddressInput(**data)" in generated
+    assert "return AddressInput.model_validate(_data)" in generated
 
 
 def test_coercible_scalars_change_annotation():
@@ -198,9 +200,9 @@ def test_union_target_factory_validates_through_pydantic():
         ],
     )
     code = parse_to_code(generated)
-    assert "TypeAdapter(MachineInput).validate_python(data)" in code
-    # Member factories stay plain constructions.
-    assert "return CpuInput(**data)" in code
+    assert "TypeAdapter(MachineInput).validate_python(_data)" in code
+    # Member factories validate the same way; both branches go through pydantic.
+    assert "return CpuInput.model_validate(_data)" in code
 
     unit_test_with(
         generated,

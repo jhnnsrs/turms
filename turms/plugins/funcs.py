@@ -398,18 +398,43 @@ def unset_union_annotation(annotation: ast.expr, registry: ClassRegistry) -> ast
     )
 
 
-def dict_str_any_annotation(registry: ClassRegistry) -> ast.expr:
-    """Returns a ``Dict[str, Any]`` annotation for the loosely-typed variables dict."""
+def dict_str_object_annotation(registry: ClassRegistry) -> ast.expr:
+    """Returns a ``Dict[str, object]`` annotation for an argument-assembly dict.
+
+    ``object`` rather than ``Any``: these dicts are write-only buffers whose values come straight
+    from the enclosing function's already-typed parameters, and whose keys are literals this
+    generator emits -- so ``Any`` bought no checking and only disabled it. ``object`` still
+    satisfies a ``Dict[str, Any]``/``Mapping[str, Any]`` parameter, so callers are unaffected;
+    what it does refuse is ``**``-unpacking the buffer into a typed signature, which is why
+    :mod:`turms.plugins.input_funcs` validates its dict instead of splatting it.
+
+    Spelled ``builtins.object`` because a bare ``object`` is shadowable: a schema is free to name
+    a field ``object`` (kraph's ``assertStructure`` does), which makes it a *parameter* of the
+    generated function and turns the annotation into a reference to that parameter rather than
+    the type. Qualifying it is the only spelling no field name can capture.
+    """
     registry.register_import("typing.Dict")
-    registry.register_import("typing.Any")
+    registry.register_import("builtins")
     return ast.Subscript(
         value=ast.Name(id="Dict", ctx=ast.Load()),
         slice=ast.Tuple(
-            elts=[ast.Name(id="str", ctx=ast.Load()), ast.Name(id="Any", ctx=ast.Load())],
+            elts=[
+                ast.Name(id="str", ctx=ast.Load()),
+                ast.Attribute(
+                    value=ast.Name(id="builtins", ctx=ast.Load()),
+                    attr="object",
+                    ctx=ast.Load(),
+                ),
+            ],
             ctx=ast.Load(),
         ),
         ctx=ast.Load(),
     )
+
+
+#: Kept for third-party plugins that imported the old name. turms is published and this name
+#: carries no underscore, so removing it outright would break them on upgrade.
+dict_str_any_annotation = dict_str_object_annotation
 
 
 def generate_input_type_params(
@@ -606,7 +631,7 @@ def generate_variable_assignments(
     stmts.append(
         ast.AnnAssign(
             target=ast.Name(id="variables", ctx=ast.Store()),
-            annotation=dict_str_any_annotation(registry),
+            annotation=dict_str_object_annotation(registry),
             value=ast.Dict(keys=[], values=[]),
             simple=1,
         )
@@ -636,7 +661,7 @@ def generate_variable_assignments(
             stmts.append(
                 ast.AnnAssign(
                     target=ast.Name(id=inner_name, ctx=ast.Store()),
-                    annotation=dict_str_any_annotation(registry),
+                    annotation=dict_str_object_annotation(registry),
                     value=ast.Dict(keys=[], values=[]),
                     simple=1,
                 )

@@ -235,7 +235,9 @@ def test_modern_arkitekt_operations(arkitekt_schema):
         assert "'" not in parameters and '"' not in parameters
         assert "Optional[" not in line and "Union[" not in line and "List[" not in line
 
-    assert "dict[str, Any]" in code
+    # The argument-assembly buffers are `object`-valued, and PEP-585 built-in generics mean the
+    # annotation is spelled `dict[...]` rather than `Dict[...]`.
+    assert "dict[str, builtins.object]" in code
 
     unit_test_with(generated_ast, "")
 
