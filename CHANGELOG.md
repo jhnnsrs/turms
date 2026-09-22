@@ -1,6 +1,38 @@
 # CHANGELOG
 
 
+## v2.1.2 (2026-09-22)
+
+### Bug Fixes
+
+- **funcs**: Type argument buffers as object and stop them being shadowed
+  ([`654be27`](https://github.com/jhnnsrs/turms/commit/654be277cab8a3a14437f75259e1fa90ff55e213))
+
+The generated argument-assembly dicts were `Dict[str, Any]`, which bought no checking and disabled
+  what there was. They are write-only buffers whose values come from the enclosing function's
+  already-typed parameters, so `Dict[str, builtins.object]` is both accurate and still assignable to
+  a `Mapping[str, Any]` parameter.
+
+`builtins.object` rather than a bare `object`, because a schema may name a field `object` -- kraph's
+  `assertStructure` does -- which makes it a parameter of the generated function and captures the
+  annotation. Qualifying it is the only spelling no field name can take.
+
+For the same reason the input-funcs local is `_data` now: an input type with a `data` field shadowed
+  it.
+
+`object` is not assignable to a typed field, so `Cls(**data)` would no longer check; input funcs
+  call `Cls.model_validate(_data)` instead, which takes the mapping whole, resolves the same aliases
+  and leaves `exclude_unset` reporting exactly the keys that were set -- the @oneOf branch already
+  worked this way.
+
+`dict_str_any_annotation` stays as an alias, since turms is published and third-party plugins import
+  it.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01QEr4a9XNWRms96tmxUPXmz
+
+
 ## v2.1.1 (2026-09-21)
 
 ### Bug Fixes
