@@ -283,9 +283,15 @@ class ClassRegistry(object):
         Seeding every type of the declared kinds is deliberate: an unreferenced
         one costs nothing, because the import is registered where the type is
         *referenced*, not here. ``include`` narrows that to the named types, and
-        the project generates the rest itself.
+        the project generates the rest itself -- or, when another external module
+        declares no ``include``, that module takes the rest: modules with an
+        ``include`` claim their names first, so a catch-all module never collides
+        with them. Two claims on one name that are both explicit still collide.
         """
-        for external in self.config.external_modules:
+        explicit = [m for m in self.config.external_modules if m.include is not None]
+        catch_all = [m for m in self.config.external_modules if m.include is None]
+        claimed_explicitly: set[str] = set()
+        for external in [*explicit, *catch_all]:
             include = set(external.include) if external.include is not None else None
             seeded: set[str] = set()
             for kind in external.kinds:
@@ -309,6 +315,8 @@ class ClassRegistry(object):
                         continue
                     if include is not None and typename not in include:
                         continue
+                    if include is None and typename in claimed_explicitly:
+                        continue
                     seeded.add(typename)
                     if typename in self.external_module_map:
                         raise RegistryError(
@@ -322,6 +330,8 @@ class ClassRegistry(object):
                     )
                     self.external_module_map[typename] = external.module
 
+            if include is not None:
+                claimed_explicitly |= seeded
             if include is not None and include - seeded:
                 raise RegistryError(
                     f"external module {external.module} includes "

@@ -237,3 +237,35 @@ def test_include_takes_only_the_named_types_and_the_project_generates_the_rest(a
 def test_an_included_name_the_schema_lacks_is_an_error(arkitekt_schema):
     with pytest.raises(RegistryError, match="DefinitionInputt"):
         _api_ast(arkitekt_schema, _api_config(include=["DefinitionInputt"]))
+
+
+def test_a_catch_all_module_takes_what_an_including_module_leaves(arkitekt_schema):
+    """The shape rekuest's api needs: a few names from a spec package, the rest
+    from the project's own protocol module. Declaration order does not matter."""
+    config = GeneratorConfig(
+        documents=build_relative_glob(DOCUMENTS),
+        scalar_definitions=SCALARS,
+        external_modules=[
+            {"module": EXTERNAL, "kinds": ["enum", "input"]},
+            {"module": "the_spec", "kinds": ["input"], "include": ["DefinitionInput"]},
+        ],
+    )
+    registry_view = _api_ast(arkitekt_schema, config)
+    generated = parse_asts_to_string(registry_view)
+
+    assert "from the_spec import DefinitionInput" in generated
+    assert f"from {EXTERNAL} import" in generated
+    assert "class DefinitionInput(" not in generated
+
+
+def test_two_explicit_claims_on_one_name_still_collide(arkitekt_schema):
+    config = GeneratorConfig(
+        documents=build_relative_glob(DOCUMENTS),
+        scalar_definitions=SCALARS,
+        external_modules=[
+            {"module": "a", "kinds": ["input"], "include": ["DefinitionInput"]},
+            {"module": "b", "kinds": ["input"], "include": ["DefinitionInput"]},
+        ],
+    )
+    with pytest.raises(RegistryError, match="provided by both"):
+        _api_ast(arkitekt_schema, config)

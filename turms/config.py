@@ -318,7 +318,8 @@ class ExternalModuleConfig(BaseModel):
     hand-maintained package that owns some inputs and enums while this project
     generates the rest. A name that is not an enum or input of the declared kinds
     in the schema is an error, so a typo cannot silently fall back to generating
-    the type."""
+    the type. Another external module without ``include`` then provides every
+    remaining type of its kinds."""
 
     from_project: Optional[str] = None
     """A sibling project in the same config whose stylers must match this one's.
