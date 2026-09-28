@@ -282,9 +282,12 @@ class ClassRegistry(object):
 
         Seeding every type of the declared kinds is deliberate: an unreferenced
         one costs nothing, because the import is registered where the type is
-        *referenced*, not here.
+        *referenced*, not here. ``include`` narrows that to the named types, and
+        the project generates the rest itself.
         """
         for external in self.config.external_modules:
+            include = set(external.include) if external.include is not None else None
+            seeded: set[str] = set()
             for kind in external.kinds:
                 if kind == "enum":
                     graphql_type, class_map, style = (
@@ -304,6 +307,9 @@ class ClassRegistry(object):
                         definition, graphql_type
                     ):
                         continue
+                    if include is not None and typename not in include:
+                        continue
+                    seeded.add(typename)
                     if typename in self.external_module_map:
                         raise RegistryError(
                             f"{typename} is provided by both "
@@ -315,6 +321,13 @@ class ClassRegistry(object):
                         typename
                     )
                     self.external_module_map[typename] = external.module
+
+            if include is not None and include - seeded:
+                raise RegistryError(
+                    f"external module {external.module} includes "
+                    f"{sorted(include - seeded)}, which are not "
+                    f"{' or '.join(external.kinds)} types of this schema."
+                )
 
     def _reference_external(self, typename: str, classname: str) -> None:
         """Register the import a reference to an external type needs.

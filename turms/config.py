@@ -311,6 +311,15 @@ class ExternalModuleConfig(BaseModel):
     names: Dict[str, str] = Field(default_factory=dict)
     """Per-type overrides, for when the styler-derived name is not the exported one."""
 
+    include: Optional[List[str]] = None
+    """The GraphQL typenames this module provides; ``None`` means every type of ``kinds``.
+
+    Set it when the module holds only part of the schema's vocabulary -- a
+    hand-maintained package that owns some inputs and enums while this project
+    generates the rest. A name that is not an enum or input of the declared kinds
+    in the schema is an error, so a typo cannot silently fall back to generating
+    the type."""
+
     from_project: Optional[str] = None
     """A sibling project in the same config whose stylers must match this one's.
 

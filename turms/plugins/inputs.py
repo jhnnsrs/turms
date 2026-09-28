@@ -644,6 +644,36 @@ def generate_inputs(
                 discriminator=discriminator, value=member_key
             )
 
+        if type_key in registry.external_module_map:
+            # Owned by an external module. Its unions must be too: a generated
+            # union alias names its members as bare classes of this module, and
+            # an external union's members are the external module's classes.
+            generated_unions = [
+                union_type
+                for union_type, _, _ in memberships
+                if union_type not in registry.external_module_map
+            ]
+            if generated_unions:
+                raise GenerationError(
+                    f"'{type.name}' comes from {registry.external_module_map[type_key]} "
+                    f"but its union(s) {generated_unions} are generated here. A "
+                    "@unionElementOf union and its members must come from the same place."
+                )
+            union_member_types.add(type_key)
+            continue
+
+        external_unions = [
+            union_type
+            for union_type, _, _ in memberships
+            if union_type in registry.external_module_map
+        ]
+        if external_unions:
+            raise GenerationError(
+                f"'{type.name}' is generated here but its union(s) {external_unions} "
+                "come from an external module. A @unionElementOf union and its "
+                "members must come from the same place."
+            )
+
         name = registry.generate_inputtype(type.name)
         union_member_types.add(type_key)
         for union_type, _, _ in memberships:

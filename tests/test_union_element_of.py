@@ -171,3 +171,53 @@ def test_discriminator_mismatch_is_error(tmp_path):
     )
     with pytest.raises(GenerationError, match="Discriminator mismatch"):
         _generate(tmp_path, sdl=sdl)
+
+
+# --------------------------------------------------------------------------- #
+# External unions: a union and its members come from the same place
+# --------------------------------------------------------------------------- #
+
+TRANSFORM_UNION = [
+    "TransformInput",
+    "RelationInput",
+    "AffineTransformInput",
+    "ScaleTransformInput",
+    "FieldTransformInput",
+]
+
+
+def _generate_with_external(tmp_path, include):
+    doc = tmp_path / "ops.graphql"
+    doc.write_text(operation)
+    config = GeneratorConfig(
+        documents=str(tmp_path / "**/*.graphql"),
+        external_modules=[{"module": "transforms", "kinds": ["input"], "include": include}],
+    )
+    return generate_ast(
+        config,
+        build_ast_schema(parse(schema_sdl)),
+        stylers=[DefaultStyler()],
+        plugins=[InputsPlugin(), ObjectsPlugin(), OperationsPlugin()],
+    )
+
+
+def test_an_external_union_imports_the_union_and_generates_none_of_its_members(tmp_path):
+    from turms.run import parse_asts_to_string
+
+    generated = parse_asts_to_string(_generate_with_external(tmp_path, TRANSFORM_UNION))
+
+    assert "class CreateTransformationInput(BaseModel)" in generated
+    assert "from transforms import" in generated
+    for name in TRANSFORM_UNION:
+        assert f"class {name}(" not in generated
+        assert f"{name} = Annotated" not in generated
+
+
+def test_an_external_member_of_a_generated_union_is_refused(tmp_path):
+    with pytest.raises(GenerationError, match="must come from the same place"):
+        _generate_with_external(tmp_path, ["ScaleTransformInput"])
+
+
+def test_a_generated_member_of_an_external_union_is_refused(tmp_path):
+    with pytest.raises(GenerationError, match="must come from the same place"):
+        _generate_with_external(tmp_path, ["TransformInput", "RelationInput"])

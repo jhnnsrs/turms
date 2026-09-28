@@ -201,3 +201,39 @@ def test_projects_with_different_stylers_are_refused():
         load_projects_from_configpath(
             build_relative_glob("/configs/test_external_styler_mismatch.yaml")
         )
+
+
+# --------------------------------------------------------------------------- #
+# include: a module that owns part of the vocabulary
+# --------------------------------------------------------------------------- #
+
+
+def test_include_takes_only_the_named_types_and_the_project_generates_the_rest(arkitekt_schema):
+    config = GeneratorConfig(
+        documents=build_relative_glob(DOCUMENTS),
+        scalar_definitions=SCALARS,
+        external_modules=[{"module": EXTERNAL, "include": ["ArgPortInput"]}],
+    )
+    generated = parse_asts_to_string(
+        generate_ast(
+            config,
+            arkitekt_schema,
+            stylers=STYLERS,
+            plugins=[
+                EnumsPlugin(config=EnumsPluginConfig(skip_unreferenced=False)),
+                InputsPlugin(config=InputsPluginConfig(skip_unreferenced=False)),
+            ],
+        )
+    )
+
+    # The included type is imported where DefinitionInput references it...
+    assert "class ArgPortInput(" not in generated
+    assert f"from {EXTERNAL} import ArgPortInput" in generated
+    # ...and everything else is still this project's.
+    assert "class DefinitionInput(" in generated
+    assert "class ReturnPortInput(" in generated
+
+
+def test_an_included_name_the_schema_lacks_is_an_error(arkitekt_schema):
+    with pytest.raises(RegistryError, match="DefinitionInputt"):
+        _api_ast(arkitekt_schema, _api_config(include=["DefinitionInputt"]))
