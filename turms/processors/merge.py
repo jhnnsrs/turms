@@ -3,6 +3,7 @@ from turms.processors.base import Processor, ProcessorConfig
 import libcst as cst
 from collections import OrderedDict
 from turms.config import GeneratorConfig
+from typing import Optional, Sequence
 import os
 
 # load beasts.py as a ast.Module
@@ -16,12 +17,68 @@ def retrieve_symbol_name(simple_statement: cst.SimpleStatementLine):
         return None
 
 
+def _decorator_call(decorator: cst.Decorator) -> Optional[cst.Call]:
+    return decorator.decorator if isinstance(decorator.decorator, cst.Call) else None
+
+
+def _code_for(node: cst.CSTNode) -> str:
+    return cst.Module(body=[]).code_for_node(node)
+
+
+def merge_decorator(generated: cst.Decorator, existing: cst.Decorator) -> cst.Decorator:
+    """Merges a single decorator.
+
+    Keeps every keyword argument from the freshly generated decorator, 
+    but preserves any additional keyword arguments that only exist 
+    on the hand-edited (existing) decorator.
+    """
+
+    generated_call = _decorator_call(generated)
+    existing_call = _decorator_call(existing)
+
+    if generated_call is None or existing_call is None:
+        return generated
+
+    if _code_for(generated_call.func) != _code_for(existing_call.func):
+        # Different callable entirely (e.g. strawberry.field -> strawberry.mutation) -
+        # not safe to merge keywords across different call targets.
+        return generated
+
+    generated_keywords = {
+        arg.keyword.value for arg in generated_call.args if arg.keyword is not None
+    }
+    preserved_args = [
+        arg
+        for arg in existing_call.args
+        if arg.keyword is not None and arg.keyword.value not in generated_keywords
+    ]
+
+    if not preserved_args:
+        return generated
+
+    merged_call = generated_call.with_changes(args=[*generated_call.args, *preserved_args])
+    return generated.with_changes(decorator=merged_call)
+
+
+def merge_decorators(
+    generated: Sequence[cst.Decorator], existing: Sequence[cst.Decorator]
+) -> Sequence[cst.Decorator]:
+    return [
+        merge_decorator(gen_dec, existing[index]) if index < len(existing) else gen_dec
+        for index, gen_dec in enumerate(generated)
+    ]
+
+
 def merge_functions(generated: cst.FunctionDef, existing: cst.FunctionDef):
     # merge the two functions
 
-    # we want to merge the body of the new function into the existing one
+    # we want to merge the body of the new function into the existing one, and preserve
+    # any hand-added decorator keyword arguments that have no schema representation
 
-    new_def = generated.with_changes(body=existing.body)
+    new_def = generated.with_changes(
+        body=existing.body,
+        decorators=merge_decorators(generated.decorators, existing.decorators),
+    )
     return new_def
 
 
