@@ -1,6 +1,33 @@
 # CHANGELOG
 
 
+## v2.2.0 (2026-09-29)
+
+### Features
+
+- **external_modules**: A module without include takes what explicit includes leave
+  ([`7e563fd`](https://github.com/jhnnsrs/turms/commit/7e563fd33cf03c2cfdbada088f0d4363903be2d1))
+
+Modules that name their types claim them first, so a catch-all module (the project's own protocol
+  module) and a partial one (a spec package) can split one kind between them. Two explicit claims on
+  one name still collide.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+
+- **external_modules**: Take part of a schema's vocabulary with `include`
+  ([`ef9840a`](https://github.com/jhnnsrs/turms/commit/ef9840a23c6b389d8f691f2673dd4c4448ed61d6))
+
+An external module used to claim every enum and input of its kinds, so a package could not own some
+  of the vocabulary while the project generated the rest. `include` names the types it provides; an
+  included name the schema lacks is an error rather than a silent fallback to generating it.
+
+The @unionElementOf pre-pass also generated external members (raising in generate_inputtype), and a
+  union alias on one side with members on the other produced bare, unimported names. A union and its
+  members must now come from the same place, and a split is a clear error.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+
+
 ## v2.1.2 (2026-09-22)
 
 ### Bug Fixes
