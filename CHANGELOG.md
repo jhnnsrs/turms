@@ -1,6 +1,20 @@
 # CHANGELOG
 
 
+## v2.2.1 (2026-09-30)
+
+### Bug Fixes
+
+- Work against graphql-core 3.3
+  ([`f3cd0af`](https://github.com/jhnnsrs/turms/commit/f3cd0af412813aa4ddf2cce31b08878ee9e44373))
+
+3.3 removed get_field_def and get_operation_root_type and moved defaults from default_value to
+  default. turms.schema_lookup provides versions that work on 3.2 and 3.3, and optional AST lists
+  are treated as empty.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+
+
 ## v2.2.0 (2026-09-29)
 
 ### Features
