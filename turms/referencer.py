@@ -264,7 +264,7 @@ def create_reference_registry_from_documents(
     for operation in operations.values():
         type = schema.get_root_type(operation.operation)
 
-        for argument in operation.variable_definitions:
+        for argument in operation.variable_definitions or ():
             recurse_type_annotation(argument, argument.type, schema, registry)
 
         for selection in operation.selection_set.selections:

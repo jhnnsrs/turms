@@ -23,7 +23,7 @@ from turms.utils import (
     non_typename_fields,
     target_from_node,
 )
-from graphql.utilities.type_info import get_field_def
+from turms.schema_lookup import get_field_def
 
 import ast
 from graphql.type.definition import (

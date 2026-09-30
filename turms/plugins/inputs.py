@@ -9,6 +9,7 @@ from graphql import (
     GraphQLScalarType,
     Undefined,
 )
+from turms.schema_lookup import get_default_value
 from turms.errors import GenerationError
 from pydantic_settings import SettingsConfigDict
 from turms.plugins.base import Plugin, PluginConfig, rename_deprecated_keys
@@ -302,11 +303,11 @@ def generate_input_type(
         # nullable OR carries a schema default. For a default we no longer bake the
         # value: the field is omitted on serialization (exclude_unset) so the
         # server applies its own default.
-        has_default = value.default_value is not Undefined
+        has_default = get_default_value(value) is not Undefined
         # A null default carries no useful information; only mark non-null defaults.
         default_string = (
-            str(value.default_value)
-            if has_default and value.default_value is not None
+            str(get_default_value(value))
+            if has_default and get_default_value(value) is not None
             else None
         )
         omittable = has_default or not isinstance(value.type, GraphQLNonNull)
@@ -387,7 +388,7 @@ def validate_oneof_input_type(type: GraphQLInputObjectType):
                 f"'{value_key}'. The spec requires all fields of a @oneOf input "
                 "to be nullable."
             )
-        if value.default_value is not Undefined:
+        if get_default_value(value) is not Undefined:
             raise GenerationError(
                 f"@oneOf input type '{type.name}' has a default value on field "
                 f"'{value_key}'. The spec forbids defaults on @oneOf input fields."
@@ -598,13 +599,13 @@ def generate_inputs(
     union_member_types = set()
 
     for type_key, type in inputobjects_type.items():
-        directives = type.ast_node.directives if type.ast_node else []
+        directives = (type.ast_node.directives or ()) if type.ast_node else ()
         # unionElementOf is repeatable: a member may belong to several unions.
         memberships = []
         for directive in directives:
             if directive.name.value != "unionElementOf":
                 continue
-            args = {arg.name.value: arg.value.value for arg in directive.arguments}
+            args = {arg.name.value: arg.value.value for arg in directive.arguments or ()}
             union_type = args.get("union")
             discriminator = args.get("discriminator")
             member_key = args.get("key")
@@ -797,11 +798,11 @@ def generate_inputs(
             field_name = registry.generate_node_name(value_key)
             # Omittable (optional, default None) when nullable OR carrying a schema
             # default; defaults are deferred to the server via exclude_unset.
-            has_default = value.default_value is not Undefined
+            has_default = get_default_value(value) is not Undefined
             # A null default carries no useful information; only mark non-null defaults.
             default_string = (
-                str(value.default_value)
-                if has_default and value.default_value is not None
+                str(get_default_value(value))
+                if has_default and get_default_value(value) is not None
                 else None
             )
             omittable = has_default or not isinstance(value.type, GraphQLNonNull)

@@ -11,8 +11,8 @@ from pydantic import Field, model_validator
 from graphql.language.ast import (
     FieldNode,
 )
-from graphql.utilities.get_operation_root_type import get_operation_root_type
-from graphql.utilities.type_info import get_field_def
+from turms.schema_lookup import get_operation_root_type
+from turms.schema_lookup import get_field_def
 
 import re
 from graphql import NonNullTypeNode, language
@@ -293,7 +293,7 @@ def generate_operation(
     if plugin_config.create_arguments:
         arguments_body = []
 
-        for v in o.variable_definitions:
+        for v in o.variable_definitions or ():
             is_optional = not isinstance(v.type, NonNullTypeNode) or v.default_value
             annotation = recurse_type_annotation(v.type, registry)
             # A NonNull variable that carries a schema default is optional on the

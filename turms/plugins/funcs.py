@@ -26,8 +26,8 @@ from graphql.language.ast import (
     TypeNode,
 )
 from graphql import GraphQLSchema
-from graphql.utilities.get_operation_root_type import get_operation_root_type
-from graphql.utilities.type_info import get_field_def
+from turms.schema_lookup import get_operation_root_type
+from turms.schema_lookup import get_field_def
 from pydantic import BaseModel, Field
 from pydantic_settings import SettingsConfigDict
 from turms.config import GeneratorConfig, PythonType
@@ -509,12 +509,12 @@ def generate_parameters(
 
     arg_variables = [
         v
-        for v in operation_definition.variable_definitions
+        for v in operation_definition.variable_definitions or ()
         if isinstance(v.type, NonNullTypeNode) and not v.default_value
     ]
     kwarg_variables = [
         v
-        for v in operation_definition.variable_definitions
+        for v in operation_definition.variable_definitions or ()
         if not isinstance(v.type, NonNullTypeNode) or v.default_value
     ]
 
@@ -637,7 +637,7 @@ def generate_variable_assignments(
         )
     )
 
-    for v in o.variable_definitions:
+    for v in o.variable_definitions or ():
         gql_name = v.variable.name.value
         is_required = isinstance(v.type, NonNullTypeNode) and not v.default_value
 
@@ -881,7 +881,7 @@ def estimate_variable_name(
         return
     for field in o.selection_set.selections:
         if isinstance(field, FieldNode):
-            for arg in field.arguments:
+            for arg in field.arguments or ():
                 the_field = get_field_def(client_schema, root, field)
                 if isinstance(arg.value, VariableNode):
                     if arg.value.name.value in the_field.args:
@@ -963,7 +963,7 @@ def generate_query_doc(
     for arg in extra_args:
         description += f"    {arg.key} ({arg.type}): {arg.description}\n"
 
-    for v in o.variable_definitions:
+    for v in o.variable_definitions or ():
         if v.variable.name.value in plugin_config.expand_input_types:
             input_type = v.type
 
@@ -979,7 +979,7 @@ def generate_query_doc(
             if isinstance(v.type, NonNullTypeNode) and not v.default_value:
                 description += f"    {registry.generate_parameter_name(v.variable.name.value)} ({recurse_type_label(v.type, registry)}): {field_description}\n"
 
-    for v in o.variable_definitions:
+    for v in o.variable_definitions or ():
         field_description = description_map.get(v.variable.name.value, "No description")
 
         if not isinstance(v.type, NonNullTypeNode) or v.default_value:

@@ -1,7 +1,7 @@
 import ast
 import glob
 import re
-from typing import List, Optional, Sequence, Set, Union
+from typing import Any, List, Optional, Sequence, Set, TypeVar, Union
 
 from graphql import (
     BooleanValueNode,
@@ -37,7 +37,7 @@ from graphql import (
     validate,
 )
 from graphql.error.graphql_error import GraphQLError
-from graphql.language.ast import DocumentNode, FieldNode, NameNode
+from graphql.language.ast import DocumentNode, FieldNode, NameNode, Node
 from graphql import GraphQLSchema
 
 from turms.annotations import list_label, optional_label
@@ -58,6 +58,8 @@ from turms.errors import (  # noqa: F401  (re-exported: see note below)
 from turms.registry import ClassRegistry
 
 from .config import GraphQLTypes
+
+NodeT = TypeVar("NodeT", bound=Node)
 
 commentline_regex = re.compile(r"^.*#(.*)")
 #: A line that is *only* a comment. Used to walk back over the block of `#` lines above an
@@ -120,13 +122,13 @@ def field_is_conditional(node: Union[FieldNode, InlineFragmentNode]) -> bool:
     ``@include(if: true)``) are recognised so they do not widen the type
     needlessly.
     """
-    for directive in node.directives:
+    for directive in node.directives or ():
         name = directive.name.value
         if name not in ("skip", "include"):
             continue
 
         condition = next(
-            (arg.value for arg in directive.arguments if arg.name.value == "if"),
+            (arg.value for arg in directive.arguments or () if arg.name.value == "if"),
             None,
         )
         if isinstance(condition, BooleanValueNode):
@@ -410,48 +412,71 @@ def generate_pydantic_config(
         return []
 
 
+def replace_node(node: NodeT, **changes: Any) -> NodeT:
+    """A copy of an AST node with ``changes`` applied.
+
+    graphql-core 3.3 made AST nodes frozen, so a node is never assigned into: it is
+    rebuilt. Every field is carried over by name (``keys``, which 3.2 and 3.3 both
+    define), so the copy keeps its ``loc`` and anything else it had.
+    """
+    fields = {key: getattr(node, key) for key in node.keys}
+    fields.update(changes)
+    return type(node)(**fields)
+
+
+def _typename_field() -> FieldNode:
+    return FieldNode(
+        name=NameNode(value="__typename"),
+        arguments=(),
+        directives=(),
+        selection_set=None,
+    )
+
+
 def add_typename_recursively(
     selection_set: SelectionSetNode | None, skip: bool = False
-) -> None:
-    if selection_set is None:
-        return
+) -> SelectionSetNode | None:
+    """``selection_set`` with ``__typename`` selected, and in every nested field's.
 
-    # Collect all existing fields in the selection set
-    selections = list(selection_set.selections)
+    Returns a new selection set rather than changing this one (AST nodes are
+    frozen in graphql-core 3.3). ``skip`` leaves this level alone and still
+    descends: an operation's root has no ``__typename`` of its own.
+    """
+    if selection_set is None:
+        return None
+
+    selections = [
+        replace_node(field, selection_set=add_typename_recursively(field.selection_set))
+        if isinstance(field, FieldNode) and field.selection_set
+        else field
+        for field in selection_set.selections
+    ]
+
     has_typename = any(
         isinstance(field, FieldNode) and field.name.value == "__typename"
         for field in selections
     )
-
-    # Add __typename if it's not already present
     if not has_typename and not skip:
-        selections.append(
-            FieldNode(
-                name=NameNode(value="__typename"),
-                arguments=[],
-                directives=[],
-                selection_set=None,
-            )
-        )
+        selections.append(_typename_field())
 
-    # Apply the function recursively to nested selection sets
-    for field in selections:
-        if isinstance(field, FieldNode) and field.selection_set:
-            add_typename_recursively(field.selection_set)
-
-    # Update the selection set with potentially added __typename fields
-    selection_set.selections = tuple(selections)
+    return replace_node(selection_set, selections=tuple(selections))
 
 
 def auto_add_typename_field_to_all_objects(document: DocumentNode) -> DocumentNode:
-    for definition in document.definitions:
-        if isinstance(definition, (OperationDefinitionNode, FragmentDefinitionNode)):
-            add_typename_recursively(
+    definitions = [
+        replace_node(
+            definition,
+            selection_set=add_typename_recursively(
                 definition.selection_set,
                 skip=isinstance(definition, OperationDefinitionNode),
-            )
+            ),
+        )
+        if isinstance(definition, (OperationDefinitionNode, FragmentDefinitionNode))
+        else definition
+        for definition in document.definitions
+    ]
 
-    return document
+    return replace_node(document, definitions=tuple(definitions))
 
 
 def parse_documents(
@@ -495,6 +520,7 @@ fragment_searcher = re.compile(r"\.\.\.(?P<fragment>[a-zA-Z]*)")
 
 def auto_add_typename_field_to_fragment_str(fragment_str: str) -> str:
     x = parse(fragment_str)
+    definitions = []
     for fragment in x.definitions:
         if isinstance(fragment, FragmentDefinitionNode):
             selections = list(fragment.selection_set.selections)
@@ -502,17 +528,16 @@ def auto_add_typename_field_to_fragment_str(fragment_str: str) -> str:
                 isinstance(field, FieldNode) and field.name.value == "__typename"
                 for field in selections
             ):
-                selections.append(
-                    FieldNode(
-                        name=NameNode(value="__typename"),
-                        arguments=[],
-                        directives=[],
-                        selection_set=None,
-                    )
+                selections.append(_typename_field())
+                fragment = replace_node(
+                    fragment,
+                    selection_set=replace_node(
+                        fragment.selection_set, selections=tuple(selections)
+                    ),
                 )
-                fragment.selection_set.selections = tuple(selections)
+        definitions.append(fragment)
 
-    return print_ast(x)
+    return print_ast(replace_node(x, definitions=tuple(definitions)))
 
 
 def replace_iteratively(
@@ -573,7 +598,7 @@ def is_oneof_input_type(graphql_type) -> bool:
     ast_node = getattr(graphql_type, "ast_node", None)
     if ast_node is None:
         return False
-    return any(directive.name.value == "oneOf" for directive in ast_node.directives)
+    return any(directive.name.value == "oneOf" for directive in ast_node.directives or ())
 
 
 def get_interface_bases(config: GeneratorConfig, registry: ClassRegistry):

@@ -215,10 +215,10 @@ def generate_input_funcs(
     # factories must validate through pydantic instead. Mirror the detection.
     union_targets = set()
     for type in inputobjects_type.values():
-        for directive in type.ast_node.directives if type.ast_node else []:
+        for directive in (type.ast_node.directives or ()) if type.ast_node else ():
             if directive.name.value != "unionElementOf":
                 continue
-            for arg in directive.arguments:
+            for arg in directive.arguments or ():
                 if arg.name.value == "union":
                     union_targets.add(arg.value.value)
 

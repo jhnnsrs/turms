@@ -23,6 +23,7 @@ from graphql import (
 )
 from pydantic_settings import SettingsConfigDict
 
+from turms.schema_lookup import get_default_value
 from turms.plugins.base import Plugin, PluginConfig, rename_deprecated_keys
 import ast
 from typing import Any, Dict, List, Protocol, runtime_checkable
@@ -201,8 +202,8 @@ def default_generate_directives(
 
             type = value.type
 
-            if value.default_value is not None:
-                default = convert_default_value_to_ast(value.default_value)
+            if get_default_value(value) is not None:
+                default = convert_default_value_to_ast(get_default_value(value))
             else:
                 default = None
 
@@ -690,7 +691,7 @@ def generate_directive_keywords(
 
     directives = [
         directive
-        for directive in ast_node.directives
+        for directive in ast_node.directives or ()
         if directive.name.value not in plugin_config.builtin_directives
     ]
 
@@ -703,7 +704,7 @@ def generate_directive_keywords(
                 ),
                 keywords=[
                     ast.keyword(arg=arg.name.value, value=convert_valuenode_to_ast(arg.value))
-                    for arg in directive.arguments
+                    for arg in directive.arguments or ()
                 ],
                 args=[],
             )
@@ -784,12 +785,12 @@ def generate_inputs(
             # schema default; either way the generated dataclass needs a
             # Python default so the field isn't a required constructor
             # argument the caller is forced to pass.
-            has_default = value.default_value is not Undefined
+            has_default = get_default_value(value) is not Undefined
             omittable = has_default or not isinstance(value.type, GraphQLNonNull)
 
             if omittable:
                 default = (
-                    convert_default_value_to_ast(value.default_value)
+                    convert_default_value_to_ast(get_default_value(value))
                     if has_default
                     else ast.Constant(value=None)
                 )
@@ -968,7 +969,7 @@ def generate_types(
                     key: value
                     for key, value in sorted(
                         value.args.items(),
-                        key=lambda item: item[1].default_value == Undefined,
+                        key=lambda item: get_default_value(item[1]) == Undefined,
                         reverse=True,
                     )
                 }
@@ -983,13 +984,13 @@ def generate_types(
                                 config,
                                 plugin_config,
                                 registry=registry,
-                                is_optional=arg.default_value == Undefined,
+                                is_optional=get_default_value(arg) == Undefined,
                             ),
                         )
                     )
 
-                    if arg.default_value != Undefined:
-                        kwdefaults.append(ast.Constant(value=arg.default_value))
+                    if get_default_value(arg) != Undefined:
+                        kwdefaults.append(ast.Constant(value=get_default_value(arg)))
 
             body = []
 

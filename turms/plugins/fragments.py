@@ -17,7 +17,7 @@ from graphql import (
     GraphQLSchema,
 )
 
-from graphql.utilities.type_info import get_field_def
+from turms.schema_lookup import get_field_def
 from pydantic import Field, model_validator
 from pydantic_settings import SettingsConfigDict
 from turms.config import GeneratorConfig, GraphQLTypes
