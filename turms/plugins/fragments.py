@@ -344,8 +344,11 @@ def generate_fragment(
             decorator_list=[],
             keywords=[],
             type_params=[],
-            body=merge_body_sequences(
-                mother_class_fields if mother_class_fields else [ast.Pass()]
+            body=registry.directive_class_vars_for(
+                type.name,
+                merge_body_sequences(
+                    mother_class_fields if mother_class_fields else [ast.Pass()]
+                ),
             ),
         )
 
@@ -407,12 +410,15 @@ def generate_fragment(
                 decorator_list=[],
                 keywords=[],
                 type_params=[],
-                body=merge_body_sequences(
-                    [
-                        description_field,
-                        generate_typename_field(i.name, registry, config),
-                    ],
-                    inline_fields,
+                body=registry.directive_class_vars_for(
+                    i.name,
+                    merge_body_sequences(
+                        [
+                            description_field,
+                            generate_typename_field(i.name, registry, config),
+                        ],
+                        inline_fields,
+                    ),
                 ),
             )
 
@@ -526,10 +532,13 @@ def generate_fragment(
                 decorator_list=[],
                 keywords=[],
                 type_params=[],
-                body=merge_body_sequences(
-                    fields,
-                    generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry),
-                    meta_body,
+                body=registry.directive_class_vars_for(
+                    type.name,
+                    merge_body_sequences(
+                        fields,
+                        generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry),
+                        meta_body,
+                    ),
                 ),
             )
         )
@@ -628,8 +637,11 @@ def generate_fragment(
                 decorator_list=[],
                 keywords=[],
                 type_params=[],
-                body=merge_body_sequences(
-                    [generate_typename_field(i.name, registry, config)], inline_fields
+                body=registry.directive_class_vars_for(
+                    i.name,
+                    merge_body_sequences(
+                        [generate_typename_field(i.name, registry, config)], inline_fields
+                    ),
                 ),
             )
 

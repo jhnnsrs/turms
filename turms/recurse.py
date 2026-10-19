@@ -160,10 +160,13 @@ def recurse_annotation(
                     for base in config.object_bases
                 ]
 
-                merged_body = merge_body_sequences(
-                    this_inline_fragment_fields,
-                    generate_pydantic_config(
-                        GraphQLTypes.FRAGMENT, config, registry
+                merged_body = registry.directive_class_vars_for(
+                    sub_node.type_condition.name.value,
+                    merge_body_sequences(
+                        this_inline_fragment_fields,
+                        generate_pydantic_config(
+                            GraphQLTypes.FRAGMENT, config, registry
+                        ),
                     ),
                 )
                 if not merged_body:
@@ -354,8 +357,12 @@ def recurse_annotation(
             decorator_list=[],
             keywords=[],
             type_params=[],
-            body=merge_body_sequences(
-                body, generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry)
+            body=registry.directive_class_vars_for(
+                type.name,
+                merge_body_sequences(
+                    body,
+                    generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry),
+                ),
             ),
         )
         subtree.append(mother_class)
@@ -395,12 +402,15 @@ def recurse_annotation(
                 decorator_list=[],
                 keywords=[],
                 type_params=[],
-                body=merge_body_sequences(
-                    [
-                        description_field,
-                        generate_typename_field(i.name, registry, config),
-                    ],
-                    inline_fields,
+                body=registry.directive_class_vars_for(
+                    i.name,
+                    merge_body_sequences(
+                        [
+                            description_field,
+                            generate_typename_field(i.name, registry, config),
+                        ],
+                        inline_fields,
+                    ),
                 ),
             )
 
@@ -643,8 +653,12 @@ def recurse_annotation(
             decorator_list=[],
             keywords=[],
             type_params=[],
-            body=merge_body_sequences(
-                body, generate_pydantic_config(GraphQLTypes.OBJECT, config, registry)
+            body=registry.directive_class_vars_for(
+                type.name,
+                merge_body_sequences(
+                    body,
+                    generate_pydantic_config(GraphQLTypes.OBJECT, config, registry),
+                ),
             ),
         )
 
