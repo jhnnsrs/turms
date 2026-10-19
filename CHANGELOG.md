@@ -1,6 +1,45 @@
 # CHANGELOG
 
 
+## v2.3.0 (2026-10-19)
+
+### Build System
+
+- **deps**: Lock graphql-core 3.3.0
+  ([`643c777`](https://github.com/jhnnsrs/turms/commit/643c77757e7d09276d79d6fc5b3848f5e7c987de))
+
+The floor stays >=3.2.0: schema_lookup keeps the 3.2/3.3 shims. Under 3.3, print_ast writes object
+  literals with inner spaces (`{ search: $search }`), so a client regenerated with it re-spaces its
+  stored documents; they are semantically identical.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+### Chores
+
+- The lockfile names turms 2.2.1
+  ([`011b96b`](https://github.com/jhnnsrs/turms/commit/011b96befa6bcd79cf457713e449bac1f1143251))
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- Directive_class_vars stamps a type's directive applications onto every class generated for it
+  ([`3bae587`](https://github.com/jhnnsrs/turms/commit/3bae587bfee4bd0a3f00f3fb2ad2a16d6625129e))
+
+`type Dataset @identified(by: "@x/dataset")` with the rule {directive: identified, argument: by,
+  attribute: __identifier__} gives `__identifier__: ClassVar[Literal["@x/dataset"]]` on the
+  fragment, on every nested selection of the type (a class of its own, not a subclass of the
+  fragment), on inline fragments, interface implementations, objects and inputs. A single string,
+  integer, boolean or enum value is typed as its Literal, so a Protocol can tell the types apart; a
+  repeatable directive gives a tuple, a rule without an argument a True marker.
+
+It fails closed: a directive or argument the schema does not declare, a stamp named like a field, a
+  type generated as no class (union, enum, scalar, @oneOf input, @unionElementOf placeholder) and an
+  introspected schema, whose directive applications are invisible, are errors.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+
 ## v2.2.1 (2026-09-30)
 
 ### Bug Fixes
