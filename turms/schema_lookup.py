@@ -111,3 +111,14 @@ def root_field_nodes(
             if name in seen or name not in fragments:
                 continue
             yield from root_field_nodes(fragments[name].selection_set, fragments, seen | {name})
+
+
+def input_field_is_required(field: GraphQLInputField) -> bool:
+    """Whether a caller must give this input field: non-null, and with no default to fall back on.
+
+    A non-null field with a default (``allowMesh: Boolean! = false``) may be left out: the server
+    applies the default (GraphQL spec, "Input Coercion").
+    """
+    from graphql import GraphQLNonNull, Undefined
+
+    return isinstance(field.type, GraphQLNonNull) and get_default_value(field) is Undefined

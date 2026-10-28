@@ -26,7 +26,7 @@ from graphql.language.ast import (
     TypeNode,
 )
 from graphql import GraphQLSchema
-from turms.schema_lookup import get_operation_root_type
+from turms.schema_lookup import get_operation_root_type, input_field_is_required
 from turms.schema_lookup import get_field_def
 from pydantic import BaseModel, Field
 from pydantic_settings import SettingsConfigDict
@@ -449,7 +449,7 @@ def generate_input_type_params(
     for value_key, value in input_type.fields.items():
         field_name = registry.generate_node_name(value_key)
 
-        if isinstance(value.type, GraphQLNonNull):
+        if input_field_is_required(value):
             pos_args.append(
                 ast.arg(
                     arg=field_name,
@@ -674,7 +674,7 @@ def generate_variable_assignments(
                     ctx=ast.Store(),
                 )
                 field_value = ast.Name(id=field_param, ctx=ast.Load())
-                if isinstance(field.type, GraphQLNonNull):
+                if input_field_is_required(field):
                     # required field → always present (positional parameter)
                     stmts.append(
                         ast.Assign(targets=[field_subscript], value=field_value)

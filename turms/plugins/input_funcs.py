@@ -19,6 +19,7 @@ from graphql import GraphQLInputObjectType, GraphQLNonNull, GraphQLSchema
 from pydantic import Field
 from pydantic_settings import SettingsConfigDict
 
+from turms.schema_lookup import input_field_is_required
 from turms.config import GeneratorConfig, PythonType
 from turms.plugins.base import Plugin, PluginConfig
 from turms.plugins.funcs import (
@@ -110,7 +111,7 @@ def generate_input_func(
         )
         param_value = ast.Name(id=field_param, ctx=ast.Load())
 
-        if isinstance(value.type, GraphQLNonNull):
+        if input_field_is_required(value):
             # required -> always present
             body.append(ast.Assign(targets=[subscript], value=param_value))
         else:
