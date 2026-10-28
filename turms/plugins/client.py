@@ -15,10 +15,11 @@ import importlib
 from typing import List, Optional
 
 from graphql import GraphQLSchema
-from graphql.language.ast import OperationDefinitionNode, OperationType
+from graphql.language.ast import FragmentDefinitionNode, OperationDefinitionNode, OperationType
 from pydantic import model_validator
 from pydantic_settings import SettingsConfigDict
 
+from turms.class_fields import ClassField, check_target
 from turms.config import GeneratorConfig
 from turms.errors import GenerationError
 from turms.plugins.base import Plugin
@@ -78,6 +79,18 @@ class ClientPluginConfig(OperationFuncsConfig):
     """Dotted paths of classes the generated class will be mixed into. Every
     attribute they have (and every pydantic field they declare) is reserved:
     pydantic lets a field silently hide a same-named method, with only a warning."""
+    client_fields: List[ClassField] = []
+    """Class variables of the generated class, gathered from its operations: a name, a
+    kind, an ``operation`` collector and how its values combine (see
+    :mod:`turms.class_fields`). ``root_field_directive`` reads what the server says on
+    the root fields the operations select, e.g. the scopes they need::
+
+        client_fields:
+          - name: __scopes__
+            kind: tuple[str, ...]
+            collector: {type: root_field_directive, directive: auth, argument: required_scopes}
+            combine: union
+    """
 
     @model_validator(mode="after")
     def _check(self) -> "ClientPluginConfig":
@@ -245,6 +258,7 @@ def generate_client_class(
     methods: List[ast.FunctionDef | ast.AsyncFunctionDef],
     plugin_config: ClientPluginConfig,
     registry: ClassRegistry,
+    stamps: Optional[List[tuple[str, str, str]]] = None,
 ) -> ast.ClassDef:
     """Wraps the generated methods in the client class.
 
@@ -259,12 +273,24 @@ def generate_client_class(
         | {"self"}
     )
     seen: set[str] = set()
+    stamps = stamps or []
+
+    for name, _, _ in stamps:
+        if name in reserved:
+            raise GenerationError(
+                f"client_fields: {name!r} on {plugin_config.client_class} shadows a reserved name; rename it"
+            )
 
     for method in methods:
         if method.name in reserved:
             raise GenerationError(
                 f"Generated method {method.name!r} on {plugin_config.client_class} "
                 "shadows a reserved name; rename the operation"
+            )
+        if method.name in {name for name, _, _ in stamps}:
+            raise GenerationError(
+                f"client_fields: {method.name!r} is both a class field and a method of "
+                f"{plugin_config.client_class}; rename one"
             )
         if method.name in seen:
             raise GenerationError(
@@ -307,7 +333,7 @@ def generate_client_class(
         name=plugin_config.client_class,
         bases=bases,
         keywords=[],
-        body=[doc, *methods],
+        body=registry.with_class_vars([doc, *methods], stamps) if stamps else [doc, *methods],
         decorator_list=[],
         type_params=[],
     )
@@ -386,4 +412,19 @@ class ClientPlugin(Plugin):
                     )
                 )
 
-        return [generate_client_class(methods, plugin_config, registry)]
+        fragments = {
+            node.name.value: node
+            for node in documents.definitions
+            if isinstance(node, FragmentDefinitionNode)
+        }
+        stamps = []
+        for field in plugin_config.client_fields:
+            collector = check_target(field, "operation", "client_fields")
+            collector.check(client_schema, registry)
+            groups = [
+                collector.collect_operation(client_schema, operation, fragments, registry)
+                for operation in operations
+            ]
+            stamps.append(field.stamp(groups, client_schema, registry))
+
+        return [generate_client_class(methods, plugin_config, registry, stamps)]

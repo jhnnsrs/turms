@@ -6,7 +6,7 @@ defaults from ``default_value`` to ``default`` (a ``GraphQLDefaultInput``). Thes
 turms's own versions, so the rest of turms works against either.
 """
 
-from typing import Any, Optional, cast
+from typing import Any, Dict, Iterator, Optional, cast
 
 from graphql import (
     GraphQLArgument,
@@ -14,7 +14,11 @@ from graphql import (
     coerce_input_value,
     value_from_ast,
     FieldNode,
+    FragmentDefinitionNode,
+    FragmentSpreadNode,
     GraphQLError,
+    InlineFragmentNode,
+    SelectionSetNode,
     GraphQLField,
     GraphQLInterfaceType,
     GraphQLObjectType,
@@ -89,3 +93,21 @@ def get_default_value(input_value: GraphQLArgument | GraphQLInputField) -> Any: 
         # nested input field's own default; coerce_input_literal (3.3 only) does not.
         return _coerce_literal(default.literal, input_value.type)
     return coerce_input_value(default.value, input_value.type)
+
+
+def root_field_nodes(
+    selection_set: SelectionSetNode,
+    fragments: Dict[str, FragmentDefinitionNode],
+    seen: frozenset[str] = frozenset(),
+) -> Iterator[FieldNode]:
+    """The fields an operation selects on its root type, through fragments spread or inlined on it."""
+    for selection in selection_set.selections:
+        if isinstance(selection, FieldNode):
+            yield selection
+        elif isinstance(selection, InlineFragmentNode):
+            yield from root_field_nodes(selection.selection_set, fragments, seen)
+        elif isinstance(selection, FragmentSpreadNode):
+            name = selection.name.value
+            if name in seen or name not in fragments:
+                continue
+            yield from root_field_nodes(fragments[name].selection_set, fragments, seen | {name})

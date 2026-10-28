@@ -344,7 +344,7 @@ def generate_fragment(
             decorator_list=[],
             keywords=[],
             type_params=[],
-            body=registry.directive_class_vars_for(
+            body=registry.class_fields_for(
                 type.name,
                 merge_body_sequences(
                     mother_class_fields if mother_class_fields else [ast.Pass()]
@@ -410,7 +410,7 @@ def generate_fragment(
                 decorator_list=[],
                 keywords=[],
                 type_params=[],
-                body=registry.directive_class_vars_for(
+                body=registry.class_fields_for(
                     i.name,
                     merge_body_sequences(
                         [
@@ -532,7 +532,7 @@ def generate_fragment(
                 decorator_list=[],
                 keywords=[],
                 type_params=[],
-                body=registry.directive_class_vars_for(
+                body=registry.class_fields_for(
                     type.name,
                     merge_body_sequences(
                         fields,
@@ -637,7 +637,7 @@ def generate_fragment(
                 decorator_list=[],
                 keywords=[],
                 type_params=[],
-                body=registry.directive_class_vars_for(
+                body=registry.class_fields_for(
                     i.name,
                     merge_body_sequences(
                         [generate_typename_field(i.name, registry, config)], inline_fields

@@ -373,7 +373,7 @@ def generate_types(
                 ],
                 decorator_list=[],
                 keywords=[],
-                body=registry.directive_class_vars_for(
+                body=registry.class_fields_for(
                     key,
                     fields
                     + generate_pydantic_config(GraphQLTypes.OBJECT, config, registry, key),

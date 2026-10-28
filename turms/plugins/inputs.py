@@ -373,7 +373,7 @@ def generate_input_type(
         ],
         decorator_list=[],
         keywords=[],
-        body=registry.directive_class_vars_for(
+        body=registry.class_fields_for(
             key,
             fields
             + generate_pydantic_config(GraphQLTypes.INPUT, config, registry, typename=key),
@@ -716,7 +716,7 @@ def generate_inputs(
             continue
 
         if is_oneof_input_type(type):
-            registry.refuse_directive_class_vars(
+            registry.refuse_class_fields(
                 key, "a @oneOf input is generated as a union of its variants, not a class"
             )
             validate_oneof_input_type(type)
@@ -740,7 +740,7 @@ def generate_inputs(
             continue
 
         if type.name in union_input_types:
-            registry.refuse_directive_class_vars(
+            registry.refuse_class_fields(
                 key, "a @unionElementOf placeholder is generated as a union alias, not a class"
             )
             registry.register_import("typing.Union")
@@ -867,7 +867,7 @@ def generate_inputs(
                 ],
                 decorator_list=[],
                 keywords=[],
-                body=registry.directive_class_vars_for(
+                body=registry.class_fields_for(
                     key,
                     fields
                     + generate_pydantic_config(

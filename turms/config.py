@@ -25,6 +25,7 @@ from typing import (
     runtime_checkable,
 )
 from turms.helpers import import_string
+from turms.class_fields import ClassField
 from enum import Enum
 from .rules import specified_rules_map
 
@@ -283,49 +284,6 @@ fragments of the same GraphQL type are not interchangeable, and an operation
 belongs to whoever generated its document."""
 
 
-class DirectiveClassVar(BaseModel):
-    """One directive whose applications on a GraphQL type become a class variable.
-
-    ``{directive: identified, argument: by, attribute: __identifier__}`` turns
-    ``type Metric @identified(by: "@mikro/metric")`` into
-    ``__identifier__: ClassVar[str] = "@mikro/metric"`` on **every** class generated
-    for ``Metric``: its fragments, each nested selection of it and its objects class.
-
-    - The value is the argument's, read against the directive's own argument type
-      (an enum value is its name, a list a tuple); an omitted argument takes the
-      directive definition's default. A single string, integer, boolean or enum value
-      is typed as its ``Literal``, so a checker can tell the stamped classes apart.
-    - A ``repeatable`` directive always gives a tuple, one entry per application, so
-      the attribute's type does not depend on how often a type carries it.
-    - Without ``argument`` the attribute is a presence marker: ``True``.
-    - A type without the directive gets no attribute.
-
-    Directive applications are only visible in an SDL schema; a rule against an
-    introspected schema is an error, as is a directive or argument the schema does
-    not declare.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    directive: str
-    """The directive's name, without ``@``."""
-
-    argument: Optional[str] = None
-    """The argument whose value is stamped; ``None`` stamps ``True`` for presence."""
-
-    attribute: str
-    """The class variable's name. A dunder (``__identifier__``) never meets a field."""
-
-    @field_validator("attribute")
-    @classmethod
-    def _is_an_identifier(cls, value: str) -> str:
-        import keyword
-
-        if not value.isidentifier() or keyword.iskeyword(value):
-            raise ValueError(f"{value!r} is not a python identifier")
-        return value
-
-
 class ExternalModuleConfig(BaseModel):
     """A module that already holds generated types for this schema.
 
@@ -561,11 +519,11 @@ class GeneratorConfig(BaseSettings):
     )
     "Additional config for the generated models as map of GraphQL Type to config attributes"
 
-    directive_class_vars: List[DirectiveClassVar] = Field(
+    class_fields: List[ClassField] = Field(
         default_factory=list,
-        description="Directives whose applications on a GraphQL type become class variables of every class generated for it",
+        description="Class variables of every class generated for a GraphQL type: a name, a kind, what collects their values off the type and how they combine",
     )
-    "Directives whose applications on a GraphQL type become class variables of every class generated for it (see DirectiveClassVar)"
+    "Class variables of every class generated for a GraphQL type (see turms.class_fields.ClassField): e.g. a directive's argument, stamped as __identifier__"
 
     force_plugin_order: bool = True
     "Should the plugins be forced to run in the order they are defined"

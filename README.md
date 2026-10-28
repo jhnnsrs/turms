@@ -192,7 +192,6 @@ Plugins generate the actual code. Enable them per project; order matters (enums 
 | `turms.plugins.funcs.FuncsPlugin` | Typed, documented call functions per operation (sync + async) that delegate to your client through configurable proxies |
 | `turms.plugins.client.ClientPlugin` | One class with a typed, documented method per operation (sync + async) that delegates to `execute`/`aexecute`/`subscribe`/`asubscribe` of `self`; mix it into your client |
 | `turms.plugins.strawberry.StrawberryPlugin` | A Strawberry server schema with typed resolver stubs |
-| `turms.plugins.scopes.ScopesPlugin` | `SCOPES: List[str]`, the scopes the project's operations need, read off `@auth(required_scopes: ...)` on the root fields they select (from SDL; an introspected schema is refused) |
 
 The funcs plugin turns operations into plain function calls. With an executor proxy configured (see [`examples/rath-usage`](examples/rath-usage)):
 
@@ -263,6 +262,7 @@ turms complies with [graphql-config](https://www.graphql-config.com/docs/user/us
 | `min_python_version` | `"3.10"` | Oldest Python the generated code must run on — drives `type_annotation_style: auto` |
 | `omitted_document_rules` | `[]` | GraphQL validation rules to skip for documents |
 | `dump_schema` / `dump_configuration` | `false` | Also write the resolved schema / project config next to the output |
+| `class_fields` | `[]` | Class variables of every class generated for a GraphQL type, collected off the type (see [Class fields](#class-fields)) |
 
 Every option can also be supplied through environment variables with the `TURMS_` prefix (e.g. `TURMS_OUT_DIR=generated`), courtesy of Pydantic settings.
 
@@ -276,6 +276,52 @@ schema:
 ```
 
 See the [documentation website](https://jhnnsrs.github.io/turms) for the full configuration reference, including all per-plugin options.
+
+### Class fields
+
+A class variable of a generated class is declared as a policy: a `name`, a `kind` (its
+annotation, inferred when omitted), a `collector` that gathers its values and how they
+`combine`. Two places take them:
+
+- **`class_fields`** stamps every class generated for a GraphQL type: its fragments, each nested
+  selection of it, its objects class. Its collectors read a type.
+- **`client_fields`** on `turms.plugins.client.ClientPlugin` stamps the generated client class
+  with what its operations gather. Its collectors read an operation.
+
+```yaml
+extensions:
+  turms:
+    class_fields:
+      - name: __identifier__            # Literal["@mikro/metric"] on every class of Metric
+        collector: {type: type_directive, directive: identified, argument: by}
+    plugins:
+      - type: turms.plugins.client.ClientPlugin
+        client_class: MikroApi
+        client_fields:
+          - name: __scopes__            # the scopes every root field the client selects needs
+            kind: tuple[str, ...]
+            collector: {type: root_field_directive, directive: auth, argument: required_scopes}
+            combine: union
+```
+
+| Collector | Reads | Values |
+| --- | --- | --- |
+| `type_directive` | a directive's applications on a type (`directive`, `argument`; none: `True` for presence) | one per application; an omitted argument takes the directive's default |
+| `root_field_directive` | a directive's argument on every root field an operation selects | a list's items each one; `required` (default on) fails generation on a selected field that gives none |
+| `operation_directive` | a directive's argument on the operation itself, in the client's documents | a list's items each one |
+
+A collector can also be your own: a dotted path to a `turms.class_fields.Collector`.
+
+`combine` is `first` (a scalar), `all` (every value, in order), `ordered` (every value once),
+`union` (once, sorted) or `intersection` (what every group holds), or a dotted path to a
+function of the groups (then give the `kind`). Unset, it is the collector's own: `first`, or
+`all` for a repeatable directive, for `type_directive`; `union` for the others. Without a
+`kind`, a single string, integer, boolean or enum value is typed as its `Literal`, several as a
+tuple. Collectors reading the schema's directives need an SDL schema: an introspected one,
+and a directive or argument the schema does not declare, are errors.
+
+`class_fields` replaces `directive_class_vars` (turms 2.3): `{directive, argument, attribute}`
+is `{name: attribute, collector: {type: type_directive, directive, argument}}`.
 
 ### Modern type annotations
 

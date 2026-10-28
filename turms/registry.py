@@ -3,6 +3,8 @@ from keyword import iskeyword
 from typing import Callable, Dict, List, Optional, Set
 
 from graphql import (
+    GraphQLArgument,
+    GraphQLDirective,
     GraphQLEnumType,
     GraphQLInputObjectType,
     GraphQLInputType,
@@ -278,9 +280,9 @@ class ClassRegistry(object):
         #: ``reference_inputtype``/``reference_enum``.
         self.external_module_map: Dict[str, str] = {}
 
-        #: GraphQL typename -> ``(attribute, annotation, value)`` per ``directive_class_vars``
-        #: rule its applications satisfy. Filled by :meth:`seed_directive_class_vars`.
-        self.directive_class_var_map: Dict[str, List[tuple[str, str, object]]] = {}
+        #: GraphQL typename -> ``(name, annotation, value source)`` per ``class_fields`` entry
+        #: that collected something for it. Filled by :meth:`seed_class_fields`.
+        self.class_field_map: Dict[str, List[tuple[str, str, str]]] = {}
 
         self.log = log
 
@@ -353,72 +355,55 @@ class ClassRegistry(object):
                     f"{' or '.join(external.kinds)} types of this schema."
                 )
 
-    def seed_directive_class_vars(self, schema: GraphQLSchema) -> None:
-        """Read every ``config.directive_class_vars`` rule off the schema, once.
+    def directive_definition(
+        self, schema: GraphQLSchema, directive: str, argument: Optional[str], needs_sdl: bool = True
+    ) -> tuple[GraphQLDirective, Optional[GraphQLArgument]]:
+        """The directive and its argument a class field reads, refused when the schema cannot give them.
+
+        Fails closed: a directive or an argument the schema does not declare is an error, and so
+        is a schema that cannot show where a directive is applied (an introspected one), when the
+        applications to read are the schema's own (``needs_sdl``).
+        """
+        definition = schema.get_directive(directive)
+        if definition is None:
+            raise RegistryError(f"class_fields: the schema declares no directive @{directive}")
+        if needs_sdl and definition.ast_node is None:
+            raise RegistryError(
+                f"class_fields: @{directive} has no SDL definition, so its applications are "
+                "invisible (an introspected schema carries none). Generate from the SDL the server prints."
+            )
+        if argument is None:
+            return definition, None
+        found = definition.args.get(argument)
+        if found is None:
+            raise RegistryError(f"class_fields: @{directive} has no argument {argument!r} (it has {sorted(definition.args)})")
+        return definition, found
+
+    def seed_class_fields(self, schema: GraphQLSchema) -> None:
+        """Collect every ``config.class_fields`` entry off the schema's types, once.
 
         Must run **before any plugin**: every class a plugin generates for a type asks
-        :meth:`directive_class_vars_for` for its stamps. Fails closed: a rule naming a
-        directive or argument the schema does not declare, or a schema that cannot
-        show directive applications at all (introspected), is an error rather than a
-        silent absence of every attribute.
+        :meth:`class_fields_for` for its stamps. A type that collects nothing gets no stamp;
+        one that is generated as no class (a union, an enum, a scalar) and collects something
+        is an error.
         """
-        for rule in self.config.directive_class_vars:
-            directive = schema.get_directive(rule.directive)
-            if directive is None:
-                raise RegistryError(
-                    f"directive_class_vars: the schema declares no directive @{rule.directive}"
-                )
-            if directive.ast_node is None:
-                raise RegistryError(
-                    f"directive_class_vars: @{rule.directive} has no SDL definition, so its "
-                    "applications are invisible (an introspected schema carries none). "
-                    "Generate from the SDL the server prints."
-                )
-            argument = None
-            if rule.argument is not None:
-                argument = directive.args.get(rule.argument)
-                if argument is None:
-                    raise RegistryError(
-                        f"directive_class_vars: @{rule.directive} has no argument "
-                        f"{rule.argument!r} (it has {sorted(directive.args)})"
-                    )
+        from turms.class_fields import check_target
 
-            annotation = (
-                _class_var_annotation(argument.type, self) if argument is not None else "bool"
-            )
-            if directive.is_repeatable:
-                self.register_import("typing.Tuple")
-                annotation = f"Tuple[{annotation}, ...]"
-
+        for field in self.config.class_fields:
+            collector = check_target(field, "type", "class_fields")
+            collector.check(schema, self)
             for typename, definition in schema.type_map.items():
-                node = getattr(definition, "ast_node", None)
-                if typename.startswith("__") or node is None:
+                if typename.startswith("__") or getattr(definition, "ast_node", None) is None:
                     continue
-                nodes = [node, *(getattr(definition, "extension_ast_nodes", None) or ())]
-                applications = [
-                    application
-                    for n in nodes
-                    for application in (getattr(n, "directives", None) or ())
-                    if application.name.value == rule.directive
-                ]
-                if not applications:
+                groups = collector.collect_type(schema, definition, self)
+                if not groups:
                     continue
                 if not isinstance(definition, (GraphQLObjectType, GraphQLInterfaceType, GraphQLInputObjectType)):
                     raise RegistryError(
-                        f"directive_class_vars: {typename} carries @{rule.directive}, but a "
+                        f"class_fields: {typename} would carry {field.name}, but a "
                         f"{type(definition).__name__} is generated as no class to stamp"
                     )
-
-                values = [
-                    _directive_argument_value(application, rule.argument, argument)
-                    if argument is not None
-                    else True
-                    for application in applications
-                ]
-                value = tuple(values) if directive.is_repeatable else values[0]
-                self.directive_class_var_map.setdefault(typename, []).append(
-                    (rule.attribute, self._literal_or(annotation, value), value)
-                )
+                self.class_field_map.setdefault(typename, []).append(field.stamp(groups, schema, self))
 
     def _literal_or(self, annotation: str, value: object) -> str:
         """``Literal[value]`` for a single string, integer or boolean, else ``annotation``.
@@ -433,30 +418,28 @@ class ClassRegistry(object):
             return f"Literal[{value!r}]"
         return annotation
 
-    def refuse_directive_class_vars(self, typename: str, reason: str) -> None:
+    def refuse_class_fields(self, typename: str, reason: str) -> None:
         """Fail where a type with stamps is generated as something other than a class.
 
         Called by the sites that emit a type as an alias (a ``@oneOf`` input, a
         ``@unionElementOf`` placeholder): the stamps would otherwise vanish silently.
         """
-        stamps = self.directive_class_var_map.get(typename)
+        stamps = self.class_field_map.get(typename)
         if stamps:
             raise RegistryError(
-                f"directive_class_vars: {typename} would carry "
-                f"{', '.join(attribute for attribute, _, _ in stamps)}, but {reason}"
+                f"class_fields: {typename} would carry "
+                f"{', '.join(name for name, _, _ in stamps)}, but {reason}"
             )
 
-    def directive_class_vars_for(
-        self, typename: str, body: List[ast.stmt]
-    ) -> List[ast.stmt]:
-        """``body`` with the class variables ``typename``'s directives stamp, after its docstring.
+    def class_fields_for(self, typename: str, body: List[ast.stmt]) -> List[ast.stmt]:
+        """``body`` with the class variables ``typename``'s class fields stamp, after its docstring.
 
         Every site that builds a class *for a GraphQL type* passes its body through
         here, so a nested selection carries the same stamps as the type's fragment.
         A stamp named like one of the class's own fields is an error: pydantic would
         read the class variable as the field's default.
         """
-        stamps = self.directive_class_var_map.get(typename)
+        stamps = self.class_field_map.get(typename)
         if not stamps:
             return body
 
@@ -465,26 +448,30 @@ class ClassRegistry(object):
             for statement in body
             if isinstance(statement, ast.AnnAssign) and isinstance(statement.target, ast.Name)
         }
-        self.register_import("typing.ClassVar")
-        statements: List[ast.stmt] = []
-        for attribute, annotation, value in stamps:
-            if attribute in fields:
+        for name, _, _ in stamps:
+            if name in fields:
                 raise RegistryError(
-                    f"directive_class_vars: {attribute!r} is also a field of the class "
+                    f"class_fields: {name!r} is also a field of the class "
                     f"generated for {typename}. Pick a name no field takes (a dunder)."
                 )
-            statements.append(
-                ast.AnnAssign(
-                    target=ast.Name(id=attribute, ctx=ast.Store()),
-                    annotation=ast.Subscript(
-                        value=ast.Name(id="ClassVar", ctx=ast.Load()),
-                        slice=ast.parse(annotation, mode="eval").body,
-                        ctx=ast.Load(),
-                    ),
-                    value=ast.parse(repr(value), mode="eval").body,
-                    simple=1,
-                )
+        return self.with_class_vars(body, stamps)
+
+    def with_class_vars(self, body: List[ast.stmt], stamps: List[tuple[str, str, str]]) -> List[ast.stmt]:
+        """``body`` with ``name: ClassVar[annotation] = value`` per stamp, right after its docstring."""
+        self.register_import("typing.ClassVar")
+        statements: List[ast.stmt] = [
+            ast.AnnAssign(
+                target=ast.Name(id=name, ctx=ast.Store()),
+                annotation=ast.Subscript(
+                    value=ast.Name(id="ClassVar", ctx=ast.Load()),
+                    slice=ast.parse(annotation, mode="eval").body,
+                    ctx=ast.Load(),
+                ),
+                value=ast.parse(source, mode="eval").body,
+                simple=1,
             )
+            for name, annotation, source in stamps
+        ]
 
         body = [statement for statement in body if not isinstance(statement, ast.Pass)]
         has_docstring = (
@@ -1066,14 +1053,14 @@ def _directive_argument_value(application, name: str, argument) -> object:  # no
         value = get_default_value(argument)
         if value is Undefined:
             raise RegistryError(
-                f"directive_class_vars: an application of @{application.name.value} gives no "
+                f"class_fields: an application of @{application.name.value} gives no "
                 f"{name!r} and the directive declares no default for it"
             )
     else:
         value = value_from_ast(node, argument.type)
         if value is Undefined:
             raise RegistryError(
-                f"directive_class_vars: @{application.name.value}({name}: ...) is not a valid "
+                f"class_fields: @{application.name.value}({name}: ...) is not a valid "
                 f"{argument.type}"
             )
     return _frozen(value)

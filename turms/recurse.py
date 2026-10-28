@@ -160,7 +160,7 @@ def recurse_annotation(
                     for base in config.object_bases
                 ]
 
-                merged_body = registry.directive_class_vars_for(
+                merged_body = registry.class_fields_for(
                     sub_node.type_condition.name.value,
                     merge_body_sequences(
                         this_inline_fragment_fields,
@@ -357,7 +357,7 @@ def recurse_annotation(
             decorator_list=[],
             keywords=[],
             type_params=[],
-            body=registry.directive_class_vars_for(
+            body=registry.class_fields_for(
                 type.name,
                 merge_body_sequences(
                     body,
@@ -402,7 +402,7 @@ def recurse_annotation(
                 decorator_list=[],
                 keywords=[],
                 type_params=[],
-                body=registry.directive_class_vars_for(
+                body=registry.class_fields_for(
                     i.name,
                     merge_body_sequences(
                         [
@@ -653,7 +653,7 @@ def recurse_annotation(
             decorator_list=[],
             keywords=[],
             type_params=[],
-            body=registry.directive_class_vars_for(
+            body=registry.class_fields_for(
                 type.name,
                 merge_body_sequences(
                     body,

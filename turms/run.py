@@ -598,7 +598,7 @@ def generate_ast(
     # first time anything references it. See ClassRegistry.seed_external.
     registry.seed_external(schema)
     # Also before any plugin: every class generated for a type is stamped as it is built.
-    registry.seed_directive_class_vars(schema)
+    registry.seed_class_fields(schema)
 
     for plugin in plugins:
         try:
