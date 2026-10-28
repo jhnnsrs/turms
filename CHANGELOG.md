@@ -1,6 +1,59 @@
 # CHANGELOG
 
 
+## v3.0.0 (2026-10-28)
+
+### Chores
+
+- Lock 2.3.0
+  ([`502d063`](https://github.com/jhnnsrs/turms/commit/502d063ba5016fc9708c84df8d8e45e499ea185b))
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+### Features
+
+- Class fields: a name, a kind, a collector and a combine
+  ([`715ee19`](https://github.com/jhnnsrs/turms/commit/715ee197783e7ce0e00ca33fb4e3ccdd752839bb))
+
+A class variable of a generated class is now declared as a policy. It has a `name` and a `kind`
+  (inferred when unset), a `collector` that gathers values, and a `combine` that reduces them
+  (`first`, `all`, `ordered`, `union`, `intersection`, or a dotted path).
+
+It is used in two places: - `class_fields` stamps every class generated for a GraphQL type, with
+  collectors that read a type (`type_directive`). - `ClientPlugin.client_fields` stamps the
+  generated client class, with collectors that read an operation (`root_field_directive`,
+  `operation_directive`). For example, the scopes every root field the client selects needs.
+  `required` fails generation on a selected field that names none.
+
+A collector can be your own, given as a dotted path. Collectors that read the schema's directives
+  still refuse an introspected schema, an undeclared directive or an unknown argument
+  (`directive_definition`).
+
+BREAKING CHANGE: `directive_class_vars` is replaced by `class_fields`. `{directive, argument,
+  attribute}` becomes `{name: attribute, collector: {type: type_directive, directive, argument}}`,
+  with the same
+
+output. The `ScopesPlugin` is gone: use `client_fields`.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+- Scopesplugin gathers the scopes a client's operations need
+  ([`1307e8a`](https://github.com/jhnnsrs/turms/commit/1307e8aa531bf90ddc2dbaeb3960f63456ed920f))
+
+It reads `@auth(required_scopes: ...)` (the directive and arguments are configurable) off the root
+  fields every operation of the project selects, including through fragments on the root type, and
+  emits them as one module-level `SCOPES: List[str]`. A schema that doesn't declare the directive,
+  or that came from introspection and so carries no applications, is refused rather than producing
+  an empty list.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+### Breaking Changes
+
+- `directive_class_vars` is replaced by `class_fields`. `{directive, argument, attribute}` becomes
+  `{name: attribute, collector: {type: type_directive, directive, argument}}`, with the same
+
+
 ## v2.3.0 (2026-10-19)
 
 ### Build System
