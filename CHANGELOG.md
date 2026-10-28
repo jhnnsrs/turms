@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## v3.0.1 (2026-10-28)
+
+### Bug Fixes
+
+- An expanded input field with a default is an optional parameter
+  ([`a2dd787`](https://github.com/jhnnsrs/turms/commit/a2dd7876c793ea1d20a555367a86156a7830c4ff))
+
+A non-null input field with a default (`allowMesh: Boolean! = false`) may be left out: the server
+  applies the default. The funcs and client plugins made it a required positional parameter, so a
+  server adding such a field broke every caller. It is now an UNSET keyword parameter, and it isn't
+  sent unless the caller gives it. The inputs plugin already treated it this way.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+
 ## v3.0.0 (2026-10-28)
 
 ### Chores
