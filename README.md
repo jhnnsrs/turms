@@ -192,6 +192,7 @@ Plugins generate the actual code. Enable them per project; order matters (enums 
 | `turms.plugins.funcs.FuncsPlugin` | Typed, documented call functions per operation (sync + async) that delegate to your client through configurable proxies |
 | `turms.plugins.client.ClientPlugin` | One class with a typed, documented method per operation (sync + async) that delegates to `execute`/`aexecute`/`subscribe`/`asubscribe` of `self`; mix it into your client |
 | `turms.plugins.strawberry.StrawberryPlugin` | A Strawberry server schema with typed resolver stubs |
+| `turms.plugins.scopes.ScopesPlugin` | `SCOPES: List[str]`, the scopes the project's operations need, read off `@auth(required_scopes: ...)` on the root fields they select (from SDL; an introspected schema is refused) |
 
 The funcs plugin turns operations into plain function calls. With an executor proxy configured (see [`examples/rath-usage`](examples/rath-usage)):
 
