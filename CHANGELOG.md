@@ -1,6 +1,39 @@
 # CHANGELOG
 
 
+## v3.1.0 (2026-11-23)
+
+### Features
+
+- Generated code meets the arkitekt Python standard
+  ([`5abc449`](https://github.com/jhnnsrs/turms/commit/5abc44926ddb4190d7e5389aeb13ca581c731ae0))
+
+A project on the standard (every argument and return annotated, no Any, collections.abc, sorted and
+  used imports) runs turms with RuffProcessor(fix: true). ruff fixes what it can and fails on the
+  rest, so everything turms emits that ruff cannot fix has to be right already:
+
+- The generated builtins are annotated: GraphQLDefault(value: object), Deprecated(reason: str |
+  None), UnsetType.__new__/__repr__/__bool__ and its _instance (no Self: the class name, quoted).
+  They are now authored as source like the markers. Deprecated quotes `str | None` where the target
+  python predates PEP 604. - The discriminator's model_post_init is `(self, context: object, /) ->
+  None`. pydantic declares the context Any, but a generated module cannot carry a noqa (comments do
+  not survive the AST), and object is the widest honest type for an argument the override never
+  reads. - The @oneOf wire serializer takes the member union and a SerializerFunctionWrapHandler and
+  returns dict[str, object]. - Iterator, AsyncIterator, Iterable (funcs, client) and AsyncGenerator
+  (strawberry) come from collections.abc. - EnumsPlugin imports Enum only when it emits an enum; a
+  builtin introspection enum (__TypeKind) now imports it itself (it was undefined).
+
+tests/test_generated_standard.py generates client, funcs, oneOf, discriminated-input and strawberry
+  modules, runs them through RuffProcessor(fix, format) under this repo's copy of the standard and
+  lints and format-checks the result (fails on the previous turms, passes now). No snapshot changed:
+  none covers the builtins, the imports or the iterators. The tests that asserted an Enum import for
+  schemas without an enum now assert the import follows the enums.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_011cg5eFTPpZkvu6HSjH3Bwp
+
+
 ## v3.0.2 (2026-11-23)
 
 ### Bug Fixes
