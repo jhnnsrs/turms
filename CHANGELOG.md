@@ -1,6 +1,65 @@
 # CHANGELOG
 
 
+## v3.0.2 (2026-11-23)
+
+### Bug Fixes
+
+- Every argument and return annotated, no Any; bugbear findings fixed
+  ([`8a8ba61`](https://github.com/jhnnsrs/turms/commit/8a8ba6157a80ad1482eba7be8a1c7f2d1036a13a))
+
+The rest of the arkitekt standard by hand, across the package, the tests and the hand-written
+  examples (generated code stays excluded).
+
+Package: the AST builders return the ast node types they build (ast.expr, ast.Subscript,
+  list[ast.AST], ...), stylers and processors take and return str, the CLI commands take the
+  projects dict with_projects injects (its own signature is now Callable[..., None], which it always
+  was), and reference_object / reference_interface return Name | Constant / Constant. The
+  before-validators of the plugin configs take and return object. The runtime type aliases
+  (ParsedValue, BoundType, ExtraOptions, SchemaField, SchemaType) are TypeAliases spelled with |.
+  import_class, import_string and instantiate keep Any for what a dotted path names, with a noqa
+  saying so. The rich log closure binds its tree per project, retry/lookup failures raise from their
+  cause, unused loop variables are underscored; replace_iteratively keeps its public [] default
+  (only read) under a noqa, and stream_changes keeps its loop rather than yield from.
+
+Tests: fixtures, parametrized values and helpers typed; two tests expect pydantic's ValidationError
+  instead of any Exception; a glob variant of test_build_multiple_files was shadowed by its namesake
+  and never ran: it is renamed and runs (and passes). No behaviour change: the suite passes (323
+  passed; 3.10 without network tests: 295 passed, 2 skipped).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+### Code Style
+
+- Adopt the arkitekt Python standard (ruff format, safe fixes)
+  ([`a29891d`](https://github.com/jhnnsrs/turms/commit/a29891d4a109280fcb7b080f57f81fdbd9c2f58b))
+
+ruff.shared.toml / pyright.shared.json synced from arkitektio/.github; the repo's own settings go to
+  ruff.toml / pyrightconfig.json, which exclude the generated code (turms output in the examples,
+  the merge fixtures and the strawberry snapshots); the dev dependencies move from [tool.uv] to the
+  dev group, where ruff and basedpyright are pinned; a new quality.yaml calls the shared
+  python-quality workflow. The code (and the Python in the docs) is reformatted (line length 88, as
+  Black) and ruff's safe fixes applied (import order, modern annotations). The pydantic-basic
+  example had a stray closing parenthesis, a syntax error ruff cannot format around; it is gone. The
+  RuffProcessor tests run ruff in a temporary directory: ruff reads the ruff.toml of where it runs,
+  and the repo's own is not what they test. No behaviour change: the suite passes as before (322
+  passed).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+### Continuous Integration
+
+- The shared quality workflow, required, with a type-check baseline
+  ([`89a4a2c`](https://github.com/jhnnsrs/turms/commit/89a4a2c98872b2c7da4e39af8479a81807f59180))
+
+.basedpyright/baseline.json holds the 853 errors (and 1 warning) the repo had when it adopted the
+  standard (871 before it; most are list[ast.AST] passed where the ast constructors want
+  list[stmt]/list[expr], and raw values the tests hand pydantic to validate): CI fails on any other.
+  .git-blame-ignore-revs lists the formatting-only commit.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+
 ## v3.0.1 (2026-10-28)
 
 ### Bug Fixes
