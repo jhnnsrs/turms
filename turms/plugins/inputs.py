@@ -2,7 +2,6 @@ import ast
 import re
 import textwrap
 from dataclasses import dataclass
-from typing import Any
 
 from graphql import (
     GraphQLInputObjectType,
@@ -47,12 +46,12 @@ class InputsPluginConfig(PluginConfig):
 
     @model_validator(mode="before")
     @classmethod
-    def _rename_deprecated(cls, values: Any) -> Any:
+    def _rename_deprecated(cls, values: object) -> object:
         return rename_deprecated_keys(values, {"inputtype_bases": "input_bases"})
 
     @model_validator(mode="before")
     @classmethod
-    def _reject_removed_options(cls, values: Any) -> Any:
+    def _reject_removed_options(cls, values: object) -> object:
         if isinstance(values, dict) and "allow_population_by_field_name" in values:
             raise ValueError(
                 "'allow_population_by_field_name' was never read by the inputs "
@@ -68,8 +67,8 @@ def generate_input_annotation(
     config: GeneratorConfig,
     plugin_config: InputsPluginConfig,
     registry: ClassRegistry,
-    is_optional=True,
-):
+    is_optional: bool = True,
+) -> ast.expr:
     if isinstance(type, GraphQLScalarType):
         if is_optional:
             registry.register_import("typing.Optional")
@@ -117,7 +116,7 @@ def generate_input_annotation(
         ):
             registry.register_import("typing.Tuple")
 
-            def list_builder(x):
+            def list_builder(x: ast.expr) -> ast.Subscript:
                 return ast.Subscript(
                     value=ast.Name("Tuple", ctx=ast.Load()),
                     slice=ast.Tuple(elts=[x, ast.Constant(value=...)], ctx=ast.Load()),
@@ -127,7 +126,7 @@ def generate_input_annotation(
         else:
             registry.register_import("typing.List")
 
-            def list_builder(x):
+            def list_builder(x: ast.expr) -> ast.Subscript:
                 return ast.Subscript(
                     value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
                 )
@@ -165,7 +164,7 @@ def generate_input_field_annotation(
     plugin_config: InputsPluginConfig,
     registry: ClassRegistry,
     omittable: bool,
-):
+) -> ast.expr:
     """Builds an input field's annotation. A NonNull field that is nonetheless
     omittable on the client (because it carries a schema default) defaults to
     ``None``, so its annotation must be wrapped in ``Optional[...]`` even though
@@ -190,7 +189,7 @@ def generate_input_field_value(
     description: str | None,
     registry: ClassRegistry,
     config: GeneratorConfig,
-):
+) -> ast.expr | None:
     """Builds the AnnAssign value for an input field. Emits a ``Field(...)`` call
     carrying the alias, the ``None`` default (for omittable fields) and the GraphQL
     field description; falls back to a bare ``None``/required value when no
@@ -240,7 +239,7 @@ def generate_input_type(
     registry: ClassRegistry,
     key: str,
     discriminators: list[Discriminator] | None = None,
-):
+) -> ast.ClassDef:
     additional_bases = get_additional_bases_for_type(type.name, config, registry)
 
     fields = (
@@ -386,7 +385,7 @@ def generate_input_type(
     )
 
 
-def validate_oneof_input_type(type: GraphQLInputObjectType):
+def validate_oneof_input_type(type: GraphQLInputObjectType) -> None:
     """Enforce the spec constraints on a ``@oneOf`` input: every field must be
     nullable and must not carry a default value."""
     for value_key, value in type.fields.items():
@@ -435,7 +434,7 @@ def _snake(name: str) -> str:
 
 def generate_union_alias(
     alias_name: str, member_names: list[str], registry: ClassRegistry
-):
+) -> ast.Assign:
     if len(member_names) == 1:
         value = ast.Name(id=member_names[0], ctx=ast.Load())
     else:
@@ -460,7 +459,7 @@ def generate_oneof_wrapper_input(
     config: GeneratorConfig,
     plugin_config: InputsPluginConfig,
     registry: ClassRegistry,
-):
+) -> list[ast.AST]:
     """Generate a ``@oneOf`` input as a union of per-field wrapper classes, each
     carrying its single field as required. A wrapper serializes to the tagged
     wire form ``{fieldName: value}`` through the ordinary
@@ -534,7 +533,7 @@ def generate_oneof_direct_union(
     type: GraphQLInputObjectType,
     members: dict[str, GraphQLInputObjectType],
     registry: ClassRegistry,
-):
+) -> list[ast.stmt]:
     """Generate a ``@oneOf`` input following the tagged input-union pattern as a
     direct union of the member models, with a ``WrapSerializer`` restoring the
     ``{fieldName: memberDict}`` wire form. Must be emitted after all member
@@ -588,7 +587,7 @@ def generate_inputs(
     config: GeneratorConfig,
     plugin_config: InputsPluginConfig,
     registry: ClassRegistry,
-):
+) -> list[ast.AST]:
     tree = []
 
     inputobjects_type = {
@@ -651,7 +650,7 @@ def generate_inputs(
         # One Literal field per distinct discriminator name; all unions sharing
         # a discriminator name must agree on this member's key.
         discriminators: dict[str, Discriminator] = {}
-        for union_type, discriminator, member_key in memberships:
+        for _union_type, discriminator, member_key in memberships:
             existing = discriminators.get(discriminator)
             if existing is not None and existing.value != member_key:
                 raise GenerationError(

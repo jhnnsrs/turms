@@ -24,7 +24,7 @@ SCHEMA = build_schema(
 )
 
 
-def test_defaults_are_coerced_and_fill_nested_field_defaults():
+def test_defaults_are_coerced_and_fill_nested_field_defaults() -> None:
     holder = SCHEMA.type_map["Holder"].fields
 
     assert get_default_value(SCHEMA.query_type.fields["items"].args["policy"]) == {
@@ -35,14 +35,14 @@ def test_defaults_are_coerced_and_fill_nested_field_defaults():
     assert get_default_value(holder["listed"]) == [1]
 
 
-def test_no_default_is_undefined_and_a_null_default_is_none():
+def test_no_default_is_undefined_and_a_null_default_is_none() -> None:
     holder = SCHEMA.type_map["Holder"].fields
 
     assert get_default_value(holder["bare"]) is Undefined
     assert get_default_value(holder["nulled"]) is None
 
 
-def test_field_and_root_type_lookup():
+def test_field_and_root_type_lookup() -> None:
     operation = parse(
         "mutation { touch } query { items { id __typename } }"
     ).definitions

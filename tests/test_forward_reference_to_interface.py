@@ -1,3 +1,5 @@
+from graphql import GraphQLSchema
+
 from turms.config import GeneratorConfig
 from turms.plugins.objects import ObjectsPlugin
 from turms.run import generate_ast
@@ -8,7 +10,7 @@ from .utils import (
 )
 
 
-def test_generation(forward_reference_to_interface_schema):
+def test_generation(forward_reference_to_interface_schema: GraphQLSchema) -> None:
     config = GeneratorConfig()
 
     generated_ast = generate_ast(

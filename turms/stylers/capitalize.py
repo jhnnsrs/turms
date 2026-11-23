@@ -13,20 +13,20 @@ class CapitalizeStyler(BaseStyler):
 
     config: CapitalizeStylerConfig = Field(default_factory=CapitalizeStylerConfig)
 
-    def style_fragment_name(self, typename):
+    def style_fragment_name(self, typename: str) -> str:
         return capitalize_first(typename)
 
-    def style_query_name(self, typename):
+    def style_query_name(self, typename: str) -> str:
         return capitalize_first(typename)
 
-    def style_subscription_name(self, typename):
+    def style_subscription_name(self, typename: str) -> str:
         return capitalize_first(typename)
 
-    def style_mutation_name(self, typename):
+    def style_mutation_name(self, typename: str) -> str:
         return capitalize_first(typename)
 
-    def style_input_name(self, typename):
+    def style_input_name(self, typename: str) -> str:
         return capitalize_first(typename)
 
-    def style_enum_name(self, typename):
+    def style_enum_name(self, typename: str) -> str:
         return capitalize_first(typename)

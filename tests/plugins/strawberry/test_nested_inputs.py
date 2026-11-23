@@ -1,6 +1,7 @@
 import pathlib
 
 from graphql import parse
+from pytest_snapshot.plugin import Snapshot
 
 from turms.config import GeneratorConfig
 from turms.plugins.strawberry import StrawberryPlugin
@@ -26,7 +27,7 @@ input RemoveItemFromPlaylistInput {
 """
 
 
-def _generate_schema(schema: str):
+def _generate_schema(schema: str) -> str:
     config = GeneratorConfig(
         scalar_definitions={"_Any": "typing.Any"}, skip_forwards=True
     )
@@ -41,6 +42,6 @@ def _generate_schema(schema: str):
     return code
 
 
-def test_generates_schema(snapshot):
+def test_generates_schema(snapshot: Snapshot) -> None:
     snapshot.snapshot_dir = SNAPSHOTS_DIR
     snapshot.assert_match(_generate_schema(schema), "nested_inputs.py")

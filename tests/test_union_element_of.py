@@ -7,6 +7,9 @@ alias. The injected ``Literal`` discriminator must survive the proxy contract's
 ``dict(by_alias=True, exclude_unset=True)`` dump, because the server requires it.
 """
 
+import ast
+from pathlib import Path
+
 import pytest
 from graphql import parse
 
@@ -76,7 +79,7 @@ mutation CreateTransformation($input: CreateTransformationInput!) {
 """
 
 
-def _generate(tmp_path, sdl=schema_sdl):
+def _generate(tmp_path: Path, sdl: str = schema_sdl) -> list[ast.AST]:
     doc = tmp_path / "ops.graphql"
     doc.write_text(operation)
 
@@ -91,7 +94,7 @@ def _generate(tmp_path, sdl=schema_sdl):
     )
 
 
-def test_members_and_discriminated_union(tmp_path):
+def test_members_and_discriminated_union(tmp_path: Path) -> None:
     """Members get an injected Literal discriminator, the placeholder becomes a
     discriminated union, and repeatable directives put a member in two unions."""
     generated_ast = _generate(tmp_path)
@@ -129,7 +132,7 @@ def test_members_and_discriminated_union(tmp_path):
     )
 
 
-def test_discriminator_survives_exclude_unset(tmp_path):
+def test_discriminator_survives_exclude_unset(tmp_path: Path) -> None:
     """The injected discriminator is never explicitly set by the caller, but the
     server requires it: it must survive an exclude_unset dump."""
     generated_ast = _generate(tmp_path)
@@ -150,7 +153,7 @@ def test_discriminator_survives_exclude_unset(tmp_path):
     )
 
 
-def test_missing_directive_argument_is_error(tmp_path):
+def test_missing_directive_argument_is_error(tmp_path: Path) -> None:
     # Declare the args as optional so graphql-core accepts the SDL and turms'
     # own validation is what rejects the incomplete directive.
     sdl = schema_sdl.replace(
@@ -164,7 +167,7 @@ def test_missing_directive_argument_is_error(tmp_path):
         _generate(tmp_path, sdl=sdl)
 
 
-def test_discriminator_mismatch_is_error(tmp_path):
+def test_discriminator_mismatch_is_error(tmp_path: Path) -> None:
     sdl = schema_sdl.replace(
         '@unionElementOf(union: "TransformInput", discriminator: "kind", key: "FIELD")',
         '@unionElementOf(union: "TransformInput", discriminator: "type", key: "FIELD")',
@@ -186,7 +189,7 @@ TRANSFORM_UNION = [
 ]
 
 
-def _generate_with_external(tmp_path, include):
+def _generate_with_external(tmp_path: Path, include: list[str]) -> list[ast.AST]:
     doc = tmp_path / "ops.graphql"
     doc.write_text(operation)
     config = GeneratorConfig(
@@ -204,8 +207,8 @@ def _generate_with_external(tmp_path, include):
 
 
 def test_an_external_union_imports_the_union_and_generates_none_of_its_members(
-    tmp_path,
-):
+    tmp_path: Path,
+) -> None:
     from turms.run import parse_asts_to_string
 
     generated = parse_asts_to_string(_generate_with_external(tmp_path, TRANSFORM_UNION))
@@ -217,11 +220,11 @@ def test_an_external_union_imports_the_union_and_generates_none_of_its_members(
         assert f"{name} = Annotated" not in generated
 
 
-def test_an_external_member_of_a_generated_union_is_refused(tmp_path):
+def test_an_external_member_of_a_generated_union_is_refused(tmp_path: Path) -> None:
     with pytest.raises(GenerationError, match="must come from the same place"):
         _generate_with_external(tmp_path, ["ScaleTransformInput"])
 
 
-def test_a_generated_member_of_an_external_union_is_refused(tmp_path):
+def test_a_generated_member_of_an_external_union_is_refused(tmp_path: Path) -> None:
     with pytest.raises(GenerationError, match="must come from the same place"):
         _generate_with_external(tmp_path, ["TransformInput", "RelationInput"])

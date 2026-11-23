@@ -1,3 +1,5 @@
+from graphql import GraphQLSchema
+
 from turms.config import GeneratorConfig
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.fragments import FragmentsPlugin
@@ -15,7 +17,7 @@ from turms.stylers.snake_case import SnakeCaseStyler
 from .utils import build_relative_glob, unit_test_with
 
 
-def test_nested_input_funcs(union_schema):
+def test_nested_input_funcs(union_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/unions/*.graphql"),
     )
@@ -53,7 +55,7 @@ def test_nested_input_funcs(union_schema):
     )
 
 
-def test_fields_in_inline_fragment_on_union(union_schema):
+def test_fields_in_inline_fragment_on_union(union_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/unions/*.graphql"),
     )
@@ -77,7 +79,9 @@ def test_fields_in_inline_fragment_on_union(union_schema):
     )
 
 
-def test_union_inline_fragment_fragment_spread_in_operation(union_schema):
+def test_union_inline_fragment_fragment_spread_in_operation(
+    union_schema: GraphQLSchema,
+) -> None:
     """Union member inline in an operation must inherit fields from nested fragment spreads."""
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/unions/*.graphql"),

@@ -6,10 +6,13 @@ generics and PEP 604 unions -- `list[str] | None` instead of
 `Optional[List[str]]` -- and the typing imports that became obsolete are pruned.
 """
 
-import pytest
-from graphql import build_ast_schema, parse
+import ast
+from typing import Any
 
-from turms.config import GeneratorConfig
+import pytest
+from graphql import GraphQLSchema, build_ast_schema, parse
+
+from turms.config import GeneratorConfig, PythonVersion, TypeAnnotationStyle
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.fragments import FragmentsPlugin
 from turms.plugins.funcs import FuncsPlugin, FuncsPluginConfig, FunctionDefinition
@@ -48,7 +51,7 @@ type Query {
 """
 
 
-def generate(**config_kwargs):
+def generate(**config_kwargs: Any) -> list[ast.AST]:
     config = GeneratorConfig(
         scalar_definitions={"GenericScalar": "typing.Dict"}, **config_kwargs
     )
@@ -76,13 +79,18 @@ def generate(**config_kwargs):
         ("auto", "3.12", True, True),
     ],
 )
-def test_style_resolution(style, version, builtin_generics, union_operator):
+def test_style_resolution(
+    style: TypeAnnotationStyle,
+    version: PythonVersion,
+    builtin_generics: bool,
+    union_operator: bool,
+) -> None:
     config = GeneratorConfig(type_annotation_style=style, min_python_version=version)
     assert config.use_builtin_generics is builtin_generics
     assert config.use_union_operator is union_operator
 
 
-def test_defaults_are_auto():
+def test_defaults_are_auto() -> None:
     """`auto` on the default floor (3.10, matching turms' own requires-python)
     means new projects get the modern spelling without configuring anything."""
     config = GeneratorConfig()
@@ -97,7 +105,7 @@ def test_defaults_are_auto():
 # --------------------------------------------------------------------------- #
 
 
-def test_legacy_output_unchanged():
+def test_legacy_output_unchanged() -> None:
     """`legacy` still produces exactly the classic typing spelling."""
     code = parse_to_code(generate(type_annotation_style="legacy"))
     assert "Optional[List[str]]" in code
@@ -107,7 +115,7 @@ def test_legacy_output_unchanged():
     assert "|" not in code
 
 
-def test_modern_output():
+def test_modern_output() -> None:
     # the default (auto on 3.10) has to agree with an explicit `modern`
     assert parse_to_code(generate()) == parse_to_code(
         generate(type_annotation_style="modern")
@@ -123,7 +131,7 @@ def test_modern_output():
     assert "List[" not in code
 
 
-def test_modern_prunes_typing_imports():
+def test_modern_prunes_typing_imports() -> None:
     code = parse_to_code(generate(type_annotation_style="modern"))
     typing_imports = [
         line for line in code.splitlines() if line.startswith("from typing import")
@@ -135,7 +143,7 @@ def test_modern_prunes_typing_imports():
         assert "Dict" not in line
 
 
-def test_builtin_generics_only():
+def test_builtin_generics_only() -> None:
     """python 3.9 gets PEP 585 but not PEP 604."""
     generated_ast = generate(type_annotation_style="auto", min_python_version="3.9")
     code = parse_to_code(generated_ast)
@@ -145,7 +153,7 @@ def test_builtin_generics_only():
     unit_test_with(generated_ast, "")
 
 
-def test_forward_references_become_string_annotations():
+def test_forward_references_become_string_annotations() -> None:
     """`'Country' | None` is a TypeError at class creation, so a union with a
     forward reference has to be emitted as a whole string annotation."""
     code = parse_to_code(generate(type_annotation_style="modern"))
@@ -155,7 +163,7 @@ def test_forward_references_become_string_annotations():
     unit_test_with(generate(type_annotation_style="modern"), "")
 
 
-def test_scalar_definition_from_other_module_is_not_rewritten():
+def test_scalar_definition_from_other_module_is_not_rewritten() -> None:
     """Only names that really came from `typing` may become builtins."""
     config = GeneratorConfig(
         type_annotation_style="modern",
@@ -193,7 +201,7 @@ FUNCS = FuncsPlugin(
 )
 
 
-def test_modern_arkitekt_operations(arkitekt_schema):
+def test_modern_arkitekt_operations(arkitekt_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/arkitekt/**/*.graphql"),
         scalar_definitions={
@@ -241,7 +249,7 @@ def test_modern_arkitekt_operations(arkitekt_schema):
     unit_test_with(generated_ast, "")
 
 
-def test_modern_multi_interface(multi_interface_schema):
+def test_modern_multi_interface(multi_interface_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/multi_interface/**/*.graphql"),
         **MODERN,
@@ -255,7 +263,7 @@ def test_modern_multi_interface(multi_interface_schema):
     unit_test_with(generated_ast, "")
 
 
-def test_modern_unions(union_schema):
+def test_modern_unions(union_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/unions/**/*.graphql"), **MODERN
     )
@@ -270,7 +278,7 @@ def test_modern_unions(union_schema):
     unit_test_with(generated_ast, "")
 
 
-def test_modern_nested_inputs(nested_input_schema):
+def test_modern_nested_inputs(nested_input_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/nested_inputs/**/*.graphql"), **MODERN
     )
@@ -283,7 +291,7 @@ def test_modern_nested_inputs(nested_input_schema):
     unit_test_with(generated_ast, "")
 
 
-def test_modern_oneof_input_funcs(oneof_schema):
+def test_modern_oneof_input_funcs(oneof_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(**MODERN)
     generated_ast = generate_ast(
         config,
@@ -294,7 +302,9 @@ def test_modern_oneof_input_funcs(oneof_schema):
     unit_test_with(generated_ast, "")
 
 
-def test_modern_forward_reference_to_interface(forward_reference_to_interface_schema):
+def test_modern_forward_reference_to_interface(
+    forward_reference_to_interface_schema: GraphQLSchema,
+) -> None:
     generated_ast = generate_ast(
         GeneratorConfig(**MODERN),
         forward_reference_to_interface_schema,
@@ -304,7 +314,9 @@ def test_modern_forward_reference_to_interface(forward_reference_to_interface_sc
     unit_test_with(generated_ast, "")
 
 
-def test_modern_multiple_forward_references(multiple_forward_references_schema):
+def test_modern_multiple_forward_references(
+    multiple_forward_references_schema: GraphQLSchema,
+) -> None:
     generated_ast = generate_ast(
         GeneratorConfig(**MODERN),
         multiple_forward_references_schema,
@@ -314,7 +326,7 @@ def test_modern_multiple_forward_references(multiple_forward_references_schema):
     unit_test_with(generated_ast, "")
 
 
-def test_modern_mro(mro_test_schema):
+def test_modern_mro(mro_test_schema: GraphQLSchema) -> None:
     generated_ast = generate_ast(
         GeneratorConfig(**MODERN),
         mro_test_schema,
@@ -324,7 +336,7 @@ def test_modern_mro(mro_test_schema):
     unit_test_with(generated_ast, "ThisWorks(foo='hallo', bar='good')")
 
 
-def test_modern_keyword(keyword_schema):
+def test_modern_keyword(keyword_schema: GraphQLSchema) -> None:
     generated_ast = generate_ast(
         GeneratorConfig(**MODERN),
         keyword_schema,
@@ -334,7 +346,7 @@ def test_modern_keyword(keyword_schema):
     unit_test_with(generated_ast, "")
 
 
-def test_modern_strawberry(arkitekt_schema):
+def test_modern_strawberry(arkitekt_schema: GraphQLSchema) -> None:
     """Strawberry reads the annotations itself, so it has to cope with them too."""
     config = GeneratorConfig(
         scalar_definitions={
@@ -360,7 +372,7 @@ def test_modern_strawberry(arkitekt_schema):
 # --------------------------------------------------------------------------- #
 
 
-def test_modern_docstring_labels(arkitekt_schema):
+def test_modern_docstring_labels(arkitekt_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/arkitekt/**/*.graphql"),
         scalar_definitions={

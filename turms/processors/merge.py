@@ -10,7 +10,7 @@ from turms.processors.base import Processor, ProcessorConfig
 # load beasts.py as a ast.Module
 
 
-def retrieve_symbol_name(simple_statement: cst.SimpleStatementLine):
+def retrieve_symbol_name(simple_statement: cst.SimpleStatementLine) -> str | None:
     for node in simple_statement.body:
         if isinstance(node, cst.AnnAssign):
             return node.target.value
@@ -18,7 +18,9 @@ def retrieve_symbol_name(simple_statement: cst.SimpleStatementLine):
         return None
 
 
-def merge_functions(generated: cst.FunctionDef, existing: cst.FunctionDef):
+def merge_functions(
+    generated: cst.FunctionDef, existing: cst.FunctionDef
+) -> cst.FunctionDef:
     # merge the two functions
 
     # we want to merge the body of the new function into the existing one
@@ -29,7 +31,7 @@ def merge_functions(generated: cst.FunctionDef, existing: cst.FunctionDef):
 
 def merge_statements(
     generated: cst.SimpleStatementLine, existing: cst.SimpleStatementLine
-):
+) -> cst.SimpleStatementLine:
     # merge the two statements
 
     # we want to merge the body of the new statement into the existing one
@@ -38,7 +40,7 @@ def merge_statements(
     return new_def
 
 
-def merge_class(generated: cst.ClassDef, existing: cst.ClassDef):
+def merge_class(generated: cst.ClassDef, existing: cst.ClassDef) -> cst.ClassDef:
     # merge the two classes
     body_symbols = OrderedDict()
     body_implemented_symbols = []
@@ -97,7 +99,7 @@ def merge_class(generated: cst.ClassDef, existing: cst.ClassDef):
     last_key = None
     for existingkey in body_implemented_symbols:
         last_key = existingkey
-        for key, value in body_symbols.items():
+        for key, _value in body_symbols.items():
             if existingkey == key:
                 break
             if key in body_missing_symbols:
@@ -134,7 +136,7 @@ class MergeProcessorConfig(ProcessorConfig):
     type: str = "turms.processors.merge.MergeProcessor"
 
 
-def merge_code(old_code: str, new_code: str, config: MergeProcessorConfig):
+def merge_code(old_code: str, new_code: str, config: MergeProcessorConfig) -> str:
 
     existing_module = cst.parse_module(old_code)
     new_module = cst.parse_module(new_code)
@@ -195,7 +197,7 @@ def merge_code(old_code: str, new_code: str, config: MergeProcessorConfig):
     last_key = None
     for existingkey in implemented_symbols:
         last_key = existingkey
-        for key, value in symbols.items():
+        for key, _value in symbols.items():
             if existingkey == key:
                 break
             if key in missing_symbols:
@@ -246,7 +248,7 @@ class MergeProcessor(Processor):
 
     config: MergeProcessorConfig = Field(default_factory=MergeProcessorConfig)
 
-    def run(self, gen_file: str, config: GeneratorConfig):
+    def run(self, gen_file: str, config: GeneratorConfig) -> str:
 
         old_generated_file = os.path.join(
             config.out_dir,

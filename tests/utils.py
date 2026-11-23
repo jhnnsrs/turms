@@ -10,7 +10,7 @@ from turms.run import write_code_to_file
 DIR_NAME = os.path.dirname(os.path.realpath(__file__))
 
 
-def build_relative_glob(path):
+def build_relative_glob(path: str) -> str:
     return DIR_NAME + path
 
 
@@ -89,7 +89,7 @@ def parse_to_code(tree: list[ast.AST]) -> str:
     return ast.unparse(ast.fix_missing_locations(md))
 
 
-def find_type_checker():
+def find_type_checker() -> str | None:
     """Path to a pyright-compatible checker, or None.
 
     Looked up rather than assumed: the alias-mode guarantee is a *static* one, so
@@ -105,7 +105,9 @@ def find_type_checker():
     return None
 
 
-def type_check_with(generated_ast: list[ast.AST], test_string: str):
+def type_check_with(
+    generated_ast: list[ast.AST], test_string: str
+) -> list[tuple[int, str]] | None:
     """Type-checks the generated module plus ``test_string`` and returns the
     diagnostics as a list of ``(line, message)``, line numbers being relative to
     ``test_string`` (0-based, as the checker reports them for the appended code).
@@ -140,10 +142,10 @@ def type_check_with(generated_ast: list[ast.AST], test_string: str):
         )
         try:
             report = json.loads(s.stdout.decode())
-        except json.JSONDecodeError:  # pragma: no cover
+        except json.JSONDecodeError as e:  # pragma: no cover
             raise ExecuteError(
                 f"Type checker produced no JSON: {s.stdout.decode()[:2000]}"
-            )
+            ) from e
 
     return [
         (d["range"]["start"]["line"], d["message"])
@@ -154,7 +156,7 @@ def type_check_with(generated_ast: list[ast.AST], test_string: str):
 
 def unit_test_with(
     generated_ast: list[ast.AST], test_string: str, strict_warnings: bool = False
-):
+) -> bool:
 
     added_code = ast.parse(dedent(test_string)).body
     # We need to unparse before otherwise there might be complaints with missing lineno
@@ -181,7 +183,7 @@ def unit_test_with_external(
     generated_ast: list[ast.AST],
     test_string: str,
     module_name: str = "external_schema",
-):
+) -> bool:
     """Run a *pair* of generated modules, the second importing the first.
 
     ``unit_test_with`` writes one module, so it cannot express the thing a split

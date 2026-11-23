@@ -1,6 +1,7 @@
 import ast
 
 from graphql import build_ast_schema, parse
+from pytest_snapshot.plugin import Snapshot
 
 from turms.config import GeneratorConfig
 from turms.plugins.inputs import InputsPlugin
@@ -20,7 +21,7 @@ input X {
 """
 
 
-def test_generates_schema(snapshot):
+def test_generates_schema(snapshot: Snapshot) -> None:
     config = GeneratorConfig()
 
     schema = build_ast_schema(parse(inputs))

@@ -3,8 +3,11 @@ out (the server applies the default), as the GraphQL spec says; one without a de
 
 import ast
 import inspect
+from pathlib import Path
+from typing import Any
 
 from graphql import parse
+from pydantic import BaseModel
 
 from turms.config import GeneratorConfig
 from turms.plugins.client import ClientPlugin, ClientPluginConfig
@@ -44,7 +47,7 @@ mutation Make($input: MakeInput!) {
 """
 
 
-def _api(tmp_path):
+def _api(tmp_path: Path) -> dict[str, Any]:
     (tmp_path / "ops.graphql").write_text(DOCUMENTS)
     config = GeneratorConfig(documents=str(tmp_path / "*.graphql"))
     tree = generate_ast(
@@ -65,7 +68,7 @@ def _api(tmp_path):
             ),
         ],
     )
-    namespace: dict = {}
+    namespace: dict[str, Any] = {}
     exec(
         ast.unparse(ast.fix_missing_locations(ast.Module(body=tree, type_ignores=[]))),
         namespace,
@@ -73,7 +76,9 @@ def _api(tmp_path):
     return namespace
 
 
-def test_a_non_null_field_with_a_default_is_an_optional_parameter(tmp_path):
+def test_a_non_null_field_with_a_default_is_an_optional_parameter(
+    tmp_path: Path,
+) -> None:
     namespace = _api(tmp_path)
     parameters = inspect.signature(namespace["ThingApi"].make).parameters
     assert parameters["name"].default is inspect.Parameter.empty
@@ -81,12 +86,19 @@ def test_a_non_null_field_with_a_default_is_an_optional_parameter(tmp_path):
     assert parameters["note"].default is not inspect.Parameter.empty
 
 
-def test_a_field_left_out_is_not_sent_and_the_server_applies_its_default(tmp_path):
+def test_a_field_left_out_is_not_sent_and_the_server_applies_its_default(
+    tmp_path: Path,
+) -> None:
     namespace = _api(tmp_path)
     sent = []
 
     class Client(namespace["ThingApi"]):
-        def execute(self, operation, variables, **kwargs):
+        def execute(
+            self,
+            operation: type[BaseModel],
+            variables: dict[str, object],
+            **kwargs: object,
+        ) -> BaseModel:
             sent.append(variables)
             return operation.model_validate(
                 {"make": {"__typename": "Thing", "id": "1"}}

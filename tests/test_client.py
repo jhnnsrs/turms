@@ -3,8 +3,10 @@ to ``execute``/``aexecute``/``subscribe``/``asubscribe`` of ``self``."""
 
 import ast
 from textwrap import dedent
+from typing import Any
 
 import pytest
+from graphql import GraphQLSchema
 from pydantic import ValidationError
 
 from turms.config import GeneratorConfig
@@ -51,7 +53,7 @@ async def collect(agen):
 """
 
 
-def generate(schema, **client_config):
+def generate(schema: GraphQLSchema, **client_config: Any) -> list[ast.AST]:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/beasts/*.graphql"),
     )
@@ -71,7 +73,7 @@ def generate(schema, **client_config):
     )
 
 
-def method_names(generated, class_name="BeastApi"):
+def method_names(generated: list[ast.AST], class_name: str = "BeastApi") -> list[str]:
     module = ast.parse(parse_to_code(generated))
     assert not [
         n for n in module.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
@@ -86,7 +88,9 @@ def method_names(generated, class_name="BeastApi"):
     ]
 
 
-def test_operations_become_methods_delegating_to_self(beast_schema):
+def test_operations_become_methods_delegating_to_self(
+    beast_schema: GraphQLSchema,
+) -> None:
     generated = generate(beast_schema)
     assert sorted(method_names(generated)) == sorted(
         [
@@ -127,7 +131,7 @@ def test_operations_become_methods_delegating_to_self(beast_schema):
     )
 
 
-def test_delegate_names_are_configurable(beast_schema):
+def test_delegate_names_are_configurable(beast_schema: GraphQLSchema) -> None:
     generated = generate(
         beast_schema,
         execute="run",
@@ -141,7 +145,7 @@ def test_delegate_names_are_configurable(beast_schema):
     assert "self.execute(" not in code
 
 
-def test_only_the_requested_variants_are_generated(beast_schema):
+def test_only_the_requested_variants_are_generated(beast_schema: GraphQLSchema) -> None:
     assert sorted(method_names(generate(beast_schema, sync_methods=False))) == sorted(
         ["aget_beasts", "acreate_beast", "awatch_beast"]
     )
@@ -150,19 +154,19 @@ def test_only_the_requested_variants_are_generated(beast_schema):
     )
 
 
-def test_at_least_one_variant_is_required():
+def test_at_least_one_variant_is_required() -> None:
     with pytest.raises(ValidationError, match="at least one"):
         ClientPluginConfig(client_class="X", sync_methods=False, async_methods=False)
 
 
-def test_client_bases_are_imported_and_used(beast_schema):
+def test_client_bases_are_imported_and_used(beast_schema: GraphQLSchema) -> None:
     generated = generate(beast_schema, client_bases=["mocks.ExtraArguments"])
     code = parse_to_code(generated)
     assert "from mocks import" in code
     assert "class BeastApi(ExtraArguments):" in code
 
 
-def test_a_base_can_provide_the_delegates(beast_schema):
+def test_a_base_can_provide_the_delegates(beast_schema: GraphQLSchema) -> None:
     # The mixin is complete on its own once a base implements the delegates.
     generated = generate(beast_schema, client_bases=["mocks.RecordingExecutor"])
     unit_test_with(
@@ -173,7 +177,9 @@ def test_a_base_can_provide_the_delegates(beast_schema):
     )
 
 
-def test_global_kwargs_are_forwarded_to_the_delegate(beast_schema):
+def test_global_kwargs_are_forwarded_to_the_delegate(
+    beast_schema: GraphQLSchema,
+) -> None:
     generated = generate(
         beast_schema, global_kwargs=[Kwarg(key="timeout", type="typing.Any")]
     )
@@ -182,25 +188,29 @@ def test_global_kwargs_are_forwarded_to_the_delegate(beast_schema):
     assert "self.execute(Get_beasts, variables, timeout=timeout)" in code
 
 
-def test_reserved_method_name_is_refused(beast_schema):
+def test_reserved_method_name_is_refused(beast_schema: GraphQLSchema) -> None:
     with pytest.raises(GenerationError, match="shadows a reserved name"):
         generate(beast_schema, reserved_names=["get_beasts"])
 
 
-def test_an_operation_named_like_a_delegate_is_refused(beast_schema):
+def test_an_operation_named_like_a_delegate_is_refused(
+    beast_schema: GraphQLSchema,
+) -> None:
     # The method would replace the very executor it delegates to.
     with pytest.raises(GenerationError, match="shadows a reserved name"):
         generate(beast_schema, execute="get_beasts")
 
 
-def test_duplicate_method_names_are_refused(beast_schema):
+def test_duplicate_method_names_are_refused(beast_schema: GraphQLSchema) -> None:
     # Both prefixes empty: the sync and async query collide on one name, which a
     # class would silently resolve in favour of the second.
     with pytest.raises(GenerationError, match="Two operations generate the method"):
         generate(beast_schema, prepend_async="")
 
 
-def test_reserved_from_covers_attributes_and_pydantic_fields(beast_schema):
+def test_reserved_from_covers_attributes_and_pydantic_fields(
+    beast_schema: GraphQLSchema,
+) -> None:
     # A pydantic field silently hides a same-named method (only a UserWarning),
     # so it must be refused at generation, as must a plain attribute.
     with pytest.raises(GenerationError, match="shadows a reserved name"):
@@ -213,7 +223,9 @@ def test_reserved_from_covers_attributes_and_pydantic_fields(beast_schema):
         )
 
 
-def test_reserved_from_ignores_the_previous_generation_of_the_client(beast_schema):
+def test_reserved_from_ignores_the_previous_generation_of_the_client(
+    beast_schema: GraphQLSchema,
+) -> None:
     """Regenerating must not trip over the methods the client already mixes in."""
     generate(
         beast_schema,
@@ -226,11 +238,11 @@ def test_reserved_from_ignores_the_previous_generation_of_the_client(beast_schem
 
 
 @pytest.mark.parametrize("bad", ["Beast Api", "1Api", ""])
-def test_client_class_must_be_an_identifier(bad):
+def test_client_class_must_be_an_identifier(bad: str) -> None:
     with pytest.raises(ValidationError, match="identifier"):
         ClientPluginConfig(client_class=bad)
 
 
-def test_delegates_must_be_identifiers():
+def test_delegates_must_be_identifiers() -> None:
     with pytest.raises(ValidationError, match="identifier"):
         ClientPluginConfig(client_class="X", execute="self.execute")

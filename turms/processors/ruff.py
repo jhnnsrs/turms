@@ -27,7 +27,7 @@ class RuffProcessor(Processor):
 
     config: RuffProcessorConfig = Field(default_factory=RuffProcessorConfig)
 
-    def _run_ruff(self, args, gen_file: str) -> str:
+    def _run_ruff(self, args: list[str], gen_file: str) -> str:
         result = subprocess.run(
             [sys.executable, "-m", "ruff", *args, "-"],
             input=gen_file,
@@ -40,7 +40,7 @@ class RuffProcessor(Processor):
             )
         return result.stdout
 
-    def run(self, gen_file: str, config: GeneratorConfig):
+    def run(self, gen_file: str, config: GeneratorConfig) -> str:
         if self.config.fix:
             gen_file = self._run_ruff(
                 ["check", "--fix", "--quiet", "--stdin-filename", "generated.py"],

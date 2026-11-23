@@ -1,3 +1,5 @@
+import ast
+
 import pytest
 from graphql import build_ast_schema, parse
 
@@ -29,7 +31,7 @@ type Query {
 """
 
 
-def _generate():
+def _generate() -> list[ast.AST]:
     config = GeneratorConfig()
     schema = build_ast_schema(parse(inputs))
     return generate_ast(
@@ -43,7 +45,7 @@ def _generate():
     )
 
 
-def test_defaulted_fields_are_optional_none():
+def test_defaulted_fields_are_optional_none() -> None:
     """A field with a schema default is optional and defaults to None client-side
     (the value is owned by the server, not baked into the model)."""
     generated_ast = _generate()
@@ -82,7 +84,7 @@ def test_defaulted_fields_are_optional_none():
     assert "Field(alias='plainRequired', default" not in generated
 
 
-def test_no_default_values_are_baked():
+def test_no_default_values_are_baked() -> None:
     """The schema's literal defaults must never appear as baked pydantic defaults
     (default=/default_factory=); they live only on the GraphQLDefault marker."""
     generated = parse_to_code(_generate())
@@ -96,7 +98,7 @@ def test_no_default_values_are_baked():
     assert "GraphQLDefault('[1, 2, 3]')" in generated
 
 
-def test_default_values_apply_at_runtime():
+def test_default_values_apply_at_runtime() -> None:
     """A field with a schema default is no longer required by pydantic, and is None
     until the caller (or, on the wire, the server) provides a value."""
     generated_ast = _generate()
@@ -114,7 +116,7 @@ def test_default_values_apply_at_runtime():
     )
 
 
-def test_required_field_without_default_still_required():
+def test_required_field_without_default_still_required() -> None:
     """Regression: a required field without a default must still be required."""
     generated_ast = _generate()
 

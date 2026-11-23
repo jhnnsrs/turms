@@ -1,3 +1,7 @@
+import ast
+
+from graphql import GraphQLSchema
+
 from turms.config import GeneratorConfig
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.fragments import FragmentsPlugin
@@ -10,7 +14,7 @@ from turms.stylers.snake_case import SnakeCaseStyler
 from .utils import build_relative_glob, unit_test_with
 
 
-def _generate(hello_world_schema):
+def _generate(hello_world_schema: GraphQLSchema) -> list[ast.AST]:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/skip_include/*.graphql"),
     )
@@ -27,7 +31,9 @@ def _generate(hello_world_schema):
     )
 
 
-def test_skip_and_include_make_fields_optional(hello_world_schema):
+def test_skip_and_include_make_fields_optional(
+    hello_world_schema: GraphQLSchema,
+) -> None:
     """@skip / @include let the server omit the field, so it cannot be required.
 
     ``message`` is ``String!`` in the schema, but a conditionally-included
@@ -49,7 +55,7 @@ def test_skip_and_include_make_fields_optional(hello_world_schema):
     )
 
 
-def test_literal_false_skip_stays_required(hello_world_schema):
+def test_literal_false_skip_stays_required(hello_world_schema: GraphQLSchema) -> None:
     """@skip(if: false) can never exclude the field, so it must stay required."""
     generated_ast = _generate(hello_world_schema)
 
@@ -66,7 +72,7 @@ def test_literal_false_skip_stays_required(hello_world_schema):
     )
 
 
-def test_directive_on_union_inline_fragment(union_schema):
+def test_directive_on_union_inline_fragment(union_schema: GraphQLSchema) -> None:
     """Union selections build their inline-fragment classes on a separate path.
 
     ``forward`` is ``String!`` inside a conditional inline fragment, so it must

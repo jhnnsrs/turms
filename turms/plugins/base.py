@@ -2,7 +2,6 @@ import ast
 import warnings
 from abc import abstractmethod
 from collections.abc import Sequence
-from typing import Any
 
 from graphql import GraphQLSchema
 from pydantic import BaseModel, ConfigDict, Field
@@ -17,7 +16,7 @@ class PluginConfig(BaseSettings):
     type: str
 
 
-def rename_deprecated_keys(values: Any, renames: dict) -> Any:
+def rename_deprecated_keys(values: object, renames: dict[str, str]) -> object:
     """Accept the old spelling of renamed plugin config keys, with a warning.
 
     Used by ``model_validator(mode="before")`` hooks on plugin configs. Done

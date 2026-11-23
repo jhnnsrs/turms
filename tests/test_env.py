@@ -1,6 +1,9 @@
 import ast
 import json
 
+import pytest
+from graphql import GraphQLSchema
+
 from turms.config import GeneratorConfig
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.fragments import FragmentsPlugin
@@ -15,7 +18,9 @@ from turms.stylers.snake_case import SnakeCaseStyler
 from .utils import build_relative_glob
 
 
-def test_small(hello_world_schema, monkeypatch):
+def test_small(
+    hello_world_schema: GraphQLSchema, monkeypatch: pytest.MonkeyPatch
+) -> None:
 
     monkeypatch.setenv("TURMS_DOMAIN", "test_domain")
 
@@ -24,7 +29,9 @@ def test_small(hello_world_schema, monkeypatch):
     assert config.domain == "test_domain"
 
 
-def test_env_complex(arkitekt_schema, monkeypatch):
+def test_env_complex(
+    arkitekt_schema: GraphQLSchema, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv(
         "TURMS_SCALAR_DEFINITIONS",
         json.dumps(

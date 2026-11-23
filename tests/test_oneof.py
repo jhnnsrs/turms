@@ -9,8 +9,10 @@ classes whose single required field serializes to the tagged wire form through
 the ordinary ``dict(by_alias=True, exclude_unset=True)`` proxy contract.
 """
 
+import ast
+
 import pytest
-from graphql import parse
+from graphql import GraphQLSchema, parse
 
 from turms.config import GeneratorConfig
 from turms.errors import GenerationError
@@ -25,7 +27,7 @@ from turms.stylers.default import DefaultStyler
 from .utils import build_relative_glob, parse_to_code, unit_test_with
 
 
-def _generate(oneof_schema, with_funcs=False):
+def _generate(oneof_schema: GraphQLSchema, with_funcs: bool = False) -> list[ast.AST]:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/oneof/*.graphql"),
     )
@@ -47,7 +49,7 @@ def _generate(oneof_schema, with_funcs=False):
     )
 
 
-def test_scalar_oneof_generates_wrapper_union(oneof_schema):
+def test_scalar_oneof_generates_wrapper_union(oneof_schema: GraphQLSchema) -> None:
     """A @oneOf input with scalar fields becomes per-field wrapper classes whose
     single required field serializes to the tagged wire form (incl. aliases)."""
     generated_ast = _generate(oneof_schema)
@@ -76,7 +78,7 @@ def test_scalar_oneof_generates_wrapper_union(oneof_schema):
     )
 
 
-def test_tagged_union_oneof_generates_direct_union(oneof_schema):
+def test_tagged_union_oneof_generates_direct_union(oneof_schema: GraphQLSchema) -> None:
     """A @oneOf input whose fields are distinct input types becomes a direct
     union of the member models; the serializer restores the tag wrapping."""
     generated_ast = _generate(oneof_schema)
@@ -101,7 +103,7 @@ def test_tagged_union_oneof_generates_direct_union(oneof_schema):
     )
 
 
-def test_duplicate_member_types_fall_back_to_wrappers():
+def test_duplicate_member_types_fall_back_to_wrappers() -> None:
     """When two fields share the same member type the tag cannot be recovered
     from the value's type, so wrapper classes are generated instead."""
     sdl = """
@@ -139,7 +141,7 @@ def test_duplicate_member_types_fall_back_to_wrappers():
     )
 
 
-def test_oneof_field_must_be_nullable():
+def test_oneof_field_must_be_nullable() -> None:
     sdl = """
     directive @oneOf on INPUT_OBJECT
 
@@ -160,7 +162,7 @@ def test_oneof_field_must_be_nullable():
         )
 
 
-def test_oneof_field_must_not_have_default():
+def test_oneof_field_must_not_have_default() -> None:
     sdl = """
     directive @oneOf on INPUT_OBJECT
 
@@ -181,14 +183,14 @@ def test_oneof_field_must_not_have_default():
         )
 
 
-def test_full_stack_with_funcs(oneof_schema):
+def test_full_stack_with_funcs(oneof_schema: GraphQLSchema) -> None:
     """The whole Operations + Funcs stack generates importable code over oneOf
     documents (exercises registry references and forward refs)."""
     generated_ast = _generate(oneof_schema, with_funcs=True)
     unit_test_with(generated_ast, "")
 
 
-def test_strawberry_emits_one_of_keyword(oneof_schema):
+def test_strawberry_emits_one_of_keyword(oneof_schema: GraphQLSchema) -> None:
     """The strawberry plugin detects @oneOf via the SDL ast node (graphql-core
     3.2 has no is_one_of attribute) and emits strawberry.input(one_of=True)."""
     code = parse_to_code(

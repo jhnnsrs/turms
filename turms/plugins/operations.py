@@ -1,7 +1,6 @@
 import ast
 import logging
 import re
-from typing import Any
 
 from graphql import GraphQLSchema, NonNullTypeNode, language
 from graphql.language.ast import (
@@ -50,7 +49,7 @@ class OperationsPluginConfig(PluginConfig):
 
     @model_validator(mode="before")
     @classmethod
-    def _rename_v1_spelling(cls, values: Any) -> Any:
+    def _rename_v1_spelling(cls, values: object) -> object:
         """Accept ``arguments_allow_population_by_field_name``, the pydantic v1
         spelling, as a deprecated alias.
 
@@ -73,7 +72,7 @@ def get_query_bases(
     config: GeneratorConfig,
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
-):
+) -> list[ast.Name]:
     if plugin_config.query_bases:
         for base in plugin_config.query_bases:
             registry.register_import(base)
@@ -96,7 +95,7 @@ def get_mutation_bases(
     config: GeneratorConfig,
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
-):
+) -> list[ast.Name]:
     if plugin_config.mutation_bases:
         for base in plugin_config.mutation_bases:
             registry.register_import(base)
@@ -120,7 +119,7 @@ def generate_arguments_config(
     config: GeneratorConfig,
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
-):
+) -> list[ast.Assign]:
     config_keywords = []
 
     if plugin_config.arguments_populate_by_name:
@@ -174,7 +173,7 @@ def get_subscription_bases(
     config: GeneratorConfig,
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
-):
+) -> list[ast.Name]:
     if plugin_config.subscription_bases:
         for base in plugin_config.subscription_bases:
             registry.register_import(base)
@@ -199,7 +198,7 @@ def generate_operation(
     config: GeneratorConfig,
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
-):
+) -> list[ast.AST]:
     tree = []
     if o.name is None:
         raise ValueError(

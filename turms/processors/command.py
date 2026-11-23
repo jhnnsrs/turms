@@ -33,7 +33,7 @@ class CommandProcessor(Processor):
 
     config: CommandProcessorConfig
 
-    def run(self, gen_file: str, config: GeneratorConfig):
+    def run(self, gen_file: str, config: GeneratorConfig) -> str:
         command = self.config.command
         if isinstance(command, str):
             command = shlex.split(command)

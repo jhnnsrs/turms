@@ -1,31 +1,35 @@
 import os
+from pathlib import Path
+from typing import Any
 
+import pytest
 import yaml
 from click.testing import CliRunner
 
 from turms.cli import main as cli_main
 
 
-def _turms_section(settings: str):
+def _turms_section(settings: str) -> dict[str, Any]:
+    """The turms section of a settings file: a YAML mapping, as untyped as ``yaml.safe_load``."""
     config = yaml.safe_load(settings)
     return config["projects"]["default"]["extensions"]["turms"]
 
 
-def _processors(settings: str):
+def _processors(settings: str) -> list[str]:
     return [p["type"] for p in _turms_section(settings).get("processors", [])]
 
 
-def _plugins(settings: str):
+def _plugins(settings: str) -> list[str]:
     return [p["type"] for p in _turms_section(settings)["plugins"]]
 
 
-def test_documents_template_is_default():
+def test_documents_template_is_default() -> None:
     assert cli_main.build_default_settings() == cli_main.build_default_settings(
         "documents"
     )
 
 
-def test_documents_template_includes_installed_formatters():
+def test_documents_template_includes_installed_formatters() -> None:
     """black and isort are dev dependencies, so the scaffold includes both."""
     processors = _processors(cli_main.build_default_settings("documents"))
 
@@ -33,7 +37,9 @@ def test_documents_template_includes_installed_formatters():
     assert "turms.processors.isort.IsortProcessor" in processors
 
 
-def test_documents_template_skips_missing_formatters(monkeypatch):
+def test_documents_template_skips_missing_formatters(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Without black/isort installed, no processors section is scaffolded."""
     monkeypatch.setattr(cli_main.importlib.util, "find_spec", lambda name: None)
 
@@ -43,7 +49,7 @@ def test_documents_template_skips_missing_formatters(monkeypatch):
     assert "processors" not in settings
 
 
-def test_documents_template_partial_install(monkeypatch):
+def test_documents_template_partial_install(monkeypatch: pytest.MonkeyPatch) -> None:
     """Only the processor whose tool is installed is scaffolded."""
     monkeypatch.setattr(
         cli_main.importlib.util,
@@ -56,7 +62,7 @@ def test_documents_template_partial_install(monkeypatch):
     assert processors == ["turms.processors.black.BlackProcessor"]
 
 
-def test_documents_template_core_shape():
+def test_documents_template_core_shape() -> None:
     turms = _turms_section(cli_main.build_default_settings("documents"))
     plugin_types = [p["type"] for p in turms["plugins"]]
 
@@ -66,7 +72,7 @@ def test_documents_template_core_shape():
     assert turms["scalar_definitions"] == {"uuid": "str"}
 
 
-def test_rath_template_adds_funcs_plugin():
+def test_rath_template_adds_funcs_plugin() -> None:
     settings = cli_main.build_default_settings("rath")
     turms = _turms_section(settings)
     funcs = turms["plugins"][-1]
@@ -81,7 +87,7 @@ def test_rath_template_adds_funcs_plugin():
     }
 
 
-def test_gql_template_adds_funcs_plugin():
+def test_gql_template_adds_funcs_plugin() -> None:
     settings = cli_main.build_default_settings("gql")
     funcs = _turms_section(settings)["plugins"][-1]
 
@@ -90,7 +96,7 @@ def test_gql_template_adds_funcs_plugin():
     assert all("is_async" not in d for d in funcs["definitions"])
 
 
-def test_strawberry_template_shape():
+def test_strawberry_template_shape() -> None:
     settings = cli_main.build_default_settings("strawberry")
     config = yaml.safe_load(settings)
     project = config["projects"]["default"]
@@ -106,7 +112,7 @@ def test_strawberry_template_shape():
     assert "turms.processors.merge.MergeProcessor" in processors
 
 
-def test_strawberry_template_without_libcst(monkeypatch):
+def test_strawberry_template_without_libcst(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cli_main.importlib.util, "find_spec", lambda name: None)
 
     processors = _processors(cli_main.build_default_settings("strawberry"))
@@ -114,7 +120,9 @@ def test_strawberry_template_without_libcst(monkeypatch):
     assert processors == ["turms.processors.disclaimer.DisclaimerProcessor"]
 
 
-def test_init_cli_writes_template(tmp_path, monkeypatch):
+def test_init_cli_writes_template(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """End-to-end: `turms init --template strawberry` writes a parseable config."""
     monkeypatch.chdir(tmp_path)
     runner = CliRunner()
@@ -126,7 +134,9 @@ def test_init_cli_writes_template(tmp_path, monkeypatch):
     assert _plugins(written) == ["turms.plugins.strawberry.StrawberryPlugin"]
 
 
-def test_init_cli_rejects_unknown_template(tmp_path, monkeypatch):
+def test_init_cli_rejects_unknown_template(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.chdir(tmp_path)
     runner = CliRunner()
 
@@ -136,7 +146,9 @@ def test_init_cli_rejects_unknown_template(tmp_path, monkeypatch):
     assert not os.path.exists(tmp_path / "graphql.config.yaml")
 
 
-def test_init_cli_honors_config_name(tmp_path, monkeypatch):
+def test_init_cli_honors_config_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.chdir(tmp_path)
     runner = CliRunner()
 

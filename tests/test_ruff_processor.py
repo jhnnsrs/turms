@@ -1,5 +1,6 @@
 import shutil
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -18,7 +19,7 @@ requires_ruff = pytest.mark.skipif(
 
 
 @pytest.fixture(autouse=True)
-def outside_this_repo(tmp_path, monkeypatch):
+def outside_this_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Run ruff where no project config is found.
 
     ruff reads the ruff.toml of the directory it runs in, and this repo's own
@@ -32,7 +33,7 @@ def outside_this_repo(tmp_path, monkeypatch):
 
 
 @requires_ruff
-def test_ruff_format():
+def test_ruff_format() -> None:
     """Format-only run normalizes style but keeps the (unused) imports."""
     processor = RuffProcessor(config=RuffProcessorConfig())
     result = processor.run(UNFORMATTED, GeneratorConfig())
@@ -43,7 +44,7 @@ def test_ruff_format():
 
 
 @requires_ruff
-def test_ruff_fix_removes_unused_imports():
+def test_ruff_fix_removes_unused_imports() -> None:
     """Enabling fix removes auto-fixable lint issues like unused imports."""
     processor = RuffProcessor(config=RuffProcessorConfig(fix=True))
     result = processor.run(UNFORMATTED, GeneratorConfig())
@@ -54,7 +55,7 @@ def test_ruff_fix_removes_unused_imports():
 
 
 @requires_ruff
-def test_ruff_no_op_when_everything_disabled():
+def test_ruff_no_op_when_everything_disabled() -> None:
     """Disabling both format and fix returns the code untouched."""
     processor = RuffProcessor(config=RuffProcessorConfig(format=False, fix=False))
     result = processor.run(UNFORMATTED, GeneratorConfig())
@@ -65,7 +66,7 @@ def test_ruff_no_op_when_everything_disabled():
 # --- CommandProcessor --------------------------------------------------------
 
 
-def test_command_processor_plumbing_list():
+def test_command_processor_plumbing_list() -> None:
     """Hermetic check of the stdin->stdout plumbing (no external tool needed).
 
     Pipes the code through a python one-liner that upper-cases it, so the test is
@@ -86,7 +87,7 @@ def test_command_processor_plumbing_list():
     assert result == "DEF F(): PASS\n"
 
 
-def test_command_processor_raises_on_failure():
+def test_command_processor_raises_on_failure() -> None:
     """A non-zero exit from the command surfaces as a RuntimeError."""
     processor = CommandProcessor(
         config=CommandProcessorConfig(
@@ -98,7 +99,7 @@ def test_command_processor_raises_on_failure():
 
 
 @requires_ruff
-def test_command_processor_with_ruff():
+def test_command_processor_with_ruff() -> None:
     """End-to-end: run ruff as the external command via the generic processor."""
     processor = CommandProcessor(config=CommandProcessorConfig(command="ruff format -"))
     result = processor.run(UNFORMATTED, GeneratorConfig())

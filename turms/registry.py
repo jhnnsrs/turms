@@ -240,7 +240,7 @@ class ClassRegistry:
 
     def __init__(
         self, config: GeneratorConfig, stylers: list[Styler], log: LogFunction
-    ):
+    ) -> None:
         self.stylers: list[Styler] = stylers
         self._imports: set[str] = set()
         self._builtins: set[str] = set()
@@ -515,24 +515,26 @@ class ClassRegistry:
         if module:
             self.register_import(f"{module}.{classname}")
 
-    def register_operation_single(self, operation_name: str, annotation_ast: ast.AST):
+    def register_operation_single(
+        self, operation_name: str, annotation_ast: ast.AST
+    ) -> None:
         self.operation_single_operation_map[operation_name] = annotation_ast
 
-    def get_operation_single_or_none(self, operation_name: str):
+    def get_operation_single_or_none(self, operation_name: str) -> ast.AST | None:
         return (
             self.operation_single_operation_map[operation_name]
             if operation_name in self.operation_single_operation_map
             else None
         )
 
-    def style_inputtype_class(self, typename: str):
+    def style_inputtype_class(self, typename: str) -> str:
         for styler in self.stylers:
             typename = styler.style_input_name(typename)
         if iskeyword(typename):
             typename += "_"
         return typename
 
-    def generate_inputtype(self, typename: str):
+    def generate_inputtype(self, typename: str) -> str:
         if typename in self.external_module_map:
             raise RegistryError(
                 f"{typename} is generated here and also declared as coming from "
@@ -570,14 +572,14 @@ class ClassRegistry:
             return ast.Constant(value=classname)
         return ast.Name(id=self.inputtype_class_map[typename], ctx=ast.Load())
 
-    def style_enum_class(self, typename: str):
+    def style_enum_class(self, typename: str) -> str:
         for styler in self.stylers:
             typename = styler.style_enum_name(typename)
         if iskeyword(typename):
             typename += "_"
         return typename
 
-    def generate_enum(self, typename: str):
+    def generate_enum(self, typename: str) -> str:
         if typename in self.external_module_map:
             raise RegistryError(
                 f"{typename} is generated here and also declared as coming from "
@@ -623,14 +625,14 @@ class ClassRegistry:
         # renamed the class, and then the map is the one that is right.
         return ast.Name(id=self.enum_class_map[typename], ctx=ast.Load())
 
-    def style_objecttype_class(self, typename: str):
+    def style_objecttype_class(self, typename: str) -> str:
         for styler in self.stylers:
             typename = styler.style_object_name(typename)
         if iskeyword(typename):
             typename += "_"
         return typename
 
-    def generate_objecttype(self, typename: str):
+    def generate_objecttype(self, typename: str) -> str:
         assert typename not in self.object_class_map, (
             "Type was already registered, cannot register annew"
         )
@@ -640,7 +642,7 @@ class ClassRegistry:
 
     def reference_object(
         self, typename: str, parent: str, allow_forward: bool = True
-    ) -> ast.AST:
+    ) -> ast.Name | ast.Constant:
         return self._reference_generic(
             typename,
             parent,
@@ -669,14 +671,14 @@ class ClassRegistry:
             return ast.Constant(value=classname)
         return ast.Name(id=classname, ctx=ast.Load())
 
-    def style_interface_class(self, typename: str):
+    def style_interface_class(self, typename: str) -> str:
         for styler in self.stylers:
             typename = styler.style_object_name(typename)
         if iskeyword(typename):
             typename += "_"
         return typename
 
-    def generate_interface(self, typename: str, with_base: bool = True):
+    def generate_interface(self, typename: str, with_base: bool = True) -> str:
         assert typename not in self.interface_baseclass_map, (
             "Type was already registered, cannot register annew"
         )
@@ -697,20 +699,20 @@ class ClassRegistry:
 
     def reference_interface(
         self, typename: str, parent: str, allow_forward: bool = True
-    ) -> ast.AST:
+    ) -> ast.Constant:
         # Interface need always be udpated later
         classname = self.style_interface_class(typename)
         self.forward_references.add(parent)
         return ast.Constant(value=classname)
 
-    def style_fragment_class(self, typename: str):
+    def style_fragment_class(self, typename: str) -> str:
         for styler in self.stylers:
             typename = styler.style_fragment_name(typename)
         if iskeyword(typename):
             typename += "_"
         return typename
 
-    def generate_fragment(self, fragmentname: str, is_interface: bool = False):
+    def generate_fragment(self, fragmentname: str, is_interface: bool = False) -> str:
         assert fragmentname not in self.fragment_class_map, (
             f"Fragment {fragmentname} was already registered, cannot register annew"
         )
@@ -719,26 +721,30 @@ class ClassRegistry:
         self.fragment_class_map[fragmentname] = real_classname
         return real_classname
 
-    def register_fragment_type(self, fragmentname: str, typename: GraphQLNamedType):
+    def register_fragment_type(
+        self, fragmentname: str, typename: GraphQLNamedType
+    ) -> None:
         self.fragment_type_map[fragmentname] = typename
 
     def register_interface_fragment_implementations(
         self, fragmentname: str, implementationMap: dict[str, str]
-    ):
+    ) -> None:
         self.interfacefragments_impl_map[fragmentname] = implementationMap
 
-    def get_interface_fragment_implementations(self, fragmentname: str):
+    def get_interface_fragment_implementations(
+        self, fragmentname: str
+    ) -> dict[str, str]:
         return self.interfacefragments_impl_map[fragmentname]
 
     def register_union_fragment_members(
         self, fragmentname: str, membersMap: dict[str, str]
-    ):
+    ) -> None:
         self.unionfragment_members_map[fragmentname] = membersMap
 
-    def get_union_fragment_members(self, fragmentname: str):
+    def get_union_fragment_members(self, fragmentname: str) -> dict[str, str]:
         return self.unionfragment_members_map[fragmentname]
 
-    def get_fragment_type(self, fragmentname: str):
+    def get_fragment_type(self, fragmentname: str) -> GraphQLNamedType:
         return self.fragment_type_map[fragmentname]
 
     def reference_fragment(
@@ -797,7 +803,7 @@ class ClassRegistry:
             )
         return self.fragment_class_map[typename]
 
-    def generate_node_name(self, node_name: str):
+    def generate_node_name(self, node_name: str) -> str:
         for styler in self.stylers:
             node_name = styler.style_node_name(node_name)
 
@@ -806,7 +812,7 @@ class ClassRegistry:
 
         return node_name
 
-    def generate_parameter_name(self, node_name: str):
+    def generate_parameter_name(self, node_name: str) -> str:
         for styler in self.stylers:
             node_name = styler.style_parameter_name(node_name)
 
@@ -815,14 +821,14 @@ class ClassRegistry:
 
         return node_name
 
-    def style_query_class(self, typename: str):
+    def style_query_class(self, typename: str) -> str:
         for styler in self.stylers:
             typename = styler.style_query_name(typename)
         if iskeyword(typename):
             typename += "_"
         return typename
 
-    def generate_query(self, typename: str):
+    def generate_query(self, typename: str) -> str:
         assert typename not in self.query_class_map, (
             f"Type {typename} was already registered, cannot register annew"
         )
@@ -830,14 +836,14 @@ class ClassRegistry:
         self.query_class_map[typename] = classname
         return classname
 
-    def style_mutation_class(self, typename: str):
+    def style_mutation_class(self, typename: str) -> str:
         for styler in self.stylers:
             typename = styler.style_mutation_name(typename)
         if iskeyword(typename):
             typename += "_"
         return typename
 
-    def generate_mutation(self, typename: str):
+    def generate_mutation(self, typename: str) -> str:
         assert typename not in self.mutation_class_map, (
             f"Type {typename} was already registered, cannot register annew"
         )
@@ -845,14 +851,14 @@ class ClassRegistry:
         self.mutation_class_map[typename] = classname
         return classname
 
-    def style_subscription_class(self, typename: str):
+    def style_subscription_class(self, typename: str) -> str:
         for styler in self.stylers:
             typename = styler.style_subscription_name(typename)
         if iskeyword(typename):
             typename += "_"
         return typename
 
-    def generate_subscription(self, typename: str):
+    def generate_subscription(self, typename: str) -> str:
         assert typename not in self.subscription_class_map, (
             f"Type {typename} was already registered, cannot register annew"
         )
@@ -996,10 +1002,10 @@ class ClassRegistry:
         self.register_builtin("Deprecated")
         return ast.Name(id="Deprecated", ctx=ast.Load())
 
-    def register_scalar(self, scalar_type: str, python_type: str):
+    def register_scalar(self, scalar_type: str, python_type: str) -> None:
         self.scalar_map[scalar_type] = python_type
 
-    def reference_scalar(self, scalar_type: str):
+    def reference_scalar(self, scalar_type: str) -> ast.Name:
         if scalar_type in self.scalar_map:
             python_type = self.scalar_map[scalar_type]
             if "." in python_type:

@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import NoReturn
+
 import pytest
 
 from turms.errors import GenerationError
@@ -5,7 +8,7 @@ from turms.plugins.operations import OperationsPlugin
 from turms.run import gen
 
 
-def test_create_file(tmp_path, parsable_configs):
+def test_create_file(tmp_path: Path, parsable_configs: list[str]) -> None:
     for config in parsable_configs:
         gen(config, overwrite_path=tmp_path)
 
@@ -21,8 +24,10 @@ def test_create_file(tmp_path, parsable_configs):
             )
 
 
-def test_create_file_faulty(tmp_path, parsable_configs, monkeypatch):
-    def faulty_parse(*args, **kwargs):
+def test_create_file_faulty(
+    tmp_path: Path, parsable_configs: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def faulty_parse(*args: object, **kwargs: object) -> NoReturn:
         raise Exception("Faulty parse")
 
     monkeypatch.setattr(OperationsPlugin, "generate_ast", faulty_parse)

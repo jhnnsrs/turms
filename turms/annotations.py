@@ -75,7 +75,7 @@ class AnnotationModernizer(ast.NodeTransformer):
 
     def __init__(
         self, eligible: set[str], builtin_generics: bool, union_operator: bool
-    ):
+    ) -> None:
         self.eligible = eligible
         self.builtin_generics = builtin_generics
         self.union_operator = union_operator
@@ -149,9 +149,9 @@ def _eligible_names(registry: ClassRegistry, config: GeneratorConfig) -> set[str
     return (candidates & from_typing) - shadowed
 
 
-def _walk(node) -> "list":
+def _walk(node: object) -> list[ast.AST]:
     """``ast.walk`` that also descends into nested lists (see ``_visit_sequence``)."""
-    nodes = []
+    nodes: list[ast.AST] = []
     if isinstance(node, list):
         for item in node:
             nodes.extend(_walk(item))

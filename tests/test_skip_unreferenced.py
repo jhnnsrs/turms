@@ -1,4 +1,5 @@
 import pytest
+from graphql import GraphQLSchema
 
 from turms.config import GeneratorConfig
 from turms.plugins.enums import EnumsPlugin, EnumsPluginConfig
@@ -13,7 +14,7 @@ from .utils import build_relative_glob
 
 
 @pytest.mark.network
-def test_skip_unreferenced(countries_schema):
+def test_skip_unreferenced(countries_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/countries/*.graphql"),
     )

@@ -3,7 +3,7 @@ from turms.processors.merge import MergeProcessorConfig, merge_code
 from .utils import build_relative_glob
 
 
-def test_merge_code():
+def test_merge_code() -> None:
     """Tests the merge_code function"""
 
     with open(build_relative_glob("/merge_pairs/old.py")) as f:

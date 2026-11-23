@@ -1,6 +1,7 @@
 import ast
 
 import pytest
+from graphql import GraphQLSchema
 
 from turms.config import GeneratorConfig
 from turms.plugins.enums import EnumsPlugin
@@ -13,7 +14,7 @@ from .utils import unit_test_with
 
 
 @pytest.mark.network
-def test_complex_operations(countries_schema):
+def test_complex_operations(countries_schema: GraphQLSchema) -> None:
     config = GeneratorConfig()
 
     generated_ast = generate_ast(

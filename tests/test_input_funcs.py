@@ -1,5 +1,8 @@
 """Tests for the input_funcs plugin: factory functions per input type."""
 
+import ast
+from typing import Any
+
 from graphql import build_ast_schema, parse
 
 from turms.config import GeneratorConfig
@@ -30,7 +33,7 @@ type Query {
 """
 
 
-def _generate(**inputfuncs_kwargs):
+def _generate(**inputfuncs_kwargs: Any) -> list[ast.AST]:
     config = GeneratorConfig()
     return generate_ast(
         config,
@@ -48,7 +51,7 @@ def _generate(**inputfuncs_kwargs):
     )
 
 
-def test_factory_signature_and_body():
+def test_factory_signature_and_body() -> None:
     generated = parse_to_code(_generate())
 
     # Required field -> positional; optional fields -> `... | UnsetType = UNSET`.
@@ -69,14 +72,14 @@ def test_factory_signature_and_body():
     assert "return AddressInput.model_validate(_data)" in generated
 
 
-def test_coercible_scalars_change_annotation():
+def test_coercible_scalars_change_annotation() -> None:
     generated = parse_to_code(_generate(coercible_scalars={"String": "pathlib.Path"}))
     # The String params become coercible to Path, and Path is imported.
     assert "name: Path" in generated
     assert "from pathlib import Path" in generated
 
 
-def test_global_coercible_scalars_are_used():
+def test_global_coercible_scalars_are_used() -> None:
     """coercible_scalars set on the global GeneratorConfig apply without a per-plugin
     override."""
     config = GeneratorConfig(coercible_scalars={"String": "pathlib.Path"})
@@ -97,7 +100,7 @@ def test_global_coercible_scalars_are_used():
     assert "from pathlib import Path" in generated
 
 
-def test_plugin_coercible_overrides_global():
+def test_plugin_coercible_overrides_global() -> None:
     """A plugin's coercible_scalars entry overrides the global one for that scalar."""
     config = GeneratorConfig(coercible_scalars={"String": "pathlib.Path"})
     generated = parse_to_code(
@@ -121,13 +124,13 @@ def test_plugin_coercible_overrides_global():
     assert "name: Path" not in generated
 
 
-def test_prepend_function_name():
+def test_prepend_function_name() -> None:
     generated = parse_to_code(_generate(prepend="make_"))
     assert "def make_user_input(" in generated
     assert "def make_address_input(" in generated
 
 
-def test_runtime_construction():
+def test_runtime_construction() -> None:
     """The generated factories build valid models at runtime."""
     generated_ast = _generate()
     unit_test_with(
@@ -149,7 +152,7 @@ def test_runtime_construction():
     )
 
 
-def test_unset_optionals_not_in_dump():
+def test_unset_optionals_not_in_dump() -> None:
     """Omitted optionals are unset, so exclude_unset drops them (server defaults)."""
     generated_ast = _generate()
     unit_test_with(
@@ -185,7 +188,7 @@ type Query {
 """
 
 
-def test_union_target_factory_validates_through_pydantic():
+def test_union_target_factory_validates_through_pydantic() -> None:
     """A ``@unionElementOf`` target is generated as an Annotated union, which
     is not callable — its factory must validate the collected data through
     pydantic instead, dispatching to the member class by discriminator."""

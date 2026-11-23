@@ -1,5 +1,5 @@
 import ast
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from graphql import (
     BooleanValueNode,
@@ -55,8 +55,8 @@ class StrawberryGenerateFunc(ImportableFunctionMixin, Protocol):
 
 
 def build_directive_type_annotation(
-    value: GraphQLType, registry: ClassRegistry, is_optional=True
-):
+    value: GraphQLType, registry: ClassRegistry, is_optional: bool = True
+) -> ast.expr:
 
     if isinstance(value, GraphQLScalarType):
         if is_optional:
@@ -119,7 +119,7 @@ def build_directive_type_annotation(
     raise NotImplementedError(f"Unknown type {repr(value)}")
 
 
-def convert_valuenode_to_ast(value: ConstValueNode):
+def convert_valuenode_to_ast(value: ConstValueNode) -> ast.expr:
     if isinstance(value, NullValueNode):
         return ast.Constant(value=None)
     if isinstance(value, StringValueNode):
@@ -158,7 +158,7 @@ def default_generate_directives(
     config: GeneratorConfig,
     plugin_config: "StrawberryPluginConfig",
     registry: ClassRegistry,
-):
+) -> list[ast.AST]:
     tree = []
 
     directives = client_schema.directives
@@ -281,7 +281,7 @@ def default_generate_enums(
     config: GeneratorConfig,
     plugin_config: "StrawberryPluginConfig",
     registry: ClassRegistry,
-):
+) -> list[ast.AST]:
     tree = []
 
     enum_types = {
@@ -378,7 +378,7 @@ class StrawberryPluginConfig(PluginConfig):
 
     @model_validator(mode="before")
     @classmethod
-    def _rename_deprecated(cls, values: Any) -> Any:
+    def _rename_deprecated(cls, values: object) -> object:
         return rename_deprecated_keys(values, {"inputtype_bases": "input_bases"})
 
     skip_underscore: bool = False
@@ -395,8 +395,8 @@ def generate_object_field_annotation(
     config: GeneratorConfig,
     plugin_config: StrawberryPluginConfig,
     registry: ClassRegistry,
-    is_optional=True,
-):
+    is_optional: bool = True,
+) -> ast.expr:
     if isinstance(graphql_type, GraphQLScalarType):
         if is_optional:
             registry.register_import("typing.Optional")
@@ -504,7 +504,7 @@ def generate_object_field_annotation(
     if isinstance(graphql_type, GraphQLList):
         registry.register_import("typing.List")
 
-        def list_builder(x):
+        def list_builder(x: ast.expr) -> ast.Subscript:
             return ast.Subscript(
                 value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
             )
@@ -549,8 +549,8 @@ def recurse_argument_annotation(
     config: GeneratorConfig,
     plugin_config: StrawberryPluginConfig,
     registry: ClassRegistry,
-    is_optional=True,
-):
+    is_optional: bool = True,
+) -> ast.expr:
     if isinstance(graphql_type, GraphQLScalarType):
         if is_optional:
             registry.register_import("typing.Optional")
@@ -647,7 +647,7 @@ def recurse_argument_annotation(
     if isinstance(graphql_type, GraphQLList):
         registry.register_import("typing.List")
 
-        def list_builder(x):
+        def list_builder(x: ast.expr) -> ast.Subscript:
             return ast.Subscript(
                 value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
             )
@@ -686,7 +686,7 @@ def recurse_argument_annotation(
 
 def generate_directive_keywords(
     ast_node: ObjectTypeDefinitionNode, plugin_config: StrawberryPluginConfig
-):
+) -> list[ast.keyword]:
     if not ast_node:
         return []
 
@@ -729,7 +729,7 @@ def generate_inputs(
     config: GeneratorConfig,
     plugin_config: StrawberryPluginConfig,
     registry: ClassRegistry,
-):
+) -> list[ast.AST]:
     tree = []
 
     inputobjects_type = {
@@ -863,7 +863,7 @@ def generate_types(
     config: GeneratorConfig,
     plugin_config: StrawberryPluginConfig,
     registry: ClassRegistry,
-):
+) -> list[ast.AST]:
     tree = []
 
     objects = {
@@ -1099,7 +1099,7 @@ def generate_scalars(
     config: GeneratorConfig,
     plugin_config: StrawberryPluginConfig,
     registry: ClassRegistry,
-):
+) -> list[ast.AST]:
     objects = {
         key: value
         for key, value in client_schema.type_map.items()

@@ -2,7 +2,7 @@ import ast
 import glob
 import re
 from collections.abc import Sequence
-from typing import Any, TypeVar, Union
+from typing import Any, TypeAlias, TypeVar
 
 from graphql import (
     BooleanValueNode,
@@ -13,6 +13,7 @@ from graphql import (
     GraphQLInterfaceType,
     GraphQLList,
     GraphQLNamedOutputType,
+    GraphQLNamedType,
     GraphQLNonNull,
     GraphQLObjectType,
     GraphQLOutputType,
@@ -163,7 +164,9 @@ def non_typename_fields(
     ]
 
 
-def inspect_operation_for_documentation(operation: OperationDefinitionNode):
+def inspect_operation_for_documentation(
+    operation: OperationDefinitionNode,
+) -> str | None:
     """Checks for operation level documentatoin"""
 
     if not operation.loc:
@@ -207,7 +210,7 @@ def inspect_operation_for_documentation(operation: OperationDefinitionNode):
 
 def generate_typename_field(
     typename: str, registry: ClassRegistry, config: GeneratorConfig
-):
+) -> ast.AnnAssign:
     """Generates the typename field a specific type, this will be used to determine the type of the object in the response"""
 
     registry.register_import("pydantic.Field")
@@ -283,7 +286,9 @@ def generate_alias_keywords(
     return [ast.keyword(arg="alias", value=ast.Constant(value=graphql_name))]
 
 
-def generate_generic_typename_field(registry: ClassRegistry, config: GeneratorConfig):
+def generate_generic_typename_field(
+    registry: ClassRegistry, config: GeneratorConfig
+) -> ast.AnnAssign:
     """Generates the typename field a specific type, this will be used to determine the type of the object in the response"""
 
     registry.register_import("pydantic.Field")
@@ -540,7 +545,7 @@ def auto_add_typename_field_to_fragment_str(fragment_str: str) -> str:
 def replace_iteratively(
     pattern: str,
     registry: ClassRegistry,
-    taken: list[str] = [],
+    taken: list[str] = [],  # noqa: B006 - only read, never mutated
 ) -> str:
     """Replaces the fragments in the pattern with their definitions"""
     z = set(fragment_searcher.findall(pattern))  # only set is important
@@ -584,7 +589,7 @@ def get_additional_bases_for_type(
     return []
 
 
-def is_oneof_input_type(graphql_type) -> bool:
+def is_oneof_input_type(graphql_type: GraphQLNamedType) -> bool:
     """Whether an input object type is declared with the spec ``@oneOf`` directive.
 
     graphql-core 3.3+ exposes this as ``is_one_of``; on 3.2 the directive is only
@@ -600,7 +605,9 @@ def is_oneof_input_type(graphql_type) -> bool:
     )
 
 
-def get_interface_bases(config: GeneratorConfig, registry: ClassRegistry):
+def get_interface_bases(
+    config: GeneratorConfig, registry: ClassRegistry
+) -> list[ast.Name]:
     if config.interface_bases:
         for base in config.interface_bases:
             registry.register_import(base)
@@ -684,10 +691,10 @@ def recurse_type_annotation(
                         x = registry.reference_enum(
                             type.name.value, "", allow_forward=False
                         )
-                    except NoEnumFound:
+                    except NoEnumFound as e:
                         raise NotImplementedError(
                             f"Could not find corresponding type for type '{type.name.value}'. Did you register this scalar?"
-                        )
+                        ) from e
 
         if not x:
             raise Exception(f"Could not set value for {type}")
@@ -851,10 +858,10 @@ def recurse_type_label(
                         x = registry.reference_enum(
                             type.name.value, "", allow_forward=False
                         )
-                    except NoEnumFound:
+                    except NoEnumFound as e:
                         raise NotImplementedError(
                             f"Could not find correspoinding type labler for {type.name.value}"
-                        )
+                        ) from e
 
         label = x.id if isinstance(x, ast.Name) else x.value
         return optional_label(label, registry.config) if optional else label
@@ -862,7 +869,7 @@ def recurse_type_label(
     raise NotImplementedError("Not implemented for this type")
 
 
-ParsedValue = Union[None, str, int, float, bool, list["ParsedValue"], dict]
+ParsedValue: TypeAlias = None | str | int | float | bool | list["ParsedValue"] | dict
 
 
 def parse_value_node(value_node: ValueNode) -> ParsedValue:
@@ -905,7 +912,7 @@ def parse_value_node(value_node: ValueNode) -> ParsedValue:
         )
 
 
-def convert_default_value_to_ast(value):
+def convert_default_value_to_ast(value: object) -> ast.expr | None:
     """Converts a coerced Python default value (as stored on a GraphQL input
     field / argument) into an AST node usable as a pydantic field default."""
     if value is Undefined:
@@ -935,11 +942,11 @@ def convert_default_value_to_ast(value):
 
 
 def compose_field_documentation(
-    description=None,
-    deprecation_reason=None,
-    default_string=None,
-    include_metadata=True,
-):
+    description: str | None = None,
+    deprecation_reason: str | None = None,
+    default_string: str | None = None,
+    include_metadata: bool = True,
+) -> str | None:
     """Builds a field's human-readable documentation. When ``include_metadata`` is
     True the GraphQL deprecation reason and default value are folded into the text
     alongside the description; otherwise only the plain description is returned.
@@ -958,11 +965,11 @@ def compose_field_documentation(
 
 
 def annotate_field_metadata(
-    annotation,
-    registry,
-    default_value_ast=None,
-    deprecation_reason=None,
-):
+    annotation: ast.expr,
+    registry: ClassRegistry,
+    default_value_ast: ast.expr | None = None,
+    deprecation_reason: str | None = None,
+) -> ast.expr:
     """Wraps a field annotation in ``Annotated[T, GraphQLDefault(...), Deprecated(...)]``
     when the field carries a GraphQL schema default and/or a deprecation reason.
 

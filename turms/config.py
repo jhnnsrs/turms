@@ -5,9 +5,8 @@ from enum import Enum
 from typing import (
     Any,
     Literal,
-    Optional,
     Protocol,
-    Union,
+    TypeAlias,
     runtime_checkable,
 )
 
@@ -39,12 +38,12 @@ class ConfigProxy(BaseModel):
 class ImportableFunctionMixin(Protocol):
     @classmethod
     def __get_pydantic_core_schema__(
-        cls, source_type: Any, handler: GetCoreSchemaHandler
+        cls, source_type: object, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
         return core_schema.no_info_before_validator_function(cls.validate, handler(Any))
 
     @classmethod
-    def validate(cls, value: str | Callable[[Any], Any]):
+    def validate(cls, value: str | Callable[[Any], Any]) -> object:
         if not callable(value):
             if not isinstance(value, str):  # type: ignore
                 raise TypeError("string required")
@@ -61,12 +60,12 @@ class PythonType(str):
 
     @classmethod
     def __get_pydantic_core_schema__(
-        cls, source_type: Any, handler: GetCoreSchemaHandler
+        cls, source_type: object, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
         return core_schema.no_info_after_validator_function(cls.validate, handler(str))
 
     @classmethod
-    def validate(cls, v: str):
+    def validate(cls, v: str) -> "PythonType":
         if v not in dir(builtins):
             assert "." in v, "You need to point to a module if its not a builtin type"
         return cls(v)
@@ -136,7 +135,7 @@ class FreezeConfig(BaseModel):
     """Convert GraphQL List to tuple (with varying length)"""
 
 
-ExtraOptions = Optional[Literal["ignore", "allow", "forbid"]]
+ExtraOptions: TypeAlias = Literal["ignore", "allow", "forbid"] | None
 
 AliasMode = Literal["single", "split"]
 """How a field whose python name differs from its GraphQL name carries that name.
@@ -206,7 +205,7 @@ class OptionsConfig(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def _reject_pydantic_v1_options(cls, values: Any) -> Any:
+    def _reject_pydantic_v1_options(cls, values: object) -> object:
         if isinstance(values, dict):
             if "orm_mode" in values:
                 raise ValueError(
@@ -345,7 +344,7 @@ class GeneratorConfig(BaseSettings):
 
     @model_validator(mode="before")
     @classmethod
-    def _rename_omited_document_rules(cls, values: Any) -> Any:
+    def _rename_omited_document_rules(cls, values: object) -> object:
         """``omited_document_rules`` was a typo; accept it with a warning.
 
         Done here rather than with a validation alias because an alias on a
@@ -368,7 +367,7 @@ class GeneratorConfig(BaseSettings):
 
     @model_validator(mode="before")
     @classmethod
-    def _drop_pydantic_version(cls, values: Any) -> Any:
+    def _drop_pydantic_version(cls, values: object) -> object:
         """``pydantic_version`` is a dead key: turms only targets pydantic v2.
 
         Configurations saying ``pydantic_version: v2`` keep loading -- the key
@@ -579,7 +578,7 @@ class GeneratorConfig(BaseSettings):
         return self._target_python_version >= UNION_OPERATOR_SINCE
 
     @model_validator(mode="after")
-    def validate_unset_override(self):
+    def validate_unset_override(self) -> "GeneratorConfig":
         """The UNSET sentinel type and instance must be overridden together (the
         generated ``UNSET = UnsetType()`` bundle is emitted only when neither is
         overridden)."""
@@ -619,7 +618,7 @@ class GeneratorConfig(BaseSettings):
     )
     def validate_additional_bases(cls, v: dict[str, list[str]]) -> dict[str, list[str]]:
         """Validate that the additional bases are valid importable functions or classes"""
-        for key, value_list in v.items():
+        for _key, value_list in v.items():
             for value in value_list:
                 if not isinstance(value, str):  # type: ignore
                     raise ValueError("string required")
@@ -651,8 +650,8 @@ class AdvancedSchemaField(BaseModel):
     headers: dict[str, str]
 
 
-SchemaField = Union[AnyHttpUrl, str, dict[str, AdvancedSchemaField]]
-SchemaType = Union[SchemaField, list[SchemaField]]
+SchemaField: TypeAlias = AnyHttpUrl | str | dict[str, AdvancedSchemaField]
+SchemaType: TypeAlias = SchemaField | list[SchemaField]
 
 
 class GraphQLProject(BaseSettings):

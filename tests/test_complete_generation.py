@@ -1,5 +1,7 @@
 import ast
 
+from graphql import GraphQLSchema
+
 from turms.config import GeneratorConfig
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.fragments import FragmentsPlugin
@@ -14,7 +16,7 @@ from turms.stylers.snake_case import SnakeCaseStyler
 from .utils import build_relative_glob, unit_test_with
 
 
-def test_unparse():
+def test_unparse() -> None:
     """Needs to be tested for compliance with older python versions via astunparse"""
     instring = """
 class TestClass:
@@ -25,7 +27,7 @@ class TestClass:
     ast.alias(x)
 
 
-def test_small(hello_world_schema):
+def test_small(hello_world_schema: GraphQLSchema) -> None:
 
     config = GeneratorConfig()
     generated_ast = generate_ast(
@@ -38,7 +40,7 @@ def test_small(hello_world_schema):
     assert "class HelloWorldOrder(str, Enum):" in generated, "EnumPlugin not working"
 
 
-def test_snake_case_styler(hello_world_schema):
+def test_snake_case_styler(hello_world_schema: GraphQLSchema) -> None:
     config = GeneratorConfig()
     generated_ast = generate_ast(
         config,
@@ -56,7 +58,7 @@ def test_snake_case_styler(hello_world_schema):
     )
 
 
-def test_beast_styler(beast_schema):
+def test_beast_styler(beast_schema: GraphQLSchema) -> None:
     config = GeneratorConfig()
     generated_ast = generate_ast(
         config,
@@ -70,7 +72,7 @@ def test_beast_styler(beast_schema):
     assert "from enum import Enum" in generated, "EnumPlugin not working"
 
 
-def test_beast_operations(beast_schema):
+def test_beast_operations(beast_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/beasts/*.graphql")
     )
@@ -88,7 +90,7 @@ def test_beast_operations(beast_schema):
     assert "common_name: str | None" in generated, "SnakeNodeName not working"
 
 
-def test_arkitekt_operations(arkitekt_schema):
+def test_arkitekt_operations(arkitekt_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/arkitekt/**/*.graphql"),
         scalar_definitions={
@@ -117,7 +119,7 @@ def test_arkitekt_operations(arkitekt_schema):
     )
 
 
-def test_black_complex(arkitekt_schema):
+def test_black_complex(arkitekt_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/arkitekt/**/*.graphql"),
         scalar_definitions={

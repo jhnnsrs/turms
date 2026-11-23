@@ -10,6 +10,7 @@ for one release so existing graphql.config.yaml files still load.
 import warnings
 
 import pytest
+from pydantic import BaseModel
 
 from turms.plugins.fragments import FragmentsPluginConfig
 from turms.plugins.inputs import InputsPluginConfig
@@ -25,7 +26,9 @@ RENAMES = [
 
 
 @pytest.mark.parametrize("cls,old,new,value", RENAMES)
-def test_deprecated_key_still_loads_and_warns(cls, old, new, value):
+def test_deprecated_key_still_loads_and_warns(
+    cls: type[BaseModel], old: str, new: str, value: list[str] | bool
+) -> None:
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         config = cls(**{old: value})
@@ -35,13 +38,17 @@ def test_deprecated_key_still_loads_and_warns(cls, old, new, value):
 
 
 @pytest.mark.parametrize("cls,old,new,value", RENAMES)
-def test_setting_both_spellings_is_an_error(cls, old, new, value):
+def test_setting_both_spellings_is_an_error(
+    cls: type[BaseModel], old: str, new: str, value: list[str] | bool
+) -> None:
     with pytest.raises(ValueError, match="not both"):
         cls(**{old: value, new: value})
 
 
 @pytest.mark.parametrize("cls,old,new,value", RENAMES)
-def test_new_key_needs_no_warning(cls, old, new, value):
+def test_new_key_needs_no_warning(
+    cls: type[BaseModel], old: str, new: str, value: list[str] | bool
+) -> None:
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         config = cls(**{new: value})
@@ -50,7 +57,7 @@ def test_new_key_needs_no_warning(cls, old, new, value):
     assert not [w for w in caught if issubclass(w.category, DeprecationWarning)]
 
 
-def test_bases_options_share_one_convention():
+def test_bases_options_share_one_convention() -> None:
     """Every plugin that takes base classes spells the option ``<kind>_bases``."""
     assert "object_bases" in ObjectsPluginConfig.model_fields
     assert "input_bases" in InputsPluginConfig.model_fields
@@ -62,7 +69,7 @@ def test_bases_options_share_one_convention():
         assert "inputtype_bases" not in cls.model_fields
 
 
-def test_plugin_type_defaults_point_at_real_classes():
+def test_plugin_type_defaults_point_at_real_classes() -> None:
     """``type`` defaults are the dotted path turms imports to build the plugin."""
     from turms.helpers import import_string
 

@@ -14,13 +14,13 @@ IntrospectionResult = dict[str, Any]
 DSLString = str
 
 
-def import_class(module_path: str, class_name: str) -> Any:
+def import_class(module_path: str, class_name: str) -> Any:  # noqa: ANN401 - whatever the dotted path names
     """Import a module from a module_path and return the class"""
     module = import_module(module_path)
     return getattr(module, class_name)
 
 
-def import_string(dotted_path: str) -> Any:
+def import_string(dotted_path: str) -> Any:  # noqa: ANN401 - whatever the dotted path names
     """
     Import a dotted module path and return the attribute/class designated by the
     last name in the path. Raise ImportError if the import failed. Simliar to
@@ -57,10 +57,10 @@ def load_introspection_from_url(
     """
     try:  # pragma: no cover
         import requests  # pragma: no cover
-    except ImportError:  # pragma: no cover
+    except ImportError as e:  # pragma: no cover
         raise GenerationError(
             "The requests library is required to introspect a schema from a url"
-        )  # pragma: no cover
+        ) from e  # pragma: no cover
 
     jdata = json.dumps({"query": get_introspection_query()}).encode("utf-8")
     default_headers = {"Content-Type": "application/json", "Accept": "application/json"}
@@ -89,10 +89,10 @@ def load_dsl_from_url(
 ) -> DSLString:
     try:  # pragma: no cover
         import requests  # pragma: no cover
-    except ImportError:  # pragma: no cover
+    except ImportError as e:  # pragma: no cover
         raise GenerationError(
             "The requests library is required to introspect a schema from a url"
-        )  # pragma: no cover
+        ) from e  # pragma: no cover
 
     default_headers: dict[str, str] = {}
     if headers:
@@ -141,7 +141,7 @@ def load_dsl_from_glob(
 
 def load_introspection_from_glob(
     glob_string: str,
-):
+) -> IntrospectionResult:
     schema_glob = glob.glob(glob_string, recursive=True)
     schema_glob.sort()  # Ensure deterministic order
     if len(schema_glob) == 0:

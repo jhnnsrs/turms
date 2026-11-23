@@ -1,3 +1,5 @@
+from graphql import GraphQLSchema
+
 from turms.config import GeneratorConfig
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
@@ -8,7 +10,7 @@ from turms.stylers.default import DefaultStyler
 from .utils import unit_test_with
 
 
-def test_keyword_transpiling(keyword_schema):
+def test_keyword_transpiling(keyword_schema: GraphQLSchema) -> None:
     config = GeneratorConfig()
 
     generated_ast = generate_ast(

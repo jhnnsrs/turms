@@ -123,7 +123,7 @@ def generate_async_func_name(
     plugin_config: OperationFuncsConfig,
     config: GeneratorConfig,
     registry: ClassRegistry,
-):
+) -> str:
     if not o.name:
         raise Exception("Operation name is None")
     return f"{plugin_config.prepend_async}{camel_to_snake(o.name.value)}"
@@ -134,7 +134,7 @@ def generate_sync_func_name(
     plugin_config: OperationFuncsConfig,
     config: GeneratorConfig,
     registry: ClassRegistry,
-):
+) -> str:
     if not o.name:  # pragma: no cover
         raise Exception("Operation name is None")
     return f"{plugin_config.prepend_sync}{camel_to_snake(o.name.value)}"
@@ -150,7 +150,7 @@ def get_extra_args_for_onode(
 
 def generate_passing_extra_args_for_onode(
     definition: OperationExtras, plugin_config: OperationFuncsConfig
-):
+) -> list[ast.Name]:
     return [
         ast.Name(id=arg.key, ctx=ast.Load())
         for arg in get_extra_args_for_onode(definition, plugin_config)
@@ -159,7 +159,7 @@ def generate_passing_extra_args_for_onode(
 
 def generate_passing_extra_kwargs_for_onode(
     definition: OperationExtras, plugin_config: OperationFuncsConfig
-):
+) -> list[ast.keyword]:
     return [
         ast.keyword(arg=kwarg.key, value=ast.Name(id=kwarg.key, ctx=ast.Load()))
         for kwarg in get_extra_kwargs_for_onode(definition, plugin_config)
@@ -204,7 +204,7 @@ def generate_input_annotation(
     registry: ClassRegistry,
     plugin_config: OperationFuncsConfig,
     is_optional: bool = True,
-):
+) -> ast.expr:
     if isinstance(type, GraphQLScalarType):
         if type.name in plugin_config.coercible_scalars:
             registry.register_import(plugin_config.coercible_scalars[type.name])
@@ -262,7 +262,7 @@ def generate_input_annotation(
     if isinstance(type, GraphQLList):
         registry.register_import("typing.Iterable")
 
-        def list_builder(x):
+        def list_builder(x: ast.expr) -> ast.Subscript:
             return ast.Subscript(
                 value=ast.Name("Iterable", ctx=ast.Load()), slice=x, ctx=ast.Load()
             )
@@ -294,8 +294,8 @@ def generate_input_annotation(
 def generate_input_description(
     type: GraphQLInputObjectType,
     registry: ClassRegistry,
-    is_optional=True,
-):
+    is_optional: bool = True,
+) -> str:
     if isinstance(type, GraphQLScalarType):
         return type.description or ""
 
@@ -322,7 +322,7 @@ def generate_input_description(
 
 def generate_input_type_descriptions(
     input_type: GraphQLInputObjectType, registry: ClassRegistry
-):
+) -> str:
     description = ""
 
     for value_key, value in input_type.fields.items():
@@ -442,7 +442,7 @@ def generate_input_type_params(
     input_type: GraphQLInputObjectType,
     plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
-):
+) -> tuple[list[ast.arg], list[ast.arg], list[ast.expr]]:
     pos_args = []
     kw_args = []
     kw_values = []
@@ -489,7 +489,7 @@ def generate_parameters(
     plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
     client_schema: GraphQLSchema,
-):
+) -> ast.arguments:
     pos_args = []
     kw_args = []
     kw_values = []
@@ -623,7 +623,7 @@ def generate_variable_assignments(
     plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
     client_schema: GraphQLSchema,
-):
+) -> list[ast.stmt]:
     """Builds the statements that assemble the ``variables`` dict for an
     operation, omitting any argument the caller left as ``UNSET``. Combined with
     ``exclude_unset`` serialization this lets the server apply its own defaults
@@ -708,7 +708,9 @@ def generate_variable_assignments(
     return stmts
 
 
-def generate_document_arg(o: OperationDefinitionNode, registry: ClassRegistry):
+def generate_document_arg(
+    o: OperationDefinitionNode, registry: ClassRegistry
+) -> ast.Name:
     return ast.Name(id=get_operation_class_name(o, registry), ctx=ast.Load())
 
 
@@ -816,7 +818,7 @@ def get_return_type_string(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     registry: ClassRegistry,
-    collapse=True,
+    collapse: bool = True,
 ) -> tuple[str, bool]:
     o_name = get_operation_class_name(o, registry)
 
@@ -871,7 +873,7 @@ def estimate_variable_name(
     client_schema: GraphQLSchema,
     root: GraphQLObjectType,
     description_map: dict,
-):
+) -> None:
     if o.selection_set is None:
         return
     for field in o.selection_set.selections:
@@ -911,8 +913,8 @@ def generate_query_doc(
     config: GeneratorConfig,
     plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
-    collapse=False,
-):
+    collapse: bool = False,
+) -> ast.Expr:
     x = get_operation_root_type(client_schema, o)
 
     get_operation_class_name(o, registry)
@@ -999,8 +1001,8 @@ def genereate_async_call(
     config: GeneratorConfig,
     plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
-    collapse=False,
-):
+    collapse: bool = False,
+) -> ast.Return:
     registry.register_import(definition.use)
 
     if not collapse:
@@ -1064,8 +1066,8 @@ def genereate_sync_call(
     config: GeneratorConfig,
     plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
-    collapse=False,
-):
+    collapse: bool = False,
+) -> ast.Return:
     registry.register_import(definition.use)
     if not collapse:
         return ast.Return(
@@ -1122,8 +1124,8 @@ def genereate_async_iterator(
     config: GeneratorConfig,
     plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
-    collapse=False,
-):
+    collapse: bool = False,
+) -> ast.AsyncFor:
     registry.register_import(definition.use)
     if not collapse:
         return ast.AsyncFor(
@@ -1192,8 +1194,8 @@ def genereate_sync_iterator(
     config: GeneratorConfig,
     plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
-    collapse=False,
-):
+    collapse: bool = False,
+) -> ast.For:
     registry.register_import(definition.use)
     if not collapse:
         return ast.For(
@@ -1255,7 +1257,7 @@ def genereate_sync_iterator(
         )
 
 
-def is_collapsable(o: OperationDefinitionNode):
+def is_collapsable(o: OperationDefinitionNode) -> bool:
     assert o.selection_set is not None, "Operation needs to have at least a selection"
     return len(o.selection_set.selections) == 1
 
@@ -1267,7 +1269,7 @@ def generate_operation_func(
     config: GeneratorConfig,
     plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
-):
+) -> list[ast.stmt]:
     tree = []
 
     collapse = plugin_config.collapse_lonely and is_collapsable(o)

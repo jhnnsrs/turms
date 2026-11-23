@@ -16,20 +16,20 @@ class AppenderStylerConfig(StylerConfig):
 class AppenderStyler(BaseStyler):
     config: AppenderStylerConfig = Field(default_factory=AppenderStylerConfig)
 
-    def style_fragment_name(self, typename):
+    def style_fragment_name(self, typename: str) -> str:
         return f"{typename}{self.config.append_fragment}"
 
-    def style_query_name(self, typename):
+    def style_query_name(self, typename: str) -> str:
         return f"{typename}{self.config.append_query}"
 
-    def style_subscription_name(self, typename):
+    def style_subscription_name(self, typename: str) -> str:
         return f"{typename}{self.config.append_subscription}"
 
-    def style_mutation_name(self, typename):
+    def style_mutation_name(self, typename: str) -> str:
         return f"{typename}{self.config.append_mutation}"
 
-    def style_input_name(self, typename):
+    def style_input_name(self, typename: str) -> str:
         return f"{typename}{self.config.append_input}"
 
-    def style_enum_name(self, typename):
+    def style_enum_name(self, typename: str) -> str:
         return f"{typename}{self.config.append_enum}"

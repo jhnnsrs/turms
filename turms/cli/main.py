@@ -196,7 +196,9 @@ def build_default_settings(template: str = "documents") -> str:
     )
 
 
-def generate_projects(projects: dict[str, GraphQLProject], title: str = "Turms"):
+def generate_projects(
+    projects: dict[str, GraphQLProject], title: str = "Turms"
+) -> None:
     generation_message = f"Generating the {'.'.join(projects.keys())} projects. This may take a while...\n"
 
     tree = Tree("Generating projects", style="bold green")
@@ -218,7 +220,11 @@ def generate_projects(projects: dict[str, GraphQLProject], title: str = "Turms")
             tree.add(project_tree)
             live.update(panel)
 
-            def log(message: str, level: str = "INFO"):
+            def log(
+                message: str,
+                level: str = "INFO",
+                project_tree: Tree = project_tree,
+            ) -> None:
                 if level == "WARNING":
                     project_tree.add(Tree(message, style="yellow"))
 
@@ -271,14 +277,14 @@ def generate_projects(projects: dict[str, GraphQLProject], title: str = "Turms")
 
 
 def with_projects(
-    func: Callable[[click.Context], None],
-) -> Callable[[click.Context], None]:
+    func: Callable[..., None],
+) -> Callable[..., None]:
     @click.argument("project", default=None, required=False)
     @click.option("--config", default=None)
     @wraps(func)
     def wrapper(
         *args: Any, config: str | None = None, project: str | None = None, **kwargs: Any
-    ):
+    ) -> None:
         try:
             app_directory = os.getcwd()
             config = config or scan_folder_for_single_config(app_directory)
@@ -308,7 +314,9 @@ def with_projects(
     return wrapper
 
 
-def watch_projects(projects, title="Turms"):  # pragma: no cover
+def watch_projects(
+    projects: dict[str, GraphQLProject], title: str = "Turms"
+) -> None:  # pragma: no cover
     if len(projects) > 1:
         raise click.ClickException(
             "Watching multiple projects is not supported. Please specify a single project!"
@@ -333,7 +341,7 @@ def watch_projects(projects, title="Turms"):  # pragma: no cover
         tree.renderable = f"Watching {project.documents}..."
         live.update(panel)
 
-        for event in stream_changes(project.documents):
+        for _event in stream_changes(project.documents):
             live.update(panel)
 
             try:
@@ -367,7 +375,7 @@ def watch_projects(projects, title="Turms"):  # pragma: no cover
 
 @click.group()
 @click.pass_context
-def cli(ctx):
+def cli(ctx: click.Context) -> None:
     """Welcome to turms!
 
     Welcome to Turms! Turms is a GraphQL code generator that generates code from your GraphQL schema and documents.
@@ -386,7 +394,7 @@ def cli(ctx):
     help="The starter template to scaffold: pydantic models from documents, "
     "documents plus call functions for rath or gql, or a strawberry server schema",
 )
-def init(config, template):
+def init(config: str, template: str) -> None:
     """Initialize a new graphql project"""
     welcome_panel = Panel(logo + welcome, title="turms", border_style="bold green")
 
@@ -410,14 +418,14 @@ def init(config, template):
 
 @cli.command()
 @with_projects
-def gen(projects):
+def gen(projects: dict[str, GraphQLProject]) -> None:
     """Generate the graphql project"""
     generate_projects(projects)
 
 
 @cli.command()
 @with_projects
-def watch(projects):  # pragma: no cover
+def watch(projects: dict[str, GraphQLProject]) -> None:  # pragma: no cover
     """Watch the graphql project"""
     watch_projects(projects)
 
@@ -434,7 +442,7 @@ def watch(projects):  # pragma: no cover
     default=None,
     help="The output directory for the schema files (will default to the current working directory)",
 )
-def download(projects, out, dir):
+def download(projects: dict[str, GraphQLProject], out: str, dir: str | None) -> None:
     """Download the graphql projects schema as a sdl file"""
 
     try:

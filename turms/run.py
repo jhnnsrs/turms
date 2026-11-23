@@ -2,6 +2,7 @@ import ast
 import json
 import os
 from collections.abc import Callable
+from typing import Any, TextIO
 
 import yaml
 from graphql import (
@@ -52,16 +53,16 @@ except ImportError:  # pragma: no cover - only taken on python 3.10
 
 if _tomllib is not None:
 
-    def toml_loader(file):
+    def toml_loader(file: TextIO) -> dict[str, Any]:
         return _tomllib.loads(file.read())
 
 else:  # pragma: no cover - only reachable without the 3.10 backport installed
 
-    def toml_loader(file):
+    def toml_loader(file: TextIO) -> dict[str, Any]:
         raise NotImplementedError("TOML not supported. Please install `tomli`")
 
 
-def json_loader(file):
+def json_loader(file: TextIO) -> object:
     return json.loads(file.read())
 
 
@@ -206,7 +207,7 @@ def scan_folder_for_single_config(folder_path: str | None = None) -> str:
     return configs[0]
 
 
-def write_code_to_file(code: str, outdir: str, filepath: str):
+def write_code_to_file(code: str, outdir: str, filepath: str) -> str:
     if not os.path.isdir(outdir):  # pragma: no cover
         os.makedirs(outdir)
 
@@ -230,7 +231,7 @@ def write_schema_to_file(
     outdir: str,
     filepath: str,
     raw_dsl: str | None = None,
-):
+) -> str:
     """Dumps the schema next to the generated code.
 
     ``raw_dsl`` is the SDL exactly as the source served it. It is preferred over
@@ -260,7 +261,7 @@ def write_schema_to_file(
     return generated_file
 
 
-def write_project(project: GraphQLProject, outdir: str, filepath: str):
+def write_project(project: GraphQLProject, outdir: str, filepath: str) -> str:
     if not os.path.isdir(outdir):  # pragma: no cover
         os.makedirs(outdir)
 
@@ -284,7 +285,7 @@ def gen(
     project_name: str | None = None,
     strict: bool = False,
     overwrite_path: str | None = None,
-):
+) -> None:
     """Generates  Code according to the config file
 
     Args:
@@ -336,7 +337,7 @@ def gen(
                 raise GenerationError from e
 
 
-def instantiate(module_path: str, **kwargs):
+def instantiate(module_path: str, **kwargs: Any) -> Any:  # noqa: ANN401 - an instance of the class a dotted path names
     """Instantiate A class from a file.
 
     Needs to conform to `path.to.module.ClassName`

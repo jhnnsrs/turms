@@ -1,5 +1,4 @@
 import ast
-from typing import Any
 
 from graphql import (
     GraphQLField,
@@ -41,7 +40,7 @@ class ObjectsPluginConfig(PluginConfig):
 
     @model_validator(mode="before")
     @classmethod
-    def _rename_deprecated(cls, values: Any) -> Any:
+    def _rename_deprecated(cls, values: object) -> object:
         return rename_deprecated_keys(values, {"types_bases": "object_bases"})
 
 
@@ -51,8 +50,8 @@ def generate_object_field_annotation(
     config: GeneratorConfig,
     plugin_config: ObjectsPluginConfig,
     registry: ClassRegistry,
-    is_optional=True,
-):
+    is_optional: bool = True,
+) -> ast.expr:
     if isinstance(graphql_type, GraphQLScalarType):
         if is_optional:
             registry.register_import("typing.Optional")
@@ -165,7 +164,7 @@ def generate_object_field_annotation(
         ):
             registry.register_import("typing.Tuple")
 
-            def list_builder(x):
+            def list_builder(x: ast.expr) -> ast.Subscript:
                 return ast.Subscript(
                     value=ast.Name("Tuple", ctx=ast.Load()),
                     slice=ast.Tuple(elts=[x, ast.Constant(value=...)], ctx=ast.Load()),
@@ -175,7 +174,7 @@ def generate_object_field_annotation(
         else:
             registry.register_import("typing.List")
 
-            def list_builder(x):
+            def list_builder(x: ast.expr) -> ast.Subscript:
                 return ast.Subscript(
                     value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
                 )
@@ -217,7 +216,7 @@ def generate_types(
     config: GeneratorConfig,
     plugin_config: ObjectsPluginConfig,
     registry: ClassRegistry,
-):
+) -> list[ast.AST]:
 
     tree = []
 

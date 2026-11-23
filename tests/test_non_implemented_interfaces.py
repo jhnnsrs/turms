@@ -1,4 +1,5 @@
 import pytest
+from graphql import GraphQLSchema
 
 from turms.config import GeneratorConfig
 from turms.errors import GenerationError
@@ -11,7 +12,7 @@ from .utils import (
 )
 
 
-def test_generation_ok(unimplemented_interface_schema):
+def test_generation_ok(unimplemented_interface_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(always_resolve_interfaces=False)
 
     generated_ast = generate_ast(
@@ -26,7 +27,7 @@ def test_generation_ok(unimplemented_interface_schema):
     unit_test_with(generated_ast, "Foo(forward=Ref(id='3'))")
 
 
-def test_generation_raises(unimplemented_interface_schema):
+def test_generation_raises(unimplemented_interface_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(always_resolve_interfaces=True)
 
     with pytest.raises(GenerationError):

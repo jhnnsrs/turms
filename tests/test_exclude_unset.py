@@ -6,7 +6,12 @@ the caller never set are omitted (the server applies its own default), while an
 explicitly-passed ``None`` is still transmitted.
 """
 
+import ast
+from pathlib import Path
+from typing import Any
+
 from graphql import build_ast_schema, parse
+from pydantic import ValidationError
 
 from turms.config import GeneratorConfig
 from turms.plugins.funcs import FuncsPlugin, FuncsPluginConfig, FunctionDefinition
@@ -42,7 +47,9 @@ query GetCountries($filter: Filter, $limit: Int = 10, $req: Int! = 5) {
 """
 
 
-def _generate(tmp_path, with_funcs=False, **config_kwargs):
+def _generate(
+    tmp_path: Path, with_funcs: bool = False, **config_kwargs: Any
+) -> list[ast.AST]:
     doc = tmp_path / "ops.graphql"
     doc.write_text(operation)
 
@@ -71,7 +78,7 @@ def _generate(tmp_path, with_funcs=False, **config_kwargs):
     )
 
 
-def test_input_omits_unset_keeps_explicit_null(tmp_path):
+def test_input_omits_unset_keeps_explicit_null(tmp_path: Path) -> None:
     """An omitted input field is absent from the exclude_unset dump; an explicitly
     passed None is present as null."""
     generated_ast = _generate(tmp_path)
@@ -88,7 +95,7 @@ def test_input_omits_unset_keeps_explicit_null(tmp_path):
     )
 
 
-def test_arguments_defaulted_var_is_optional_and_omitted(tmp_path):
+def test_arguments_defaulted_var_is_optional_and_omitted(tmp_path: Path) -> None:
     """A NonNull-with-default operation variable ($req: Int! = 5) is optional on the
     client and omitted when unset, so the server applies its default."""
     generated_ast = _generate(tmp_path)
@@ -108,7 +115,7 @@ def test_arguments_defaulted_var_is_optional_and_omitted(tmp_path):
     )
 
 
-def test_unset_sentinel_override(tmp_path):
+def test_unset_sentinel_override(tmp_path: Path) -> None:
     """The UNSET sentinel type and instance can be overridden via config: they are
     imported instead of generated, and used in the function signatures."""
     generated = parse_to_code(
@@ -130,15 +137,15 @@ def test_unset_sentinel_override(tmp_path):
     assert "is not CUSTOM_UNSET" in generated
 
 
-def test_unset_override_must_be_paired():
+def test_unset_override_must_be_paired() -> None:
     """Overriding only one of the UNSET type/instance is a config error."""
     import pytest
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         GeneratorConfig(unset_type_class="mocks.CustomUnset")
 
 
-def test_funcs_build_variables_conditionally(tmp_path):
+def test_funcs_build_variables_conditionally(tmp_path: Path) -> None:
     """The generated convenience function defaults optional args to UNSET and only
     adds the ones the caller provided to the variables dict."""
     generated = parse_to_code(_generate(tmp_path, with_funcs=True))

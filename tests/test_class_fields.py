@@ -7,17 +7,31 @@ must carry it too, because a nested selection is a class of its own and not a su
 the fragment.
 """
 
+import ast
+from collections.abc import Collection, Mapping
+from pathlib import Path
+from typing import Any, Protocol
+
 import pytest
-from graphql import build_client_schema, introspection_from_schema, parse
+from graphql import (
+    FragmentDefinitionNode,
+    GraphQLSchema,
+    OperationDefinitionNode,
+    build_client_schema,
+    introspection_from_schema,
+    parse,
+)
 from pydantic import ValidationError
 
 from turms.config import GeneratorConfig
 from turms.errors import GenerationError, RegistryError
+from turms.plugins.base import Plugin
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.fragments import FragmentsPlugin
 from turms.plugins.inputs import InputsPlugin
 from turms.plugins.objects import ObjectsPlugin
 from turms.plugins.operations import OperationsPlugin
+from turms.registry import ClassRegistry
 from turms.run import build_ast_schema, generate_ast
 from turms.stylers.default import DefaultStyler
 
@@ -147,14 +161,19 @@ IDENTIFIED = {
 }
 
 
-def _with(field, **collector):
+def _with(field: dict[str, Any], **collector: object) -> dict[str, Any]:
     """``field`` with some of its collector's keys replaced."""
     return {**field, "collector": {**field["collector"], **collector}}
 
 
 def _generate(
-    tmp_path, rules, sdl=schema_sdl, docs=documents, plugins=None, schema=None
-):
+    tmp_path: Path,
+    rules: list[Mapping[str, object]],
+    sdl: str = schema_sdl,
+    docs: str = documents,
+    plugins: list[Plugin] | None = None,
+    schema: GraphQLSchema | None = None,
+) -> list[ast.AST]:
     (tmp_path / "ops.graphql").write_text(docs)
     config = GeneratorConfig(documents=str(tmp_path / "*.graphql"), class_fields=rules)
     return generate_ast(
@@ -167,7 +186,9 @@ def _generate(
     )
 
 
-def test_every_class_generated_for_a_type_carries_its_identifier(tmp_path):
+def test_every_class_generated_for_a_type_carries_its_identifier(
+    tmp_path: Path,
+) -> None:
     """The fragment, a nested selection, an inline fragment, an interface's implementations."""
     generated_ast = _generate(tmp_path, [IDENTIFIED])
 
@@ -197,7 +218,7 @@ def test_every_class_generated_for_a_type_carries_its_identifier(tmp_path):
     )
 
 
-def test_a_repeatable_directive_an_enum_a_default_and_a_marker(tmp_path):
+def test_a_repeatable_directive_an_enum_a_default_and_a_marker(tmp_path: Path) -> None:
     """A tuple for a repeatable directive, an enum's name, a definition's default, ``True`` for presence."""
     generated_ast = _generate(
         tmp_path,
@@ -250,7 +271,7 @@ def test_a_repeatable_directive_an_enum_a_default_and_a_marker(tmp_path):
     )
 
 
-def test_the_objects_plugin_stamps_its_classes_too(tmp_path):
+def test_the_objects_plugin_stamps_its_classes_too(tmp_path: Path) -> None:
     generated_ast = _generate(
         tmp_path,
         [IDENTIFIED],
@@ -268,17 +289,19 @@ def test_the_objects_plugin_stamps_its_classes_too(tmp_path):
     )
 
 
-def test_a_directive_the_schema_does_not_declare_is_an_error(tmp_path):
+def test_a_directive_the_schema_does_not_declare_is_an_error(tmp_path: Path) -> None:
     with pytest.raises(RegistryError, match="no directive @identifed"):
         _generate(tmp_path, [_with(IDENTIFIED, directive="identifed")])
 
 
-def test_an_argument_the_directive_does_not_take_is_an_error(tmp_path):
+def test_an_argument_the_directive_does_not_take_is_an_error(tmp_path: Path) -> None:
     with pytest.raises(RegistryError, match="no argument 'name'"):
         _generate(tmp_path, [_with(IDENTIFIED, argument="name")])
 
 
-def test_an_introspected_schema_cannot_show_applications_and_is_an_error(tmp_path):
+def test_an_introspected_schema_cannot_show_applications_and_is_an_error(
+    tmp_path: Path,
+) -> None:
     introspected = build_client_schema(
         introspection_from_schema(build_ast_schema(parse(schema_sdl)))
     )
@@ -286,28 +309,30 @@ def test_an_introspected_schema_cannot_show_applications_and_is_an_error(tmp_pat
         _generate(tmp_path, [IDENTIFIED], schema=introspected)
 
 
-def test_a_stamp_named_like_a_field_is_an_error(tmp_path):
+def test_a_stamp_named_like_a_field_is_an_error(tmp_path: Path) -> None:
     """Pydantic would read the class variable as the field's default."""
     with pytest.raises(GenerationError, match="'name' is also a field"):
         _generate(tmp_path, [{**IDENTIFIED, "name": "name"}])
 
 
 @pytest.mark.parametrize("attribute", ["not-a-name", "class"])
-def test_a_name_that_is_no_python_identifier_is_refused_by_the_config(attribute):
+def test_a_name_that_is_no_python_identifier_is_refused_by_the_config(
+    attribute: str,
+) -> None:
     with pytest.raises(ValidationError, match="not a python identifier"):
         GeneratorConfig(
             documents="*.graphql", class_fields=[{**IDENTIFIED, "name": attribute}]
         )
 
 
-def test_a_misspelled_key_is_refused_by_the_config():
+def test_a_misspelled_key_is_refused_by_the_config() -> None:
     with pytest.raises(ValidationError):
         GeneratorConfig(
             documents="*.graphql", class_fields=[{**IDENTIFIED, "nam": "__x__"}]
         )
 
 
-def test_a_type_generated_as_no_class_is_an_error(tmp_path):
+def test_a_type_generated_as_no_class_is_an_error(tmp_path: Path) -> None:
     """A union, an enum or a scalar is never a class a stamp could land on."""
     sdl = schema_sdl.replace(
         "union Thing = Dataset | Plain", 'union Thing @tag(name: "u") = Dataset | Plain'
@@ -334,7 +359,7 @@ def test_a_type_generated_as_no_class_is_an_error(tmp_path):
         )
 
 
-def test_a_oneof_input_is_generated_as_a_union_and_is_an_error(tmp_path):
+def test_a_oneof_input_is_generated_as_a_union_and_is_an_error(tmp_path: Path) -> None:
     sdl = (
         schema_sdl
         + """
@@ -380,7 +405,7 @@ query Pick($input: PickInput!) {
         )
 
 
-def test_a_single_value_is_typed_as_its_literal(tmp_path):
+def test_a_single_value_is_typed_as_its_literal(tmp_path: Path) -> None:
     """What lets a `Protocol` with `ClassVar[Literal[...]]` tell a dataset's classes from a lens's."""
     import ast
 
@@ -438,7 +463,7 @@ def test_a_single_value_is_typed_as_its_literal(tmp_path):
 
 # --- client_fields: what a client's operations gather onto its class ----------------------
 
-from turms.class_fields import Collector  # noqa: E402
+from turms.class_fields import Collector, Groups  # noqa: E402
 from turms.plugins.client import ClientPlugin, ClientPluginConfig  # noqa: E402
 
 client_sdl = """
@@ -510,7 +535,19 @@ SCOPES = {
 }
 
 
-def _client(tmp_path, fields, docs=client_documents, sdl=client_sdl, schema=None):
+class _GeneratedClient(Protocol):
+    """A client class exec'd from generated code: its class fields are read by name."""
+
+    def __getattr__(self, name: str) -> Collection[object]: ...
+
+
+def _client(
+    tmp_path: Path,
+    fields: list[Mapping[str, object]],
+    docs: str = client_documents,
+    sdl: str = client_sdl,
+    schema: GraphQLSchema | None = None,
+) -> tuple[_GeneratedClient, str]:
     (tmp_path / "ops.graphql").write_text(docs)
     config = GeneratorConfig(documents=str(tmp_path / "*.graphql"))
     tree = generate_ast(
@@ -527,8 +564,6 @@ def _client(tmp_path, fields, docs=client_documents, sdl=client_sdl, schema=None
             ),
         ],
     )
-    import ast
-
     module = ast.unparse(
         ast.fix_missing_locations(ast.Module(body=tree, type_ignores=[]))
     )
@@ -537,7 +572,9 @@ def _client(tmp_path, fields, docs=client_documents, sdl=client_sdl, schema=None
     return namespace["ImageApi"], module
 
 
-def test_root_fields_are_found_through_fragments_spread_or_inlined_on_the_root_type():
+def test_root_fields_are_found_through_fragments_spread_or_inlined_on_the_root_type() -> (
+    None
+):
     from turms.schema_lookup import root_field_nodes
 
     document = parse(
@@ -555,7 +592,9 @@ def test_root_fields_are_found_through_fragments_spread_or_inlined_on_the_root_t
     ] == ["image", "images", "open", "secret"]
 
 
-def test_the_root_fields_operations_select_are_gathered_onto_the_client_class(tmp_path):
+def test_the_root_fields_operations_select_are_gathered_onto_the_client_class(
+    tmp_path: Path,
+) -> None:
     """Every operation's root fields, a subscription's and an extension's included, a single string a value."""
     api, module = _client(tmp_path, [SCOPES])
     assert api.__scopes__ == ("read", "thumbnail", "watch", "write")
@@ -567,7 +606,9 @@ def test_the_root_fields_operations_select_are_gathered_onto_the_client_class(tm
     assert "admin_only" not in api.__scopes__
 
 
-def test_a_selected_root_field_that_says_nothing_fails_generation(tmp_path):
+def test_a_selected_root_field_that_says_nothing_fails_generation(
+    tmp_path: Path,
+) -> None:
     docs = client_documents + "\nquery Open { open { id } }\n"
     with pytest.raises(
         GenerationError,
@@ -594,12 +635,14 @@ def test_a_selected_root_field_that_says_nothing_fails_generation(tmp_path):
         ("union", "frozenset[str]", frozenset({"read", "thumbnail", "watch", "write"})),
     ],
 )
-def test_each_combine_and_kind(tmp_path, combine, kind, expected):
+def test_each_combine_and_kind(
+    tmp_path: Path, combine: str, kind: str, expected: object
+) -> None:
     api, _ = _client(tmp_path, [{**SCOPES, "combine": combine, "kind": kind}])
     assert api.__scopes__ == expected
 
 
-def test_without_a_kind_it_is_inferred(tmp_path):
+def test_without_a_kind_it_is_inferred(tmp_path: Path) -> None:
     _, module = _client(
         tmp_path, [{key: value for key, value in SCOPES.items() if key != "kind"}]
     )
@@ -610,8 +653,8 @@ def test_without_a_kind_it_is_inferred(tmp_path):
 
 
 def test_a_directive_on_the_operation_itself_is_read_off_the_clients_documents(
-    tmp_path,
-):
+    tmp_path: Path,
+) -> None:
     field = {
         "name": "__needs__",
         "collector": {
@@ -624,7 +667,7 @@ def test_a_directive_on_the_operation_itself_is_read_off_the_clients_documents(
     assert api.__needs__ == ("extra",)
 
 
-def combine_shortest(groups):
+def combine_shortest(groups: Groups) -> tuple[object, ...]:
     """A combine of one's own: the scopes of the operation that needs the fewest."""
     return min(groups, key=len)
 
@@ -635,22 +678,28 @@ class CountingCollector(Collector):
     type: str = "tests.test_class_fields.CountingCollector"
     target = "operation"
 
-    def check(self, schema, registry):
+    def check(self, schema: GraphQLSchema, registry: ClassRegistry) -> None:
         return None
 
-    def element_annotation(self, schema, registry):
+    def element_annotation(self, schema: GraphQLSchema, registry: ClassRegistry) -> str:
         return "int"
 
-    def default_combine(self, schema):
+    def default_combine(self, schema: GraphQLSchema) -> str:
         return "all"
 
-    def collect_operation(self, schema, operation, fragments, registry):
+    def collect_operation(
+        self,
+        schema: GraphQLSchema,
+        operation: OperationDefinitionNode,
+        fragments: dict[str, FragmentDefinitionNode],
+        registry: ClassRegistry,
+    ) -> tuple[int, ...]:
         from turms.schema_lookup import root_field_nodes
 
         return (len(list(root_field_nodes(operation.selection_set, fragments))),)
 
 
-def test_a_collector_and_a_combine_of_ones_own(tmp_path):
+def test_a_collector_and_a_combine_of_ones_own(tmp_path: Path) -> None:
     shortest = {**SCOPES, "combine": "tests.test_class_fields.combine_shortest"}
     counting = {
         "name": "__roots__",
@@ -662,8 +711,8 @@ def test_a_collector_and_a_combine_of_ones_own(tmp_path):
 
 
 def test_a_type_collector_cannot_stamp_a_client_nor_an_operation_collector_a_type(
-    tmp_path,
-):
+    tmp_path: Path,
+) -> None:
     with pytest.raises(GenerationError, match="collected per type"):
         _client(
             tmp_path,
@@ -682,7 +731,9 @@ def test_a_type_collector_cannot_stamp_a_client_nor_an_operation_collector_a_typ
     ("combine", "kind"),
     [("union", "str"), ("first", "tuple[str, ...]")],
 )
-def test_a_kind_that_does_not_hold_what_the_combine_gives_is_refused(combine, kind):
+def test_a_kind_that_does_not_hold_what_the_combine_gives_is_refused(
+    combine: str, kind: str
+) -> None:
     with pytest.raises(ValidationError, match="gives"):
         ClientPluginConfig(
             client_class="ImageApi",
@@ -690,7 +741,7 @@ def test_a_kind_that_does_not_hold_what_the_combine_gives_is_refused(combine, ki
         )
 
 
-def test_a_combine_of_ones_own_needs_a_kind():
+def test_a_combine_of_ones_own_needs_a_kind() -> None:
     with pytest.raises(ValidationError, match="needs the field's `kind`"):
         ClientPluginConfig(
             client_class="ImageApi",
@@ -703,12 +754,12 @@ def test_a_combine_of_ones_own_needs_a_kind():
         )
 
 
-def test_a_client_field_named_like_a_method_is_refused(tmp_path):
+def test_a_client_field_named_like_a_method_is_refused(tmp_path: Path) -> None:
     with pytest.raises(GenerationError, match="both a class field and a method"):
         _client(tmp_path, [{**SCOPES, "name": "get"}])
 
 
-def test_client_fields_refuse_an_introspected_schema(tmp_path):
+def test_client_fields_refuse_an_introspected_schema(tmp_path: Path) -> None:
     introspected = build_client_schema(
         introspection_from_schema(build_ast_schema(parse(client_sdl)))
     )

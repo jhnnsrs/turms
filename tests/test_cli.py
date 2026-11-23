@@ -1,5 +1,6 @@
 import os
 import shutil
+from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
@@ -10,7 +11,7 @@ from .utils import build_relative_glob
 
 
 @pytest.mark.network
-def test_run_gen(tmp_path):
+def test_run_gen(tmp_path: Path) -> None:
     runner = CliRunner()
 
     c = build_relative_glob("/configs/test_cli.yaml")
@@ -27,7 +28,7 @@ def test_run_gen(tmp_path):
 
 
 @pytest.mark.network
-def test_run_gen_multiple(tmp_path):
+def test_run_gen_multiple(tmp_path: Path) -> None:
     runner = CliRunner()
 
     c = build_relative_glob("/configs/test_cli_multi_projects.yaml")
@@ -57,7 +58,7 @@ def test_run_gen_multiple(tmp_path):
 
 
 @pytest.mark.network
-def test_run_gen_display_errors(tmp_path):
+def test_run_gen_display_errors(tmp_path: Path) -> None:
     runner = CliRunner()
 
     c = build_relative_glob("/configs/test_cli_multi_projects.yaml")
@@ -86,7 +87,7 @@ def test_run_gen_display_errors(tmp_path):
 
 
 @pytest.mark.network
-def test_run_gen_multiple_but_one(tmp_path):
+def test_run_gen_multiple_but_one(tmp_path: Path) -> None:
     runner = CliRunner()
 
     c = build_relative_glob("/configs/test_cli_multi_projects.yaml")
@@ -108,7 +109,7 @@ def test_run_gen_multiple_but_one(tmp_path):
 
 
 @pytest.mark.network
-def test_run_download(tmp_path):
+def test_run_download(tmp_path: Path) -> None:
     runner = CliRunner()
 
     c = build_relative_glob("/configs/test_cli.yaml")
@@ -124,7 +125,7 @@ def test_run_download(tmp_path):
 
 
 @pytest.mark.network
-def test_run_download_multiple(tmp_path):
+def test_run_download_multiple(tmp_path: Path) -> None:
     runner = CliRunner()
 
     c = build_relative_glob("/configs/test_cli_multi_projects.yaml")
@@ -151,7 +152,7 @@ def test_run_download_multiple(tmp_path):
         )
 
 
-def test_run_init(tmp_path):
+def test_run_init(tmp_path: Path) -> None:
     runner = CliRunner()
 
     # Move config file to temp dir
@@ -164,7 +165,7 @@ def test_run_init(tmp_path):
 
 
 @pytest.mark.network
-def test_run_error_code(tmp_path):
+def test_run_error_code(tmp_path: Path) -> None:
     runner = CliRunner()
 
     c = build_relative_glob("/configs/test_cli.yaml")
@@ -181,7 +182,7 @@ def test_run_error_code(tmp_path):
 
 
 @pytest.mark.network
-def test_run_no_error_code(tmp_path):
+def test_run_no_error_code(tmp_path: Path) -> None:
     runner = CliRunner()
 
     c = build_relative_glob("/configs/test_cli_no_error.yaml")

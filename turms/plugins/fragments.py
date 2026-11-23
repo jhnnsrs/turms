@@ -2,7 +2,7 @@ import ast
 import logging
 from collections import defaultdict, deque
 from collections.abc import Sequence
-from typing import Any, Literal
+from typing import Literal
 
 from graphql import (
     DocumentNode,
@@ -47,7 +47,7 @@ def find_fragment_dependencies_recursive(
     selection_set: SelectionSetNode,
     fragment_definitions: dict[str, FragmentDefinitionNode],
     visited: set[str],
-):
+) -> set[str]:
     """Recursively find all fragment dependencies within a selection set."""
     dependencies: set[str] = set()
     if selection_set is None:
@@ -140,7 +140,7 @@ class FragmentsPluginConfig(PluginConfig):
 
     @model_validator(mode="before")
     @classmethod
-    def _rename_deprecated(cls, values: Any) -> Any:
+    def _rename_deprecated(cls, values: object) -> object:
         return rename_deprecated_keys(
             values, {"add_documentation": "extract_documentation"}
         )
@@ -151,7 +151,7 @@ def get_fragment_bases(
     config: GeneratorConfig,
     pluginConfig: FragmentsPluginConfig,
     registry: ClassRegistry,
-):
+) -> list[ast.Name]:
     bases: list[ast.Name] = []
     if pluginConfig.fragment_bases:
         for base in pluginConfig.fragment_bases:

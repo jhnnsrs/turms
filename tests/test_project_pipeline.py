@@ -5,7 +5,7 @@ from turms.run import GraphQLProject, generate
 
 
 @pytest.mark.network
-def test_project_pipeline():
+def test_project_pipeline() -> None:
     config = GraphQLProject(
         schema="https://countries.trevorblades.com/",
         scalar_definitions={"_Any": "typing.Any"},

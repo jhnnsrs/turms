@@ -1,4 +1,4 @@
-from graphql import OperationDefinitionNode, Source, parse
+from graphql import GraphQLSchema, OperationDefinitionNode, Source, parse
 
 from turms.config import GeneratorConfig
 from turms.plugins.enums import EnumsPlugin
@@ -18,7 +18,7 @@ from turms.utils import inspect_operation_for_documentation
 from .utils import build_relative_glob, unit_test_with
 
 
-def test_documentatoin(nested_input_schema):
+def test_documentatoin(nested_input_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/documentation/*.graphql"),
     )
@@ -53,7 +53,7 @@ def test_documentatoin(nested_input_schema):
     unit_test_with(generated_ast, "")
 
 
-def test_default_input_funcs(nested_input_schema):
+def test_default_input_funcs(nested_input_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/inputs_default/*.graphql"),
     )
@@ -88,7 +88,7 @@ def test_default_input_funcs(nested_input_schema):
     unit_test_with(generated_ast, "")
 
 
-def test_documentation_above_an_operation_keeps_the_whole_block():
+def test_documentation_above_an_operation_keeps_the_whole_block() -> None:
     """A `#` block above an operation is its docstring, all of it.
 
     graphql-core sets the operation's ``loc.start`` to the *last* preceding comment token

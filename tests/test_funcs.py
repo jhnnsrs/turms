@@ -1,3 +1,5 @@
+from graphql import GraphQLSchema
+
 from turms.config import GeneratorConfig
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.fragments import FragmentsPlugin
@@ -16,7 +18,7 @@ from turms.stylers.default import DefaultStyler
 from .utils import build_relative_glob, unit_test_with
 
 
-def test_arkitekt_schema(arkitekt_schema):
+def test_arkitekt_schema(arkitekt_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/arkitekt/**/*.graphql"),
         scalar_definitions={
@@ -82,7 +84,7 @@ def test_arkitekt_schema(arkitekt_schema):
     )
 
 
-def test_beasts_schema(beast_schema):
+def test_beasts_schema(beast_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/beasts/**/*.graphql"),
         scalar_definitions={
@@ -148,7 +150,7 @@ def test_beasts_schema(beast_schema):
     )
 
 
-def test_extra_args(beast_schema):
+def test_extra_args(beast_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/beasts/**/*.graphql"),
     )

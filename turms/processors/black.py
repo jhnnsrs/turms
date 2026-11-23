@@ -17,7 +17,7 @@ class BlackProcessor(Processor):
 
     config: BlackProcessorConfig = Field(default_factory=BlackProcessorConfig)
 
-    def run(self, gen_file: str, config: GeneratorConfig):
+    def run(self, gen_file: str, config: GeneratorConfig) -> str:
         from black import FileMode, format_str
 
         return format_str(gen_file, mode=FileMode())

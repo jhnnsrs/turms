@@ -27,26 +27,26 @@ from graphql.type.definition import (
 
 
 class ReferenceRegistry:
-    def __init__(self):
+    def __init__(self) -> None:
         self.fragments: set[str] = set()
         self.enums: set[str] = set()
         self.inputs: set[str] = set()
         self.scalars: set[str] = set()
         self.operations: set[str] = set()
 
-    def register_fragment(self, type_name: str):
+    def register_fragment(self, type_name: str) -> None:
         self.fragments.add(type_name)
 
-    def register_enum(self, type_name: str):
+    def register_enum(self, type_name: str) -> None:
         self.enums.add(type_name)
 
-    def register_input(self, type_name: str):
+    def register_input(self, type_name: str) -> None:
         self.inputs.add(type_name)
 
-    def register_scalar(self, type_name: str):
+    def register_scalar(self, type_name: str) -> None:
         self.scalars.add(type_name)
 
-    def is_input_registered(self, type_name: str):
+    def is_input_registered(self, type_name: str) -> bool:
         return type_name in self.inputs
 
 
@@ -56,7 +56,7 @@ def recurse_find_references(
     client_schema: GraphQLSchema,
     registry: ReferenceRegistry,
     is_optional: bool = True,
-):
+) -> None:
     if isinstance(
         graphql_type, (GraphQLUnionType, GraphQLObjectType, GraphQLInterfaceType)
     ):
@@ -200,7 +200,7 @@ def recurse_type_annotation(
 
             # We need to get all input objects that this graphql input object type references
 
-            for key, node in graphql_type.fields.items():
+            for _key, node in graphql_type.fields.items():
                 recurse_type_annotation(node, node.type, schema, registry)
 
     else:

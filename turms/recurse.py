@@ -1,5 +1,5 @@
 import ast
-from typing import Any, Union, cast
+from typing import Any, TypeAlias, cast
 
 from graphql import GraphQLSchema, GraphQLWrappingType
 from graphql.language.ast import (
@@ -710,7 +710,9 @@ def recurse_annotation(
         if config.freeze.enabled and config.freeze.convert_list_to_tuple:
             registry.register_import("typing.Tuple")
 
-            def list_builder(x: ast.Name | ast.Subscript | ast.Constant):
+            def list_builder(
+                x: ast.Name | ast.Subscript | ast.Constant,
+            ) -> ast.Subscript:
                 return ast.Subscript(
                     value=ast.Name("Tuple", ctx=ast.Load()),
                     slice=ast.Tuple(elts=[x, ast.Constant(value=...)], ctx=ast.Load()),
@@ -720,7 +722,9 @@ def recurse_annotation(
         else:
             registry.register_import("typing.List")
 
-            def list_builder(x: ast.Name | ast.Subscript | ast.Constant):
+            def list_builder(
+                x: ast.Name | ast.Subscript | ast.Constant,
+            ) -> ast.Subscript:
                 return ast.Subscript(
                     value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
                 )
@@ -758,14 +762,14 @@ def recurse_annotation(
             )
 
 
-BoundType = Union[
-    GraphQLScalarType,
-    GraphQLObjectType,
-    GraphQLInterfaceType,
-    GraphQLUnionType,
-    GraphQLEnumType,
-    GraphQLWrappingType[Any],
-]
+BoundType: TypeAlias = (
+    GraphQLScalarType
+    | GraphQLObjectType
+    | GraphQLInterfaceType
+    | GraphQLUnionType
+    | GraphQLEnumType
+    | GraphQLWrappingType[Any]
+)
 
 
 def type_field_node(
