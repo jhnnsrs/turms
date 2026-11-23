@@ -1,5 +1,6 @@
-from turms.run import generate
 import pytest
+
+from turms.run import generate
 
 
 def test_create_multi_schema(multi_schema_projects):

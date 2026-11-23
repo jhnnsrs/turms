@@ -1,11 +1,13 @@
-from abc import abstractmethod
 import ast
 import warnings
-from typing import Any, Sequence
+from abc import abstractmethod
+from collections.abc import Sequence
+from typing import Any
 
+from graphql import GraphQLSchema
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from graphql import GraphQLSchema
+
 from turms.config import GeneratorConfig, LogFunction, print_logger  # noqa: F401
 from turms.registry import ClassRegistry
 

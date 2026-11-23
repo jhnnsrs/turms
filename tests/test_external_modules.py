@@ -21,7 +21,12 @@ from .utils import build_relative_glob, unit_test_with_external
 
 STYLERS = [CapitalizeStyler(), SnakeCaseStyler()]
 EXTERNAL = "external_schema"
-SCALARS = {"QString": "str", "Any": "typing.Any", "Callback": "str", "UUID": "pydantic.UUID4"}
+SCALARS = {
+    "QString": "str",
+    "Any": "typing.Any",
+    "Callback": "str",
+    "UUID": "pydantic.UUID4",
+}
 DOCUMENTS = "/documents/arkitekt/**/*.graphql"
 
 
@@ -56,7 +61,9 @@ def _api_ast(schema, config=None, plugins=None):
         config,
         schema,
         stylers=STYLERS,
-        plugins=plugins if plugins is not None else [FragmentsPlugin(), OperationsPlugin()],
+        plugins=plugins
+        if plugins is not None
+        else [FragmentsPlugin(), OperationsPlugin()],
     )
 
 
@@ -208,7 +215,9 @@ def test_projects_with_different_stylers_are_refused():
 # --------------------------------------------------------------------------- #
 
 
-def test_include_takes_only_the_named_types_and_the_project_generates_the_rest(arkitekt_schema):
+def test_include_takes_only_the_named_types_and_the_project_generates_the_rest(
+    arkitekt_schema,
+):
     config = GeneratorConfig(
         documents=build_relative_glob(DOCUMENTS),
         scalar_definitions=SCALARS,

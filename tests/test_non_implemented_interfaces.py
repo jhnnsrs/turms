@@ -1,8 +1,7 @@
-
 import pytest
+
 from turms.config import GeneratorConfig
 from turms.errors import GenerationError
-from turms.run import generate_ast
 from turms.plugins.objects import ObjectsPlugin
 from turms.run import generate_ast
 from turms.stylers.default import DefaultStyler

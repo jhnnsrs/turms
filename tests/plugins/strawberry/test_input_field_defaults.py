@@ -44,7 +44,9 @@ input ListDefaultInput {
 
 
 def _config():
-    return GeneratorConfig(scalar_definitions={"_Any": "typing.Any"}, skip_forwards=True)
+    return GeneratorConfig(
+        scalar_definitions={"_Any": "typing.Any"}, skip_forwards=True
+    )
 
 
 def _generate_schema(schema: str):

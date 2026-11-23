@@ -37,7 +37,6 @@ turms gen
 Turms generates automatically this pydantic schema for you
 
 ```python title="/schema/api.py"
-
 class Get_capsulesQueryCapsulesMissions(GraphQLObject):
     typename: Optional[Literal["CapsuleMission"]] = Field(alias="__typename")
     flight: Optional[int]
@@ -56,7 +55,6 @@ class Get_capsulesQuery(GraphQLQuery):
     class Meta:
         domain = "default"
         document = "query get_capsules {\n  capsules {\n    id\n    missions {\n      flight\n      name\n    }\n  }\n}"
-
 ```
 
 Which you can than use easily in your rath code
@@ -68,8 +66,9 @@ from schema.api import Get_capsulesQuery
 rath = Rath(...)
 
 with rath:
-  typed_answer = GetcapuslesQuery(**rath.execute(GetcapuslesQuery.Meta.document).data) # fully tpyed
-
+    typed_answer = GetcapuslesQuery(
+        **rath.execute(GetcapuslesQuery.Meta.document).data
+    )  # fully tpyed
 ```
 
 You can also use the funcs plugin in conjuction with a rath proxy function to
@@ -82,6 +81,5 @@ from schema.api import get_capsules
 rath = Rath(...)
 
 with rath:
- typed_answer = get_capsules()
-
+    typed_answer = get_capsules()
 ```

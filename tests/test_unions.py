@@ -1,4 +1,3 @@
-
 from turms.config import GeneratorConfig
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.fragments import FragmentsPlugin
@@ -53,6 +52,7 @@ def test_nested_input_funcs(union_schema):
         'Nana(hallo={"__typename": "Foo","forward": "yes"}).hallo.forward',
     )
 
+
 def test_fields_in_inline_fragment_on_union(union_schema):
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/unions/*.graphql"),
@@ -93,4 +93,3 @@ def test_union_inline_fragment_fragment_spread_in_operation(union_schema):
         generated_ast,
         "assert InlineSpreadOnUnion(hallo={'__typename': 'Bar', 'nana': 42}).hallo.nana == 42",
     )
-

@@ -1,10 +1,10 @@
 import pytest
 
 from turms.config import GeneratorConfig
-from turms.run import generate_ast
 from turms.plugins.strawberry import StrawberryPlugin, StrawberryPluginConfig
-from turms.stylers.default import DefaultStyler
 from turms.run import generate_ast
+from turms.stylers.default import DefaultStyler
+
 from .utils import unit_test_with
 
 

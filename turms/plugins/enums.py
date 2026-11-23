@@ -1,17 +1,19 @@
-from pydantic_settings import SettingsConfigDict
-from turms.plugins.base import Plugin, PluginConfig
 import ast
-from typing import List, Sequence
-from turms.config import GeneratorConfig
+from collections.abc import Sequence
+
 from graphql import GraphQLSchema
-from pydantic import Field
 from graphql.type.definition import (
     GraphQLEnumType,
 )
-from turms.referencer import create_reference_registry_from_documents
-from turms.utils import parse_documents
-from turms.registry import ClassRegistry
+from pydantic import Field
+from pydantic_settings import SettingsConfigDict
+
+from turms.config import GeneratorConfig
 from turms.errors import GenerationError
+from turms.plugins.base import Plugin, PluginConfig
+from turms.referencer import create_reference_registry_from_documents
+from turms.registry import ClassRegistry
+from turms.utils import parse_documents
 
 
 class EnumsPluginsError(GenerationError):
@@ -33,8 +35,8 @@ def generate_enums(
     config: GeneratorConfig,
     plugin_config: EnumsPluginConfig,
     registry: ClassRegistry,
-) -> List[ast.ClassDef]:
-    tree: List[ast.ClassDef] = []
+) -> list[ast.ClassDef]:
+    tree: list[ast.ClassDef] = []
 
     enum_types = {
         key: value

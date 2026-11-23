@@ -2,6 +2,7 @@ from abc import abstractmethod
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from turms.config import GeneratorConfig, LogFunction, print_logger
 
 

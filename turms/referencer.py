@@ -1,4 +1,3 @@
-from typing import Dict, Set
 from graphql import (
     FragmentDefinitionNode,
     GraphQLEnumType,
@@ -9,6 +8,7 @@ from graphql import (
     GraphQLNonNull,
     GraphQLObjectType,
     GraphQLScalarType,
+    GraphQLSchema,
     ListTypeNode,
     NamedTypeNode,
     NonNullTypeNode,
@@ -24,16 +24,15 @@ from graphql.type.definition import (
     GraphQLType,
     GraphQLUnionType,
 )
-from graphql import GraphQLSchema
 
 
 class ReferenceRegistry:
     def __init__(self):
-        self.fragments: Set[str] = set()
-        self.enums: Set[str] = set()
-        self.inputs: Set[str] = set()
-        self.scalars: Set[str] = set()
-        self.operations: Set[str] = set()
+        self.fragments: set[str] = set()
+        self.enums: set[str] = set()
+        self.inputs: set[str] = set()
+        self.scalars: set[str] = set()
+        self.operations: set[str] = set()
 
     def register_fragment(self, type_name: str):
         self.fragments.add(type_name)
@@ -213,8 +212,8 @@ def create_reference_registry_from_documents(
 ) -> ReferenceRegistry:
     """Finds all references of types of types that are used in the documents"""
 
-    fragments: Dict[str, FragmentDefinitionNode] = {}
-    operations: Dict[str, OperationDefinitionNode] = {}
+    fragments: dict[str, FragmentDefinitionNode] = {}
+    operations: dict[str, OperationDefinitionNode] = {}
 
     registry = ReferenceRegistry()
 

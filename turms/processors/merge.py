@@ -1,9 +1,11 @@
-from pydantic import Field
-from turms.processors.base import Processor, ProcessorConfig
-import libcst as cst
-from collections import OrderedDict
-from turms.config import GeneratorConfig
 import os
+from collections import OrderedDict
+
+import libcst as cst
+from pydantic import Field
+
+from turms.config import GeneratorConfig
+from turms.processors.base import Processor, ProcessorConfig
 
 # load beasts.py as a ast.Module
 
@@ -146,7 +148,6 @@ def merge_code(old_code: str, new_code: str, config: MergeProcessorConfig):
 
     # merge the two ast.Module
     for node in new_module.body:
-
         if isinstance(node, cst.ClassDef):
             symbols[node.name.value] = node
             new_symbols.add(node.name.value)

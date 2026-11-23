@@ -27,7 +27,7 @@ def test_parse_value_node_handles_composite_defaults():
         "query Q("
         "$xs: [Int!] = [1, 2],"
         "$c: Color = RED,"
-        "$f: Filter = {a: 1, b: [\"x\"], c: {d: null}}"
+        '$f: Filter = {a: 1, b: ["x"], c: {d: null}}'
         ") { x }"
     )
     assert got["xs"] == [1, 2]

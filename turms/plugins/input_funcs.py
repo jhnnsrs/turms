@@ -13,13 +13,11 @@ plugin; the input model / pydantic performs the coercion.
 """
 
 import ast
-from typing import Dict, List
 
-from graphql import GraphQLInputObjectType, GraphQLNonNull, GraphQLSchema
+from graphql import GraphQLInputObjectType, GraphQLSchema
 from pydantic import Field
 from pydantic_settings import SettingsConfigDict
 
-from turms.schema_lookup import input_field_is_required
 from turms.config import GeneratorConfig, PythonType
 from turms.plugins.base import Plugin, PluginConfig
 from turms.plugins.funcs import (
@@ -29,6 +27,7 @@ from turms.plugins.funcs import (
 )
 from turms.referencer import create_reference_registry_from_documents
 from turms.registry import ClassRegistry
+from turms.schema_lookup import input_field_is_required
 from turms.utils import parse_documents
 
 
@@ -37,9 +36,9 @@ class InputFuncsPluginConfig(PluginConfig):
         extra="forbid", env_prefix="TURMS_PLUGINS_INPUTFUNCS_"
     )
     type: str = "turms.plugins.input_funcs.InputFuncsPlugin"
-    coercible_scalars: Dict[str, PythonType] = {}
+    coercible_scalars: dict[str, PythonType] = {}
     """Map of scalar names to a coercible python type used in the factory params."""
-    coercible_inputs: Dict[str, PythonType] = {}
+    coercible_inputs: dict[str, PythonType] = {}
     """Map of input type names to an additional python type accepted in the factory
     params (unioned onto the input model)."""
     skip_underscore: bool = True
@@ -52,6 +51,7 @@ class InputFuncsPluginConfig(PluginConfig):
 #: Name of the generated argument-assembly local. Underscored so an input type with a field
 #: called ``data`` cannot shadow the generated function's own parameter of that name.
 INPUT_DATA_NAME = "_data"
+
 
 def generate_input_func(
     typename: str,
@@ -82,7 +82,7 @@ def generate_input_func(
         input_type, plugin_config, registry
     )
 
-    body: List[ast.stmt] = []
+    body: list[ast.stmt] = []
 
     if plugin_config.extract_documentation:
         doc = f"Creates a {class_name}\n\nArguments:\n" + (
@@ -195,8 +195,8 @@ def generate_input_funcs(
     config: GeneratorConfig,
     plugin_config: InputFuncsPluginConfig,
     registry: ClassRegistry,
-) -> List[ast.AST]:
-    tree: List[ast.AST] = []
+) -> list[ast.AST]:
+    tree: list[ast.AST] = []
 
     inputobjects_type = {
         key: value
@@ -263,7 +263,7 @@ class InputFuncsPlugin(Plugin):
         client_schema: GraphQLSchema,
         config: GeneratorConfig,
         registry: ClassRegistry,
-    ) -> List[ast.AST]:
+    ) -> list[ast.AST]:
         # Merge the global coercible_scalars/coercible_inputs with this plugin's
         # overrides (plugin entries win) so funcs and input_funcs can share a
         # global config.

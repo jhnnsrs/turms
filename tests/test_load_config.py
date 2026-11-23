@@ -2,11 +2,10 @@ import pydantic
 import pytest
 
 from turms.config import GeneratorConfig
-from .utils import build_relative_glob
-from turms.run import scan_folder_for_single_config
-
 from turms.errors import GenerationError
-from turms.run import load_projects_from_configpath
+from turms.run import load_projects_from_configpath, scan_folder_for_single_config
+
+from .utils import build_relative_glob
 
 
 def test_load_projects(parsable_configs):

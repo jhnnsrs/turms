@@ -1,0 +1,58 @@
+# The arkitekt Python standard: lint and format rules every repo shares.
+#
+# Owned by arkitektio/.github (python/ruff.shared.toml) and copied verbatim into
+# each repo by `python/sync_quality.py`; edit it there, never in a repo. A repo's
+# own `ruff.toml` extends this file and adds only what is its own (excludes for
+# vendored code, per-file ignores, its target version).
+
+# Black's (and ruff's) default. The formatter wraps code to it; a string or a
+# comment it cannot wrap is left long (E501 is not selected).
+line-length = 88
+
+[lint]
+select = [
+  # Correctness: what is a bug, not a matter of taste.
+  "F",      # pyflakes: undefined and unused names, bad imports
+  "E9",     # syntax and IO errors
+  "PLE",    # pylint errors
+  "B",      # bugbear: likely bugs
+  "ASYNC",  # blocking calls in async code
+  "DTZ",    # naive datetimes
+  "LOG",    # logging misuse
+  "T10",    # leftover debugger calls
+  "ISC",    # implicit string concatenation (a missing comma in a list)
+  # Fixed automatically by `ruff check --fix`.
+  "I",      # import order
+  "UP",     # plain modernizations: list[str], X | None, no redundant imports
+  # Every argument and return annotated, and no `Any`.
+  "ANN",
+]
+ignore = [
+  # Python 3.12 generic syntax (`type X = ...`, `class Foo[T]`, `def f[T]`):
+  # the plain `TypeVar` / `TypeAlias` spellings stay.
+  "UP040", "UP046", "UP047", "UP049",
+  # `class X(StrEnum)` changes what str() of a member gives: strawberry and
+  # Django enums keep `(str, Enum)`.
+  "UP042",
+  # `timeout=` on an async function is how the client APIs take a timeout;
+  # replacing it with `asyncio.timeout` would change public signatures.
+  "ASYNC109",
+  # Formatter conflict: the formatter joins implicitly concatenated strings itself.
+  "ISC001",
+]
+
+[lint.flake8-annotations]
+# `**kwargs: Any` in a pass-through wrapper is the one honest `Any`.
+allow-star-arg-any = true
+
+[lint.flake8-bugbear]
+# Field/dependency factories called in signatures are how strawberry, pydantic
+# and FastAPI declare things, not a mutable default.
+extend-immutable-calls = [
+  "strawberry.field",
+  "strawberry.argument",
+  "strawberry_django.field",
+  "pydantic.Field",
+  "fastapi.Depends",
+  "fastapi.Query",
+]

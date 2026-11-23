@@ -1,12 +1,14 @@
 import pytest
+from graphql import build_client_schema
+
+from turms.helpers import load_introspection_from_url
 from turms.run import (
     build_schema_from_schema_type,
-    scan_folder_for_configs,
     load_projects_from_configpath,
+    scan_folder_for_configs,
 )
+
 from .utils import build_relative_glob
-from graphql import build_client_schema
-from turms.helpers import load_introspection_from_url
 
 
 @pytest.fixture(scope="session")
@@ -60,9 +62,12 @@ def nested_input_schema():
 def union_schema():
     return build_schema_from_schema_type(build_relative_glob("/schemas/union.graphql"))
 
+
 @pytest.fixture(scope="session")
 def directive_schema():
-    return build_schema_from_schema_type(build_relative_glob("/schemas/list_field_directive.graphql"))
+    return build_schema_from_schema_type(
+        build_relative_glob("/schemas/list_field_directive.graphql")
+    )
 
 
 @pytest.fixture(scope="session")
@@ -135,9 +140,7 @@ def complex_defaults_schema():
 
 @pytest.fixture(scope="session")
 def oneof_schema():
-    return build_schema_from_schema_type(
-        build_relative_glob("/schemas/oneof.graphql")
-    )
+    return build_schema_from_schema_type(build_relative_glob("/schemas/oneof.graphql"))
 
 
 @pytest.fixture(scope="session")

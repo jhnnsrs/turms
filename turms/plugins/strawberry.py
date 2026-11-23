@@ -1,8 +1,12 @@
+import ast
+from typing import Any, Protocol, runtime_checkable
+
 from graphql import (
     BooleanValueNode,
     ConstValueNode,
     EnumValueNode,
     FloatValueNode,
+    GraphQLArgument,
     GraphQLField,
     GraphQLInputObjectType,
     GraphQLInterfaceType,
@@ -15,25 +19,22 @@ from graphql import (
     IntValueNode,
     ListValueNode,
     NullValueNode,
+    ObjectTypeDefinitionNode,
     ObjectValueNode,
     StringValueNode,
     Undefined,
-    GraphQLArgument,
-    ObjectTypeDefinitionNode,
 )
-from pydantic_settings import SettingsConfigDict
-
-from turms.schema_lookup import get_default_value
-from turms.plugins.base import Plugin, PluginConfig, rename_deprecated_keys
-import ast
-from typing import Any, Dict, List, Protocol, runtime_checkable
-from turms.config import GeneratorConfig, ImportableFunctionMixin
-from graphql.utilities.build_client_schema import GraphQLSchema
-from pydantic import Field, model_validator
 from graphql.type.definition import (
     GraphQLEnumType,
 )
+from graphql.utilities.build_client_schema import GraphQLSchema
+from pydantic import Field, model_validator
+from pydantic_settings import SettingsConfigDict
+
+from turms.config import GeneratorConfig, ImportableFunctionMixin
+from turms.plugins.base import Plugin, PluginConfig, rename_deprecated_keys
 from turms.registry import ClassRegistry
+from turms.schema_lookup import get_default_value
 from turms.utils import (
     convert_default_value_to_ast,
     get_additional_bases_for_type,
@@ -50,10 +51,12 @@ class StrawberryGenerateFunc(ImportableFunctionMixin, Protocol):
         config: GeneratorConfig,
         plugin_config: "StrawberryPluginConfig",
         registry: ClassRegistry,
-    ) -> List[ast.AST]: ...  # pragma: no cover
+    ) -> list[ast.AST]: ...  # pragma: no cover
 
 
-def build_directive_type_annotation(value: GraphQLType, registry: ClassRegistry, is_optional=True):
+def build_directive_type_annotation(
+    value: GraphQLType, registry: ClassRegistry, is_optional=True
+):
 
     if isinstance(value, GraphQLScalarType):
         if is_optional:
@@ -63,7 +66,7 @@ def build_directive_type_annotation(value: GraphQLType, registry: ClassRegistry,
                 slice=registry.reference_scalar(value.name),
                 ctx=ast.Load(),
             )
-        
+
         return registry.reference_scalar(value.name)
     if isinstance(value, GraphQLObjectType):
         raise NotImplementedError("Object types cannot be used as arguments")
@@ -82,7 +85,9 @@ def build_directive_type_annotation(value: GraphQLType, registry: ClassRegistry,
 
         return registry.reference_enum(value.name)
     if isinstance(value, GraphQLNonNull):
-        return build_directive_type_annotation(value.of_type, registry, is_optional=False)
+        return build_directive_type_annotation(
+            value.of_type, registry, is_optional=False
+        )
     if isinstance(value, GraphQLList):
         registry.register_import("typing.List")
 
@@ -93,7 +98,9 @@ def build_directive_type_annotation(value: GraphQLType, registry: ClassRegistry,
                 value=ast.Name("Optional", ctx=ast.Load()),
                 slice=ast.Subscript(
                     value=ast.Name("List", ctx=ast.Load()),
-                    slice=build_directive_type_annotation(value.of_type, registry, is_optional=True),
+                    slice=build_directive_type_annotation(
+                        value.of_type, registry, is_optional=True
+                    ),
                     ctx=ast.Load(),
                 ),
                 ctx=ast.Load(),
@@ -101,14 +108,15 @@ def build_directive_type_annotation(value: GraphQLType, registry: ClassRegistry,
 
         return ast.Subscript(
             value=ast.Name("List", ctx=ast.Load()),
-            slice=build_directive_type_annotation(value.of_type, registry, is_optional=True),
+            slice=build_directive_type_annotation(
+                value.of_type, registry, is_optional=True
+            ),
             ctx=ast.Load(),
         )
     if isinstance(value, GraphQLInputObjectType):
         raise NotImplementedError("Input types cannot be used as arguments")
-    
-    raise NotImplementedError(f"Unknown type {repr(value)}")
 
+    raise NotImplementedError(f"Unknown type {repr(value)}")
 
 
 def convert_valuenode_to_ast(value: ConstValueNode):
@@ -126,9 +134,10 @@ def convert_valuenode_to_ast(value: ConstValueNode):
     if isinstance(value, EnumValueNode):
         return ast.Constant(value=value)
     if isinstance(value, ListValueNode):
-        return ast.List(elts=[convert_valuenode_to_ast(x) for x in value.values], ctx=ast.Load())
+        return ast.List(
+            elts=[convert_valuenode_to_ast(x) for x in value.values], ctx=ast.Load()
+        )
     if isinstance(value, ObjectValueNode):
-
         keys = []
         values = []
 
@@ -140,13 +149,8 @@ def convert_valuenode_to_ast(value: ConstValueNode):
             keys=keys,
             values=values,
         )
-    
+
     raise NotImplementedError(f"Unknown default value {repr(value)}")
-
-
-
-
-
 
 
 def default_generate_directives(
@@ -213,7 +217,6 @@ def default_generate_directives(
             if isinstance(default, ast.Dict):
                 needs_factory = True
 
-
             field_value = None
 
             if default:
@@ -223,9 +226,7 @@ def default_generate_directives(
                         keywords=[
                             ast.keyword(
                                 arg="default_factory",
-                                value=ast.Lambda(
-                                    args=[], body=default
-                                ),
+                                value=ast.Lambda(args=[], body=default),
                             ),
                         ],
                         args=[],
@@ -241,7 +242,6 @@ def default_generate_directives(
                         ],
                         args=[],
                     )
-
 
             assign = ast.AnnAssign(
                 target=ast.Name(
@@ -363,23 +363,24 @@ class StrawberryPluginConfig(PluginConfig):
     type: str = "turms.plugins.strawberry.StrawberryPlugin"
     generate_directives: bool = True
     generate_scalars: bool = True
-    builtin_directives: List[str] = [
+    builtin_directives: list[str] = [
         "include",
         "skip",
         "deprecated",
         "specifiedBy",
         "oneOf",
     ]
-    builtin_scalars: List[str] = ["String", "Boolean", "DateTime", "Int", "Float", "ID"]
+    builtin_scalars: list[str] = ["String", "Boolean", "DateTime", "Int", "Float", "ID"]
     generate_enums: bool = True
     generate_types: bool = True
     generate_inputs: bool = True
-    input_bases: List[str] = []
+    input_bases: list[str] = []
 
     @model_validator(mode="before")
     @classmethod
     def _rename_deprecated(cls, values: Any) -> Any:
         return rename_deprecated_keys(values, {"inputtype_bases": "input_bases"})
+
     skip_underscore: bool = False
     skip_double_underscore: bool = True
 
@@ -703,7 +704,9 @@ def generate_directive_keywords(
                     ctx=ast.Load(),
                 ),
                 keywords=[
-                    ast.keyword(arg=arg.name.value, value=convert_valuenode_to_ast(arg.value))
+                    ast.keyword(
+                        arg=arg.name.value, value=convert_valuenode_to_ast(arg.value)
+                    )
                     for arg in directive.arguments or ()
                 ],
                 args=[],
@@ -881,12 +884,12 @@ def generate_types(
     }
     registry.register_import("strawberry")
 
-    interface_map: Dict[str, List[str]] = (
-        {}
-    )  # A list of interfaces with the union classes attached
-    interface_base_map: Dict[str, str] = (
-        {}
-    )  # A list of interfaces with its respective base
+    interface_map: dict[
+        str, list[str]
+    ] = {}  # A list of interfaces with the union classes attached
+    interface_base_map: dict[
+        str, str
+    ] = {}  # A list of interfaces with its respective base
 
     for key, object_type in sorted_objects.items():
         additional_bases = get_additional_bases_for_type(
@@ -1194,7 +1197,7 @@ class StrawberryPlugin(Plugin):
         client_schema: GraphQLSchema,
         config: GeneratorConfig,
         registry: ClassRegistry,
-    ) -> List[ast.AST]:
+    ) -> list[ast.AST]:
         registry.register_import("strawberry")
 
         directives = (

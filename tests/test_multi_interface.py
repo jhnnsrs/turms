@@ -1,6 +1,4 @@
-
 from turms.config import GeneratorConfig
-from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.fragments import FragmentsPlugin
 from turms.plugins.funcs import FuncsPlugin, FuncsPluginConfig, FunctionDefinition

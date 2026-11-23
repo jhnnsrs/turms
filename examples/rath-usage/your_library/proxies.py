@@ -13,27 +13,32 @@ def execute(operation, variables, rath: Rath):
     return operation(
         **rath.query(
             operation.Meta.document,
-            operation.Arguments(**variables).model_dump(by_alias=True, exclude_unset=True),
+            operation.Arguments(**variables).model_dump(
+                by_alias=True, exclude_unset=True
+            ),
         ).data
     )
 
 
 async def aexecute(operation, variables, rath: Rath):
     x = await rath.aquery(
-        operation.Meta.document, operation.Arguments(**variables).model_dump(by_alias=True, exclude_unset=True)
+        operation.Meta.document,
+        operation.Arguments(**variables).model_dump(by_alias=True, exclude_unset=True),
     )
     return operation(**x.data)
 
 
 def subscribe(operation, variables, rath: Rath):
     for ev in rath.subscribe(
-        operation.Meta.document, operation.Arguments(**variables).model_dump(by_alias=True, exclude_unset=True)
+        operation.Meta.document,
+        operation.Arguments(**variables).model_dump(by_alias=True, exclude_unset=True),
     ):
         yield operation(**ev.data)
 
 
 async def asubscribe(operation, variables, rath: Rath):
     async for event in rath.asubscribe(
-        operation.Meta.document, operation.Arguments(**variables).model_dump(by_alias=True, exclude_unset=True)
+        operation.Meta.document,
+        operation.Arguments(**variables).model_dump(by_alias=True, exclude_unset=True),
     ):
         yield operation(**event.data)

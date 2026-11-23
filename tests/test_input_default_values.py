@@ -74,7 +74,10 @@ def test_defaulted_fields_are_optional_none():
     )
     assert "'Default: [1, 2, 3]'" in generated
     # plain optional still defaults to None and has no marker.
-    assert "plain_optional: str | None = Field(alias='plainOptional', default=None)" in generated
+    assert (
+        "plain_optional: str | None = Field(alias='plainOptional', default=None)"
+        in generated
+    )
     # plain required carries no default.
     assert "Field(alias='plainRequired', default" not in generated
 

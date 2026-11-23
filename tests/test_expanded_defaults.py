@@ -56,11 +56,20 @@ def _api(tmp_path):
             InputsPlugin(),
             FragmentsPlugin(),
             OperationsPlugin(),
-            ClientPlugin(config=ClientPluginConfig(client_class="ThingApi", expand_input_types=["input"], async_methods=False)),
+            ClientPlugin(
+                config=ClientPluginConfig(
+                    client_class="ThingApi",
+                    expand_input_types=["input"],
+                    async_methods=False,
+                )
+            ),
         ],
     )
     namespace: dict = {}
-    exec(ast.unparse(ast.fix_missing_locations(ast.Module(body=tree, type_ignores=[]))), namespace)
+    exec(
+        ast.unparse(ast.fix_missing_locations(ast.Module(body=tree, type_ignores=[]))),
+        namespace,
+    )
     return namespace
 
 
@@ -79,7 +88,9 @@ def test_a_field_left_out_is_not_sent_and_the_server_applies_its_default(tmp_pat
     class Client(namespace["ThingApi"]):
         def execute(self, operation, variables, **kwargs):
             sent.append(variables)
-            return operation.model_validate({"make": {"__typename": "Thing", "id": "1"}})
+            return operation.model_validate(
+                {"make": {"__typename": "Thing", "id": "1"}}
+            )
 
     Client().make("x")
     Client().make("y", allow_mesh=True)

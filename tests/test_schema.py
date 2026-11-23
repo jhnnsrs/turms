@@ -1,13 +1,13 @@
-
 import pytest
+
 from turms.config import GeneratorConfig
-from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.inputs import InputsPlugin
 from turms.plugins.objects import ObjectsPlugin
-from turms.stylers.default import DefaultStyler
 from turms.run import generate_ast
-from .utils import unit_test_with, ExecuteError
+from turms.stylers.default import DefaultStyler
+
+from .utils import ExecuteError, unit_test_with
 
 
 @pytest.mark.network

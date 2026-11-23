@@ -1,10 +1,12 @@
 import ast
 import glob
 import re
-from typing import Any, List, Optional, Sequence, Set, TypeVar, Union
+from collections.abc import Sequence
+from typing import Any, TypeVar, Union
 
 from graphql import (
     BooleanValueNode,
+    EnumValueNode,
     FloatValueNode,
     FragmentDefinitionNode,
     GraphQLEnumType,
@@ -15,8 +17,8 @@ from graphql import (
     GraphQLObjectType,
     GraphQLOutputType,
     GraphQLScalarType,
+    GraphQLSchema,
     GraphQLUnionType,
-    EnumValueNode,
     InlineFragmentNode,
     IntValueNode,
     ListTypeNode,
@@ -38,22 +40,21 @@ from graphql import (
 )
 from graphql.error.graphql_error import GraphQLError
 from graphql.language.ast import DocumentNode, FieldNode, NameNode, Node
-from graphql import GraphQLSchema
 
 from turms.annotations import list_label, optional_label
 from turms.config import GeneratorConfig
 from turms.errors import (  # noqa: F401  (re-exported: see note below)
-    GenerationError,
-    NoEnumFound,
-    NoInputTypeFound,
-    NoScalarFound,
     # These four live in turms.errors alongside the rest of the hierarchy, but
     # stay importable from here because plugins have always imported them from
     # turms.utils.
     FragmentNotFoundError,
+    GenerationError,
     InvalidDocuments,
     NoDocumentsFoundError,
+    NoEnumFound,
+    NoInputTypeFound,
     NoScalarEquivalentDefined,
+    NoScalarFound,
 )
 from turms.registry import ClassRegistry
 
@@ -108,7 +109,7 @@ def capitalize_first(name: str) -> str:
     return name[0].upper() + name[1:]
 
 
-def field_is_conditional(node: Union[FieldNode, InlineFragmentNode]) -> bool:
+def field_is_conditional(node: FieldNode | InlineFragmentNode) -> bool:
     """Whether ``@skip`` / ``@include`` can make this selection absent.
 
     Accepts a field or an inline fragment: a directive on the fragment applies
@@ -145,7 +146,7 @@ def field_is_conditional(node: Union[FieldNode, InlineFragmentNode]) -> bool:
 
 def non_typename_fields(
     node: FieldNode | FragmentDefinitionNode | OperationDefinitionNode,
-) -> List[FieldNode | SelectionNode]:
+) -> list[FieldNode | SelectionNode]:
     """Returns all selections on a node that are not __typename.
 
     ``__typename`` is re-emitted separately as a ``Literal`` discriminator
@@ -241,7 +242,7 @@ def generate_alias_keywords(
     graphql_name: str,
     config: GeneratorConfig,
     registry: ClassRegistry,
-) -> List[ast.keyword]:
+) -> list[ast.keyword]:
     """The ``Field(...)`` keywords that carry a field's GraphQL name.
 
     Only called when the python name and the GraphQL name actually differ.
@@ -311,7 +312,7 @@ def generate_pydantic_config(
     graphQLType: GraphQLTypes,
     config: GeneratorConfig,
     registry: ClassRegistry,
-    typename: Optional[str] = None,
+    typename: str | None = None,
 ) -> list[ast.Assign]:
     """Generates the ``model_config`` assignment for a specific type
 
@@ -324,7 +325,7 @@ def generate_pydantic_config(
 
     """
 
-    config_keywords: List[ast.keyword] = []
+    config_keywords: list[ast.keyword] = []
 
     if config.freeze.enabled:
         if graphQLType in config.freeze.types:
@@ -365,9 +366,7 @@ def generate_pydantic_config(
                     config_keywords.append(
                         ast.keyword(
                             arg="populate_by_name",
-                            value=ast.Constant(
-                                value=config.options.populate_by_name
-                            ),
+                            value=ast.Constant(value=config.options.populate_by_name),
                         )
                     )
 
@@ -375,9 +374,7 @@ def generate_pydantic_config(
                     config_keywords.append(
                         ast.keyword(
                             arg="from_attributes",
-                            value=ast.Constant(
-                                value=config.options.from_attributes
-                            ),
+                            value=ast.Constant(value=config.options.from_attributes),
                         )
                     )
 
@@ -489,12 +486,12 @@ def parse_documents(
     x = glob.glob(scan_glob, recursive=True)
     x.sort()  # Ensure deterministic order
 
-    errors: List[GraphQLError] = []
+    errors: list[GraphQLError] = []
 
     dsl = ""
 
     for file in x:
-        with open(file, "r") as f:
+        with open(file) as f:
             dsl += f.read()
 
     if dsl == "":
@@ -575,7 +572,7 @@ def replace_iteratively(
 
 def get_additional_bases_for_type(
     typename: str, config: GeneratorConfig, registry: ClassRegistry
-) -> List[ast.Name]:
+) -> list[ast.Name]:
     if typename in config.additional_bases:
         for base in config.additional_bases[typename]:
             registry.register_import(base)
@@ -598,7 +595,9 @@ def is_oneof_input_type(graphql_type) -> bool:
     ast_node = getattr(graphql_type, "ast_node", None)
     if ast_node is None:
         return False
-    return any(directive.name.value == "oneOf" for directive in ast_node.directives or ())
+    return any(
+        directive.name.value == "oneOf" for directive in ast_node.directives or ()
+    )
 
 
 def get_interface_bases(config: GeneratorConfig, registry: ClassRegistry):
@@ -621,7 +620,7 @@ def get_interface_bases(config: GeneratorConfig, registry: ClassRegistry):
 
 
 def interface_is_extended_by_other_interfaces(
-    interface: GraphQLInterfaceType, other_interfaces: Set[GraphQLInterfaceType]
+    interface: GraphQLInterfaceType, other_interfaces: set[GraphQLInterfaceType]
 ) -> bool:
     interfaces_implemented_by_other_interfaces = {
         nested_interface
@@ -635,7 +634,7 @@ def recurse_type_annotation(
     type: TypeNode,
     registry: ClassRegistry,
     optional: bool = True,
-    overwrite_final: Optional[Union[str, ast.expr]] = None,
+    overwrite_final: str | ast.expr | None = None,
 ) -> ast.expr:
     if isinstance(type, NonNullTypeNode):
         return recurse_type_annotation(
@@ -709,7 +708,7 @@ def recurse_outputtype_annotation(
     type: GraphQLNamedOutputType,
     registry: ClassRegistry,
     optional: bool = True,
-    overwrite_final: Optional[str] = None,
+    overwrite_final: str | None = None,
 ) -> ast.expr:
     if isinstance(type, GraphQLNonNull):
         # If the type is non-null, we need to recurse into the inner type
@@ -783,7 +782,7 @@ def recurse_outputtype_label(
     type: GraphQLOutputType,
     registry: ClassRegistry,
     optional: bool = True,
-    overwrite_final: Optional[str] = None,
+    overwrite_final: str | None = None,
 ) -> str:
     if isinstance(type, GraphQLNonNull):  # pragma: no cover
         return recurse_outputtype_label(
@@ -822,7 +821,7 @@ def recurse_type_label(
     type: TypeNode,
     registry: ClassRegistry,
     optional: bool = True,
-    overwrite_final: Optional[str] = None,
+    overwrite_final: str | None = None,
 ) -> str:
     if isinstance(type, NonNullTypeNode):
         return recurse_type_label(
@@ -863,7 +862,7 @@ def recurse_type_label(
     raise NotImplementedError("Not implemented for this type")
 
 
-ParsedValue = Union[None, str, int, float, bool, List["ParsedValue"], dict]
+ParsedValue = Union[None, str, int, float, bool, list["ParsedValue"], dict]
 
 
 def parse_value_node(value_node: ValueNode) -> ParsedValue:

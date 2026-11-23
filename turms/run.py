@@ -1,44 +1,43 @@
 import ast
+import json
 import os
-from typing import Dict, List, Optional, Callable, Tuple
+from collections.abc import Callable
 
 import yaml
 from graphql import (
     GraphQLSchema,
-    parse,
     build_ast_schema,
     build_client_schema,
+    parse,
     print_schema,
 )
 from pydantic import ValidationError
 from rich import get_console
 
+from turms.annotations import modernize_annotations
 from turms.config import (
     GeneratorConfig,
     GraphQLConfigMultiple,
     GraphQLConfigSingle,
     GraphQLProject,
-    SchemaType,
     LogFunction,
+    SchemaType,
     print_logger,
 )
 from turms.helpers import (
-    load_introspection_from_glob,
-    load_introspection_from_url,
+    import_string,
     load_dsl_from_glob,
     load_dsl_from_url,
-    import_string,
+    load_introspection_from_glob,
+    load_introspection_from_url,
 )
-from turms.annotations import modernize_annotations
-from turms.plugins.base import Plugin
 from turms.parsers.base import Parser
+from turms.plugins.base import Plugin
 from turms.processors.base import Processor
 from turms.registry import ClassRegistry
 from turms.stylers.base import Styler
 
 from .errors import GenerationError
-import json
-
 
 try:
     # Python 3.11+ ships a TOML parser; older versions get it from the `tomli`
@@ -96,7 +95,7 @@ def get_file_loader(file_name: str) -> Callable:
 
 def load_projects_from_configpath(
     config_path: str, select: str = None
-) -> Dict[str, GraphQLProject]:
+) -> dict[str, GraphQLProject]:
     """Loads the configuration from a configuration file
 
     Args:
@@ -107,7 +106,7 @@ def load_projects_from_configpath(
     """
     file_path, file_name = os.path.split(config_path)
 
-    with open(config_path, "r", encoding="utf-8") as file:
+    with open(config_path, encoding="utf-8") as file:
         loaded_dict = get_file_loader(config_path)(file)
 
     try:
@@ -130,7 +129,7 @@ def load_projects_from_configpath(
     return projects
 
 
-def _validate_external_modules(projects: Dict[str, GraphQLProject]) -> None:
+def _validate_external_modules(projects: dict[str, GraphQLProject]) -> None:
     """Check every ``external_modules`` entry that names a ``from_project``.
 
     The class names of an external type are derived from its GraphQL typename and
@@ -152,9 +151,7 @@ def _validate_external_modules(projects: Dict[str, GraphQLProject]) -> None:
                 )
 
             mine = [styler.model_dump() for styler in project.extensions.turms.stylers]
-            theirs = [
-                styler.model_dump() for styler in source.extensions.turms.stylers
-            ]
+            theirs = [styler.model_dump() for styler in source.extensions.turms.stylers]
             if mine != theirs:
                 raise GenerationError(
                     f"Projects {name!r} and {external.from_project!r} have different "
@@ -165,7 +162,7 @@ def _validate_external_modules(projects: Dict[str, GraphQLProject]) -> None:
                 )
 
 
-def scan_folder_for_configs(folder_path: str = None) -> List[str]:
+def scan_folder_for_configs(folder_path: str = None) -> list[str]:
     """Scans a folder for config files
 
     Args:
@@ -232,7 +229,7 @@ def write_schema_to_file(
     schema: GraphQLSchema,
     outdir: str,
     filepath: str,
-    raw_dsl: Optional[str] = None,
+    raw_dsl: str | None = None,
 ):
     """Dumps the schema next to the generated code.
 
@@ -283,10 +280,10 @@ def write_project(project: GraphQLProject, outdir: str, filepath: str):
 
 
 def gen(
-    filepath: Optional[str] = None,
-    project_name: Optional[str] = None,
+    filepath: str | None = None,
+    project_name: str | None = None,
     strict: bool = False,
-    overwrite_path: Optional[str] = None,
+    overwrite_path: str | None = None,
 ):
     """Generates  Code according to the config file
 
@@ -357,7 +354,7 @@ def is_url(url: str) -> bool:
     return url.startswith("http") or url.startswith("https")
 
 
-def load_raw_dsl_from_schema_type(schema: SchemaType) -> Optional[str]:
+def load_raw_dsl_from_schema_type(schema: SchemaType) -> str | None:
     """Returns the SDL exactly as the source served it, or None.
 
     Mirrors the branches of :func:`build_schema_from_schema_type`, but keeps the
@@ -390,8 +387,10 @@ def load_raw_dsl_from_schema_type(schema: SchemaType) -> Optional[str]:
             return " ".join(substrings) if substrings else None
 
         if isinstance(schema, str):
-            return load_dsl_from_url(schema) if is_url(schema) else load_dsl_from_glob(
-                schema
+            return (
+                load_dsl_from_url(schema)
+                if is_url(schema)
+                else load_dsl_from_glob(schema)
             )
     except Exception:
         # An introspection-only endpoint (or an unreadable glob) is not an error
@@ -481,8 +480,8 @@ def build_schema_from_schema_type(
 
 
 def generate(
-    project: GraphQLProject, log: Optional[LogFunction] = None
-) -> Tuple[str, GraphQLSchema]:
+    project: GraphQLProject, log: LogFunction | None = None
+) -> tuple[str, GraphQLSchema]:
     """Genrates the code according to the configugration
 
     The code is generated in the following order:
@@ -561,7 +560,7 @@ def generate(
     return code, schema
 
 
-def parse_asts_to_string(generated_ast: List[ast.AST]) -> str:
+def parse_asts_to_string(generated_ast: list[ast.AST]) -> str:
     module = ast.Module(body=generated_ast, type_ignores=[])
     return ast.unparse(ast.fix_missing_locations(module))
 
@@ -569,11 +568,11 @@ def parse_asts_to_string(generated_ast: List[ast.AST]) -> str:
 def generate_ast(
     config: GeneratorConfig,
     schema: GraphQLSchema,
-    plugins: Optional[List[Plugin]] = None,
-    stylers: Optional[List[Styler]] = None,
+    plugins: list[Plugin] | None = None,
+    stylers: list[Styler] | None = None,
     skip_forwards: bool = False,
     log: LogFunction = print_logger,
-) -> List[ast.AST]:
+) -> list[ast.AST]:
     """Generates the ast from the schema
 
     Args:
@@ -621,10 +620,10 @@ def generate_ast(
 
 def parse_ast(
     config: GeneratorConfig,
-    ast: List[ast.AST],
-    parsers: Optional[List[Parser]] = None,
+    ast: list[ast.AST],
+    parsers: list[Parser] | None = None,
     log: LogFunction = print_logger,
-) -> List[ast.AST]:
+) -> list[ast.AST]:
     """Parses the ast with the plugins
 
     Args:
@@ -654,10 +653,10 @@ def parse_ast(
 
 def process_code(
     config: GeneratorConfig,
-    code: List[ast.AST],
-    processors: Optional[List[Processor]] = None,
+    code: list[ast.AST],
+    processors: list[Processor] | None = None,
     log: LogFunction = print_logger,
-) -> List[ast.AST]:
+) -> list[ast.AST]:
     """Parses the ast with the plugins
 
     Args:
@@ -688,10 +687,10 @@ def process_code(
 def generate_code(
     config: GeneratorConfig,
     schema: GraphQLSchema,
-    plugins: Optional[List[Plugin]] = None,
-    stylers: Optional[List[Styler]] = None,
-    parsers: Optional[List[Parser]] = None,
-    processors: Optional[List[Processor]] = None,
+    plugins: list[Plugin] | None = None,
+    stylers: list[Styler] | None = None,
+    parsers: list[Parser] | None = None,
+    processors: list[Processor] | None = None,
     log: LogFunction = print_logger,
 ) -> str:
     generated_ast = generate_ast(

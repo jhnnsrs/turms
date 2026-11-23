@@ -27,6 +27,7 @@ class GetCountriesCountries(BaseModel):
     code: str
     name: str
 
+
 class GetCountries(BaseModel):
     countries: List[GetCountriesCountries]
 
@@ -143,12 +144,18 @@ uvx turms gen
 **4. Use the typed models** with the client of your choice — every field is validated, aliased, and autocompleted:
 
 ```python
-from examples.api.schema import GetCountries, CountryFilterInput, StringQueryOperatorInput
+from examples.api.schema import (
+    GetCountries,
+    CountryFilterInput,
+    StringQueryOperatorInput,
+)
 
 variables = GetCountries.Arguments(
     filter=CountryFilterInput(code=StringQueryOperatorInput(eq="DE"))
 )
-response = my_client.execute(GetCountries.Meta.document, variables.model_dump(by_alias=True, exclude_unset=True))
+response = my_client.execute(
+    GetCountries.Meta.document, variables.model_dump(by_alias=True, exclude_unset=True)
+)
 countries = GetCountries(**response["data"])
 
 for country in countries.countries:
@@ -377,6 +384,7 @@ additional_bases:
 ```python
 # myapp/traits.py
 from pydantic import BaseModel, field_validator
+
 
 class CountryTrait(BaseModel):
     @field_validator("code", check_fields=False)

@@ -6,7 +6,6 @@ generics and PEP 604 unions -- `list[str] | None` instead of
 `Optional[List[str]]` -- and the typing imports that became obsolete are pruned.
 """
 
-
 import pytest
 from graphql import build_ast_schema, parse
 

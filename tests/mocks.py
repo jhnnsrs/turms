@@ -1,35 +1,35 @@
-from typing import Optional, Type, TypeVar
+from typing import TypeVar
 
 from pydantic import BaseModel
 
 T = TypeVar("T")
 
 
-def query(model: Type[T], variables) -> T:
+def query(model: type[T], variables) -> T:
     return model(variables)  # pragma: nocover
 
 
-async def aquery(model: Type[T], variables) -> T:
+async def aquery(model: type[T], variables) -> T:
     return model(variables)  # pragma: nocover
 
 
-def subscribe(model: Type[T], variables) -> T:
+def subscribe(model: type[T], variables) -> T:
     yield model(variables)  # pragma: nocover
     yield model(variables)  # pragma: nocover
 
 
-async def asubscribe(model: Type[T], variables) -> T:
+async def asubscribe(model: type[T], variables) -> T:
     yield model(variables)  # pragma: nocover
     yield model(variables)  # pragma: nocover
 
 
 class ExtraArguments(BaseModel):
-    extra: Optional[str]
+    extra: str | None
 
 
 class ExtraOnOperations(BaseModel):
-    extra: Optional[str]
+    extra: str | None
 
 
 class ExtraArg(BaseModel):
-    extra: Optional[str]
+    extra: str | None

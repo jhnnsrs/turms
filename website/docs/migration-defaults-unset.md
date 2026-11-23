@@ -38,7 +38,7 @@ model:
 ```python
 # OLD
 class Filter(BaseModel):
-    limit: int = 10          # default copied from the schema
+    limit: int = 10  # default copied from the schema
 ```
 
 This is wrong for a GraphQL client. A baked default means the client **always
@@ -71,8 +71,12 @@ input DefaultInput {
 ```python
 class DefaultInput(BaseModel):
     required_with_default: int = Field(alias="requiredWithDefault", default=5)
-    optional_with_default: Optional[int] = Field(alias="optionalWithDefault", default=10)
-    list_with_default: List[int] = Field(alias="listWithDefault", default_factory=lambda: [1, 2, 3])
+    optional_with_default: Optional[int] = Field(
+        alias="optionalWithDefault", default=10
+    )
+    list_with_default: List[int] = Field(
+        alias="listWithDefault", default_factory=lambda: [1, 2, 3]
+    )
     plain_required: str = Field(alias="plainRequired")
 ```
 
@@ -80,9 +84,15 @@ class DefaultInput(BaseModel):
 
 ```python
 class DefaultInput(BaseModel):
-    required_with_default: Annotated[Optional[int], GraphQLDefault('5')] = Field(alias="requiredWithDefault", default=None)
-    optional_with_default: Annotated[Optional[int], GraphQLDefault('10')] = Field(alias="optionalWithDefault", default=None)
-    list_with_default: Annotated[Optional[List[int]], GraphQLDefault('[1, 2, 3]')] = Field(alias="listWithDefault", default=None)
+    required_with_default: Annotated[Optional[int], GraphQLDefault("5")] = Field(
+        alias="requiredWithDefault", default=None
+    )
+    optional_with_default: Annotated[Optional[int], GraphQLDefault("10")] = Field(
+        alias="optionalWithDefault", default=None
+    )
+    list_with_default: Annotated[Optional[List[int]], GraphQLDefault("[1, 2, 3]")] = (
+        Field(alias="listWithDefault", default=None)
+    )
     plain_required: str = Field(alias="plainRequired")
 ```
 
@@ -100,8 +110,8 @@ The schema default isn't lost — it's preserved as an `Annotated` metadata mark
 so it stays introspectable:
 
 ```python
-Annotated[Optional[int], GraphQLDefault('10')]   # default preserved as a string
-Annotated[str, Deprecated('use limit instead')]  # deprecation reason preserved
+Annotated[Optional[int], GraphQLDefault("10")]  # default preserved as a string
+Annotated[str, Deprecated("use limit instead")]  # deprecation reason preserved
 ```
 
 By default these marker classes are **generated into the output module**. You can
@@ -126,9 +136,9 @@ def get_countries(
 ) -> List[GetCountriesCountries]:
     variables: Dict[str, Any] = {}
     if filter is not UNSET:
-        variables['filter'] = filter
+        variables["filter"] = filter
     if limit is not UNSET:
-        variables['limit'] = limit
+        variables["limit"] = limit
     return execute(GetCountries, variables, rath).countries
 ```
 
@@ -216,7 +226,7 @@ input type** following the same UNSET model. See its
 [reference page](plugins/inputfuncs) for details. In short:
 
 ```python
-user = user_input(name="alice")          # optionals omitted (unset)
+user = user_input(name="alice")  # optionals omitted (unset)
 user.model_dump(by_alias=True, exclude_unset=True)  # -> {"name": "alice"}
 ```
 

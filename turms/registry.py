@@ -1,6 +1,6 @@
 import ast
+from collections.abc import Callable
 from keyword import iskeyword
-from typing import Callable, Dict, List, Optional, Set
 
 from graphql import (
     GraphQLArgument,
@@ -30,7 +30,7 @@ from turms.errors import (
 )
 from turms.stylers.base import Styler
 
-SCALAR_DEFAULTS: Dict[str, str] = {
+SCALAR_DEFAULTS: dict[str, str] = {
     "ID": "str",
     "String": "str",
     "Int": "int",
@@ -164,7 +164,9 @@ built_in_map = {
                                     value=ast.Call(
                                         func=ast.Attribute(
                                             value=ast.Call(
-                                                func=ast.Name(id="super", ctx=ast.Load()),
+                                                func=ast.Name(
+                                                    id="super", ctx=ast.Load()
+                                                ),
                                                 args=[],
                                                 keywords=[],
                                             ),
@@ -228,7 +230,7 @@ built_in_map = {
 }  # builtin map provides the default types for any schema if they are referenced
 
 
-class ClassRegistry(object):
+class ClassRegistry:
     """Class Registry is responsible for keeping track of all the classes that are generated
     as well as their names. It also keeps track of all the imports that are required for the
     generated code to work, as well as all the forward references that are required
@@ -237,52 +239,52 @@ class ClassRegistry(object):
     the logic behind the stylers."""
 
     def __init__(
-        self, config: GeneratorConfig, stylers: List[Styler], log: LogFunction
+        self, config: GeneratorConfig, stylers: list[Styler], log: LogFunction
     ):
-        self.stylers: List[Styler] = stylers
-        self._imports: Set[str] = set()
-        self._builtins: Set[str] = set()
+        self.stylers: list[Styler] = stylers
+        self._imports: set[str] = set()
+        self._builtins: set[str] = set()
         self.config: GeneratorConfig = config
 
-        self.scalar_map: Dict[str, str] = {
+        self.scalar_map: dict[str, str] = {
             **SCALAR_DEFAULTS,
             **config.scalar_definitions,
         }
         # map of fragment typename to the strinigify graphql document
-        self.fragment_document_map: Dict[str, str] = {}
+        self.fragment_document_map: dict[str, str] = {}
 
-        self.enum_class_map: Dict[str, str] = {}
-        self.inputtype_class_map: Dict[str, str] = {}
-        self.object_class_map: Dict[str, str] = {}
-        self.interface_reference_map: Dict[str, str] = {}
-        self.interface_baseclass_map: Dict[str, str] = {}
+        self.enum_class_map: dict[str, str] = {}
+        self.inputtype_class_map: dict[str, str] = {}
+        self.object_class_map: dict[str, str] = {}
+        self.interface_reference_map: dict[str, str] = {}
+        self.interface_baseclass_map: dict[str, str] = {}
 
-        self.operation_class_map: Dict[str, str] = {}
-        self.fragment_class_map: Dict[str, str] = {}
-        self.query_class_map: Dict[str, str] = {}
-        self.subscription_class_map: Dict[str, str] = {}
-        self.mutation_class_map: Dict[str, str] = {}
+        self.operation_class_map: dict[str, str] = {}
+        self.fragment_class_map: dict[str, str] = {}
+        self.query_class_map: dict[str, str] = {}
+        self.subscription_class_map: dict[str, str] = {}
+        self.mutation_class_map: dict[str, str] = {}
 
-        self.registered_union_fragments: Dict[str, str] = {}
-        self.forward_references: Set[str] = set()
-        self.fragment_type_map: Dict[str, GraphQLNamedType] = {}
+        self.registered_union_fragments: dict[str, str] = {}
+        self.forward_references: set[str] = set()
+        self.fragment_type_map: dict[str, GraphQLNamedType] = {}
 
         # Maps for the interface fragments and union fragments
-        self.interfacefragments_impl_map: Dict[str, Dict[str, str]] = {}
-        self.unionfragment_members_map: Dict[str, Dict[str, str]] = {}
+        self.interfacefragments_impl_map: dict[str, dict[str, str]] = {}
+        self.unionfragment_members_map: dict[str, dict[str, str]] = {}
 
-        self.operation_single_operation_map: Dict[
+        self.operation_single_operation_map: dict[
             str, ast.AST
         ] = {}  # This is used to store the operation name and the root operation class name if single
 
         #: GraphQL typename -> the module another project already generated it into.
         #: Filled by :meth:`seed_external`, read on the resolved branch of
         #: ``reference_inputtype``/``reference_enum``.
-        self.external_module_map: Dict[str, str] = {}
+        self.external_module_map: dict[str, str] = {}
 
         #: GraphQL typename -> ``(name, annotation, value source)`` per ``class_fields`` entry
         #: that collected something for it. Filled by :meth:`seed_class_fields`.
-        self.class_field_map: Dict[str, List[tuple[str, str, str]]] = {}
+        self.class_field_map: dict[str, list[tuple[str, str, str]]] = {}
 
         self.log = log
 
@@ -356,8 +358,12 @@ class ClassRegistry(object):
                 )
 
     def directive_definition(
-        self, schema: GraphQLSchema, directive: str, argument: Optional[str], needs_sdl: bool = True
-    ) -> tuple[GraphQLDirective, Optional[GraphQLArgument]]:
+        self,
+        schema: GraphQLSchema,
+        directive: str,
+        argument: str | None,
+        needs_sdl: bool = True,
+    ) -> tuple[GraphQLDirective, GraphQLArgument | None]:
         """The directive and its argument a class field reads, refused when the schema cannot give them.
 
         Fails closed: a directive or an argument the schema does not declare is an error, and so
@@ -366,7 +372,9 @@ class ClassRegistry(object):
         """
         definition = schema.get_directive(directive)
         if definition is None:
-            raise RegistryError(f"class_fields: the schema declares no directive @{directive}")
+            raise RegistryError(
+                f"class_fields: the schema declares no directive @{directive}"
+            )
         if needs_sdl and definition.ast_node is None:
             raise RegistryError(
                 f"class_fields: @{directive} has no SDL definition, so its applications are "
@@ -376,7 +384,9 @@ class ClassRegistry(object):
             return definition, None
         found = definition.args.get(argument)
         if found is None:
-            raise RegistryError(f"class_fields: @{directive} has no argument {argument!r} (it has {sorted(definition.args)})")
+            raise RegistryError(
+                f"class_fields: @{directive} has no argument {argument!r} (it has {sorted(definition.args)})"
+            )
         return definition, found
 
     def seed_class_fields(self, schema: GraphQLSchema) -> None:
@@ -393,17 +403,25 @@ class ClassRegistry(object):
             collector = check_target(field, "type", "class_fields")
             collector.check(schema, self)
             for typename, definition in schema.type_map.items():
-                if typename.startswith("__") or getattr(definition, "ast_node", None) is None:
+                if (
+                    typename.startswith("__")
+                    or getattr(definition, "ast_node", None) is None
+                ):
                     continue
                 groups = collector.collect_type(schema, definition, self)
                 if not groups:
                     continue
-                if not isinstance(definition, (GraphQLObjectType, GraphQLInterfaceType, GraphQLInputObjectType)):
+                if not isinstance(
+                    definition,
+                    (GraphQLObjectType, GraphQLInterfaceType, GraphQLInputObjectType),
+                ):
                     raise RegistryError(
                         f"class_fields: {typename} would carry {field.name}, but a "
                         f"{type(definition).__name__} is generated as no class to stamp"
                     )
-                self.class_field_map.setdefault(typename, []).append(field.stamp(groups, schema, self))
+                self.class_field_map.setdefault(typename, []).append(
+                    field.stamp(groups, schema, self)
+                )
 
     def _literal_or(self, annotation: str, value: object) -> str:
         """``Literal[value]`` for a single string, integer or boolean, else ``annotation``.
@@ -431,7 +449,7 @@ class ClassRegistry(object):
                 f"{', '.join(name for name, _, _ in stamps)}, but {reason}"
             )
 
-    def class_fields_for(self, typename: str, body: List[ast.stmt]) -> List[ast.stmt]:
+    def class_fields_for(self, typename: str, body: list[ast.stmt]) -> list[ast.stmt]:
         """``body`` with the class variables ``typename``'s class fields stamp, after its docstring.
 
         Every site that builds a class *for a GraphQL type* passes its body through
@@ -446,7 +464,8 @@ class ClassRegistry(object):
         fields = {
             statement.target.id
             for statement in body
-            if isinstance(statement, ast.AnnAssign) and isinstance(statement.target, ast.Name)
+            if isinstance(statement, ast.AnnAssign)
+            and isinstance(statement.target, ast.Name)
         }
         for name, _, _ in stamps:
             if name in fields:
@@ -456,10 +475,12 @@ class ClassRegistry(object):
                 )
         return self.with_class_vars(body, stamps)
 
-    def with_class_vars(self, body: List[ast.stmt], stamps: List[tuple[str, str, str]]) -> List[ast.stmt]:
+    def with_class_vars(
+        self, body: list[ast.stmt], stamps: list[tuple[str, str, str]]
+    ) -> list[ast.stmt]:
         """``body`` with ``name: ClassVar[annotation] = value`` per stamp, right after its docstring."""
         self.register_import("typing.ClassVar")
-        statements: List[ast.stmt] = [
+        statements: list[ast.stmt] = [
             ast.AnnAssign(
                 target=ast.Name(id=name, ctx=ast.Store()),
                 annotation=ast.Subscript(
@@ -576,7 +597,6 @@ class ClassRegistry(object):
         the top of the generated module. Deduplicated via the builtins set."""
         self._builtins.add(typename)
 
-
     def reference_enum(
         self, typename: str, parent: str, allow_forward: bool = True
     ) -> ast.Constant | ast.Name:
@@ -635,7 +655,7 @@ class ClassRegistry(object):
         typename: str,
         parent: str,
         style_func: Callable[[str], str],
-        class_map: Dict[str, str],
+        class_map: dict[str, str],
         error_class: str,
         allow_forward: bool = True,
     ) -> ast.Name | ast.Constant:
@@ -703,7 +723,7 @@ class ClassRegistry(object):
         self.fragment_type_map[fragmentname] = typename
 
     def register_interface_fragment_implementations(
-        self, fragmentname: str, implementationMap: Dict[str, str]
+        self, fragmentname: str, implementationMap: dict[str, str]
     ):
         self.interfacefragments_impl_map[fragmentname] = implementationMap
 
@@ -711,7 +731,7 @@ class ClassRegistry(object):
         return self.interfacefragments_impl_map[fragmentname]
 
     def register_union_fragment_members(
-        self, fragmentname: str, membersMap: Dict[str, str]
+        self, fragmentname: str, membersMap: dict[str, str]
     ):
         self.unionfragment_members_map[fragmentname] = membersMap
 
@@ -735,7 +755,7 @@ class ClassRegistry(object):
 
     def get_interface_fragment_implementation_or_none(
         self, fragmentname: str, typename: str
-    ) -> Optional[str]:
+    ) -> str | None:
         """Resolve an interface fragment spread against a concrete object type.
 
         A fragment defined on an interface (e.g. ``fragment Layer on Layer``)
@@ -810,7 +830,6 @@ class ClassRegistry(object):
         self.query_class_map[typename] = classname
         return classname
 
-
     def style_mutation_class(self, typename: str):
         for styler in self.stylers:
             typename = styler.style_mutation_name(typename)
@@ -825,7 +844,6 @@ class ClassRegistry(object):
         classname = self.style_mutation_class(typename)
         self.mutation_class_map[typename] = classname
         return classname
-
 
     def style_subscription_class(self, typename: str):
         for styler in self.stylers:
@@ -842,7 +860,6 @@ class ClassRegistry(object):
         self.subscription_class_map[typename] = classname
         return classname
 
-
     def register_import(self, name: str) -> None:
         if name in ("bool", "str", "int", "float", "dict", "list", "tuple"):
             return
@@ -855,15 +872,15 @@ class ClassRegistry(object):
         self._imports.discard(name)
 
     @property
-    def registered_imports(self) -> Set[str]:
+    def registered_imports(self) -> set[str]:
         return set(self._imports)
 
-    def generate_imports(self) -> List[ast.AST]:
+    def generate_imports(self) -> list[ast.AST]:
         """Generate the imports for the generated code. This is used to generate the"""
-        imports: List[ast.AST] = []
+        imports: list[ast.AST] = []
 
-        lone_top_imports: Set[str] = set()
-        top_level: Dict[str, Set[str]] = {}
+        lone_top_imports: set[str] = set()
+        top_level: dict[str, set[str]] = {}
         for name in self._imports:
             if "." not in name:
                 lone_top_imports.add(name)
@@ -883,14 +900,17 @@ class ClassRegistry(object):
             imports.append(
                 ast.ImportFrom(
                     module=top_level_name,
-                    names=[ast.alias(name=name) for name in sorted(top_level[top_level_name])],
+                    names=[
+                        ast.alias(name=name)
+                        for name in sorted(top_level[top_level_name])
+                    ],
                     level=0,
                 )
             )
 
         return imports
 
-    def generate_builtins(self) -> List[ast.AST]:
+    def generate_builtins(self) -> list[ast.AST]:
         """Generate the builtins for the generated code. This is used to generate the"""
         builtins: list[ast.AST] = []
 
@@ -904,7 +924,7 @@ class ClassRegistry(object):
 
         return builtins
 
-    def generate_forward_refs(self) -> List[ast.AST]:
+    def generate_forward_refs(self) -> list[ast.AST]:
         tree: list[ast.AST] = []
 
         for reference in sorted(self.forward_references):
@@ -1048,7 +1068,9 @@ def _directive_argument_value(application, name: str, argument) -> object:  # no
     """
     from turms.schema_lookup import get_default_value
 
-    node = next((a.value for a in application.arguments or () if a.name.value == name), None)
+    node = next(
+        (a.value for a in application.arguments or () if a.name.value == name), None
+    )
     if node is None:
         value = get_default_value(argument)
         if value is Undefined:

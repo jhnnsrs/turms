@@ -1,10 +1,12 @@
 from pydantic import Field
+
 from turms.stylers.base import BaseStyler, StylerConfig
 from turms.utils import capitalize_first
 
 
 class CapitalizeStylerConfig(StylerConfig):
     type: str = "turms.stylers.capitalize.CapitalizeStyler"
+
 
 class CapitalizeStyler(BaseStyler):
     """A styler that capitalizes the first letter of the python class names."""

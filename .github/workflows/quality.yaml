@@ -1,0 +1,19 @@
+name: Quality
+
+# The arkitekt Python standard: ruff lint, ruff format and basedpyright (against
+# .basedpyright/baseline.json), all required. Owned by arkitektio/.github
+# (python/sync_quality.py writes this file); the settings are ruff.toml and
+# pyrightconfig.json, which extend the shared ones.
+
+on:
+  push:
+    branches: [main, next]
+  pull_request:
+    branches: [main, next]
+  workflow_dispatch: {}
+
+jobs:
+  quality:
+    uses: arkitektio/.github/.github/workflows/python-quality.yml@main
+    with:
+      python-version: "3.12"

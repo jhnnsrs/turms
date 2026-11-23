@@ -3,20 +3,20 @@ from __future__ import annotations
 import ast
 import logging
 import re
-from typing import Any, List, Optional, Tuple
-
+from typing import Any
 
 from graphql import (
     FragmentSpreadNode,
     GraphQLInputObjectType,
     GraphQLInputType,
+    GraphQLList,
+    GraphQLNonNull,
     GraphQLObjectType,
+    GraphQLScalarType,
+    GraphQLSchema,
     NamedTypeNode,
     VariableNode,
     get_named_type,
-)
-from graphql.type.definition import (
-    GraphQLEnumType,
 )
 from graphql.language.ast import (
     FieldNode,
@@ -25,14 +25,20 @@ from graphql.language.ast import (
     OperationType,
     TypeNode,
 )
-from graphql import GraphQLSchema
-from turms.schema_lookup import get_operation_root_type, input_field_is_required
-from turms.schema_lookup import get_field_def
+from graphql.type.definition import (
+    GraphQLEnumType,
+)
 from pydantic import BaseModel, Field
 from pydantic_settings import SettingsConfigDict
+
 from turms.config import GeneratorConfig, PythonType
 from turms.plugins.base import Plugin, PluginConfig
 from turms.registry import ClassRegistry
+from turms.schema_lookup import (
+    get_field_def,
+    get_operation_root_type,
+    input_field_is_required,
+)
 from turms.utils import (
     capitalize_first,
     inspect_operation_for_documentation,
@@ -44,11 +50,6 @@ from turms.utils import (
     recurse_type_annotation,
     recurse_type_label,
     target_from_node,
-)
-from graphql import (
-    GraphQLList,
-    GraphQLNonNull,
-    GraphQLScalarType,
 )
 
 logger = logging.getLogger(__name__)
@@ -70,8 +71,8 @@ class Arg(BaseModel):
 class OperationExtras(BaseModel):
     """Extra parameters a generated function takes and forwards on the call."""
 
-    extra_args: List[Arg] = []
-    extra_kwargs: List[Kwarg] = []
+    extra_args: list[Arg] = []
+    extra_kwargs: list[Kwarg] = []
 
 
 NO_EXTRAS = OperationExtras()
@@ -93,10 +94,10 @@ class OperationFuncsConfig(PluginConfig):
     prepend_sync: str = ""
     prepend_async: str = "a"
     collapse_lonely: bool = True
-    global_args: List[Arg] = []
-    global_kwargs: List[Kwarg] = []
+    global_args: list[Arg] = []
+    global_kwargs: list[Kwarg] = []
     extract_documentation: bool = True
-    expand_input_types: List[str] = []
+    expand_input_types: list[str] = []
     coercible_scalars: dict[str, PythonType] = {}
     coercible_inputs: dict[str, PythonType] = {}
     """Map of input type names to an additional python type accepted in generated
@@ -108,8 +109,8 @@ class OperationFuncsConfig(PluginConfig):
 class FuncsPluginConfig(OperationFuncsConfig):
     model_config = SettingsConfigDict(extra="forbid", env_prefix="TURMS_PLUGINS_FUNCS_")
     type: str = "turms.plugins.funcs.FuncsPlugin"
-    funcs_glob: Optional[str] = None
-    definitions: List[FunctionDefinition] = []
+    funcs_glob: str | None = None
+    definitions: list[FunctionDefinition] = []
 
 
 def camel_to_snake(name: str) -> str:
@@ -142,7 +143,7 @@ def generate_sync_func_name(
 def get_extra_args_for_onode(
     definition: OperationExtras,
     plugin_config: OperationFuncsConfig,
-) -> List[Arg]:
+) -> list[Arg]:
     args = plugin_config.global_args
     return args + definition.extra_args
 
@@ -168,7 +169,7 @@ def generate_passing_extra_kwargs_for_onode(
 def get_extra_kwargs_for_onode(
     definition: OperationExtras,
     plugin_config: OperationFuncsConfig,
-) -> List[Kwarg]:
+) -> list[Kwarg]:
     kwargs = plugin_config.global_kwargs
 
     return kwargs + definition.extra_kwargs
@@ -177,7 +178,7 @@ def get_extra_kwargs_for_onode(
 def get_definitions_for_onode(
     operation_definition: OperationDefinitionNode,
     plugin_config: FuncsPluginConfig,
-) -> List[FunctionDefinition]:
+) -> list[FunctionDefinition]:
     """Checks the Plugin Config if the operation definition should be included
     in the generated functions
 
@@ -696,9 +697,7 @@ def generate_variable_assignments(
             param_value = ast.Name(id=param, ctx=ast.Load())
             if is_required:
                 # required positional argument → always present
-                stmts.append(
-                    ast.Assign(targets=[outer_subscript], value=param_value)
-                )
+                stmts.append(ast.Assign(targets=[outer_subscript], value=param_value))
             else:
                 stmts.append(
                     _guarded_variable_assign(
@@ -778,11 +777,9 @@ def get_return_type_annotation(
             if isinstance(
                 collapsable_fragment_field, FragmentSpreadNode
             ):  # Dealing with a on element fragment
-                implementation = (
-                    registry.get_interface_fragment_implementation_or_none(
-                        collapsable_fragment_field.name.value,
-                        get_named_type(field_definition.type).name,
-                    )
+                implementation = registry.get_interface_fragment_implementation_or_none(
+                    collapsable_fragment_field.name.value,
+                    get_named_type(field_definition.type).name,
                 )
                 overwrite_final = (
                     implementation
@@ -820,7 +817,7 @@ def get_return_type_string(
     client_schema: GraphQLSchema,
     registry: ClassRegistry,
     collapse=True,
-) -> Tuple[str, bool]:
+) -> tuple[str, bool]:
     o_name = get_operation_class_name(o, registry)
 
     root = get_operation_root_type(client_schema, o)
@@ -842,11 +839,9 @@ def get_return_type_string(
             if isinstance(
                 collapsable_fragment_field, FragmentSpreadNode
             ):  # Dealing with a on element fragment
-                implementation = (
-                    registry.get_interface_fragment_implementation_or_none(
-                        collapsable_fragment_field.name.value,
-                        get_named_type(potential_return_type.type).name,
-                    )
+                implementation = registry.get_interface_fragment_implementation_or_none(
+                    collapsable_fragment_field.name.value,
+                    get_named_type(potential_return_type.type).name,
                 )
                 overwrite_final = (
                     implementation
@@ -1425,7 +1420,7 @@ class FuncsPlugin(Plugin):
         client_schema: GraphQLSchema,
         config: GeneratorConfig,
         registry: ClassRegistry,
-    ) -> List[ast.AST]:
+    ) -> list[ast.AST]:
         plugin_tree = []
 
         # Merge the global coercible_scalars/coercible_inputs with this plugin's

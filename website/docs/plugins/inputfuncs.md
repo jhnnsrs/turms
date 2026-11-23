@@ -27,6 +27,7 @@ fields as keyword arguments:
 #   input UserInput { name: String!  age: Int  address: AddressInput  tags: [String!] }
 #   input AddressInput { street: String!  zip: String }
 
+
 def user_input(
     name: str,
     age: Union[Optional[int], UnsetType] = UNSET,
@@ -35,13 +36,13 @@ def user_input(
 ) -> UserInput:
     "Creates a UserInput ..."
     data: Dict[str, Any] = {}
-    data['name'] = name
+    data["name"] = name
     if age is not UNSET:
-        data['age'] = age
+        data["age"] = age
     if address is not UNSET:
-        data['address'] = address
+        data["address"] = address
     if tags is not UNSET:
-        data['tags'] = tags
+        data["tags"] = tags
     return UserInput(**data)
 ```
 

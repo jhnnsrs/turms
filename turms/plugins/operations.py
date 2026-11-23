@@ -1,22 +1,22 @@
 import ast
-from typing import Any, List, Optional
+import logging
+import re
+from typing import Any
 
-from pydantic_settings import SettingsConfigDict
-from turms.config import GeneratorConfig
-from graphql import GraphQLSchema
-from graphql.language.ast import OperationDefinitionNode, OperationType
-from turms.recurse import type_field_node
-from turms.plugins.base import Plugin, PluginConfig
-from pydantic import Field, model_validator
+from graphql import GraphQLSchema, NonNullTypeNode, language
 from graphql.language.ast import (
     FieldNode,
+    OperationDefinitionNode,
+    OperationType,
 )
-from turms.schema_lookup import get_operation_root_type
-from turms.schema_lookup import get_field_def
+from pydantic import Field, model_validator
+from pydantic_settings import SettingsConfigDict
 
-import re
-from graphql import NonNullTypeNode, language
+from turms.config import GeneratorConfig
+from turms.plugins.base import Plugin, PluginConfig
+from turms.recurse import type_field_node
 from turms.registry import ClassRegistry
+from turms.schema_lookup import get_field_def, get_operation_root_type
 from turms.utils import (
     annotate_field_metadata,
     generate_alias_keywords,
@@ -31,8 +31,6 @@ from turms.utils import (
     recurse_type_annotation,
     replace_iteratively,
 )
-import logging
-
 
 logger = logging.getLogger(__name__)
 fragment_searcher = re.compile(r"\.\.\.(?P<fragment>[a-zA-Z]*)")
@@ -41,11 +39,11 @@ fragment_searcher = re.compile(r"\.\.\.(?P<fragment>[a-zA-Z]*)")
 class OperationsPluginConfig(PluginConfig):
     model_config = SettingsConfigDict(env_prefix="TURMS_PLUGINS_OPERATIONS_")
     type: str = "turms.plugins.operations.OperationsPlugin"
-    query_bases: List[str] = []
-    arguments_bases: List[str] = []
-    mutation_bases: List[str] = []
-    subscription_bases: List[str] = []
-    operations_glob: Optional[str] = None
+    query_bases: list[str] = []
+    arguments_bases: list[str] = []
+    mutation_bases: list[str] = []
+    subscription_bases: list[str] = []
+    operations_glob: str | None = None
     create_arguments: bool = True
     extract_documentation: bool = True
     arguments_populate_by_name: bool = False
@@ -60,7 +58,10 @@ class OperationsPluginConfig(PluginConfig):
         on a ``BaseSettings`` field replaces the ``TURMS_PLUGINS_OPERATIONS_``
         env-var lookup instead of adding to it.
         """
-        if isinstance(values, dict) and "arguments_allow_population_by_field_name" in values:
+        if (
+            isinstance(values, dict)
+            and "arguments_allow_population_by_field_name" in values
+        ):
             values.setdefault(
                 "arguments_populate_by_name",
                 values.pop("arguments_allow_population_by_field_name"),
@@ -150,7 +151,7 @@ def get_arguments_bases(
     config: GeneratorConfig,
     plugin_config: OperationsPluginConfig,
     registry: ClassRegistry,
-) -> List[ast.Name]:
+) -> list[ast.Name]:
     if plugin_config.arguments_bases:
         for base in plugin_config.arguments_bases:
             registry.register_import(base)
@@ -476,7 +477,7 @@ class OperationsPlugin(Plugin):
         client_schema: GraphQLSchema,
         config: GeneratorConfig,
         registry: ClassRegistry,
-    ) -> List[ast.AST]:
+    ) -> list[ast.AST]:
         plugin_tree = []
 
         glob = self.config.operations_glob or config.documents

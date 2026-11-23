@@ -1,6 +1,7 @@
-from watchfiles.filters import BaseFilter
-from watchfiles import Change, watch
 import os
+
+from watchfiles import Change, watch
+from watchfiles.filters import BaseFilter
 
 
 class GraphQLFilter(BaseFilter):  # pragma: no cover

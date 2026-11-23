@@ -1,10 +1,12 @@
 import pytest
+from graphql import build_client_schema
+from pydantic import BaseModel
+
 from turms.errors import GenerationError
 from turms.helpers import load_introspection_from_url
-from turms.run import build_schema_from_schema_type, SchemaType
-from graphql import build_client_schema
+from turms.run import SchemaType, build_schema_from_schema_type
+
 from .utils import build_relative_glob
-from pydantic import BaseModel
 
 
 class Schema(BaseModel):

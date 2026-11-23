@@ -1,22 +1,21 @@
-
-from .utils import build_relative_glob, unit_test_with
 from graphql import OperationDefinitionNode, Source, parse
 
-from turms.utils import inspect_operation_for_documentation
 from turms.config import GeneratorConfig
-from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
-from turms.plugins.inputs import InputsPlugin
 from turms.plugins.fragments import FragmentsPlugin
-from turms.plugins.operations import OperationsPlugin
 from turms.plugins.funcs import (
-    FunctionDefinition,
     FuncsPlugin,
     FuncsPluginConfig,
+    FunctionDefinition,
 )
-from turms.stylers.snake_case import SnakeCaseStyler
-from turms.stylers.capitalize import CapitalizeStyler
+from turms.plugins.inputs import InputsPlugin
+from turms.plugins.operations import OperationsPlugin
 from turms.run import generate_ast
+from turms.stylers.capitalize import CapitalizeStyler
+from turms.stylers.snake_case import SnakeCaseStyler
+from turms.utils import inspect_operation_for_documentation
+
+from .utils import build_relative_glob, unit_test_with
 
 
 def test_documentatoin(nested_input_schema):

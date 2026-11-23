@@ -6,33 +6,33 @@ defaults from ``default_value`` to ``default`` (a ``GraphQLDefaultInput``). Thes
 turms's own versions, so the rest of turms works against either.
 """
 
-from typing import Any, Dict, Iterator, Optional, cast
+from collections.abc import Iterator
+from typing import Any, cast
 
 from graphql import (
-    GraphQLArgument,
-    GraphQLInputField,
-    coerce_input_value,
-    value_from_ast,
     FieldNode,
     FragmentDefinitionNode,
     FragmentSpreadNode,
+    GraphQLArgument,
     GraphQLError,
-    InlineFragmentNode,
-    SelectionSetNode,
     GraphQLField,
+    GraphQLInputField,
     GraphQLInterfaceType,
     GraphQLObjectType,
     GraphQLSchema,
     GraphQLType,
+    InlineFragmentNode,
     OperationDefinitionNode,
     SchemaMetaFieldDef,
+    SelectionSetNode,
     TypeMetaFieldDef,
     TypeNameMetaFieldDef,
+    coerce_input_value,
     is_composite_type,
     is_interface_type,
     is_object_type,
+    value_from_ast,
 )
-
 
 try:
     from graphql import coerce_input_literal as _coerce_literal
@@ -42,7 +42,7 @@ except ImportError:  # graphql-core 3.2, where value_from_ast fills nested defau
 
 def get_field_def(
     schema: GraphQLSchema, parent_type: GraphQLType, field_node: FieldNode
-) -> Optional[GraphQLField]:
+) -> GraphQLField | None:
     """The definition of the field ``field_node`` selects on ``parent_type``.
 
     Resolves the introspection meta fields as well. ``None`` when the parent type
@@ -97,7 +97,7 @@ def get_default_value(input_value: GraphQLArgument | GraphQLInputField) -> Any: 
 
 def root_field_nodes(
     selection_set: SelectionSetNode,
-    fragments: Dict[str, FragmentDefinitionNode],
+    fragments: dict[str, FragmentDefinitionNode],
     seen: frozenset[str] = frozenset(),
 ) -> Iterator[FieldNode]:
     """The fields an operation selects on its root type, through fragments spread or inlined on it."""
@@ -110,7 +110,9 @@ def root_field_nodes(
             name = selection.name.value
             if name in seen or name not in fragments:
                 continue
-            yield from root_field_nodes(fragments[name].selection_set, fragments, seen | {name})
+            yield from root_field_nodes(
+                fragments[name].selection_set, fragments, seen | {name}
+            )
 
 
 def input_field_is_required(field: GraphQLInputField) -> bool:
@@ -121,4 +123,6 @@ def input_field_is_required(field: GraphQLInputField) -> bool:
     """
     from graphql import GraphQLNonNull, Undefined
 
-    return isinstance(field.type, GraphQLNonNull) and get_default_value(field) is Undefined
+    return (
+        isinstance(field.type, GraphQLNonNull) and get_default_value(field) is Undefined
+    )

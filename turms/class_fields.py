@@ -40,7 +40,13 @@ from __future__ import annotations
 import ast
 import keyword
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, Iterator, List, Literal, Optional, Sequence, Tuple
+from collections.abc import Callable, Iterator, Sequence
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Literal,
+)
 
 from graphql import (
     DirectiveNode,
@@ -51,7 +57,13 @@ from graphql import (
     OperationDefinitionNode,
     get_named_type,
 )
-from pydantic import BaseModel, ConfigDict, PrivateAttr, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    PrivateAttr,
+    field_validator,
+    model_validator,
+)
 
 from turms.errors import GenerationError, RegistryError
 from turms.helpers import import_string
@@ -60,7 +72,7 @@ if TYPE_CHECKING:
     from turms.registry import ClassRegistry
 
 #: One tuple of values per directive application (a type collector) or per operation.
-Groups = List[Tuple[object, ...]]
+Groups = list[tuple[object, ...]]
 Combine = Callable[[Groups], object]
 Target = Literal["type", "operation"]
 
@@ -68,8 +80,11 @@ Target = Literal["type", "operation"]
 # --- combines -----------------------------------------------------------------------------
 
 
-def _sort_key(value: object) -> Tuple[str, object]:
-    return (type(value).__name__, value if isinstance(value, (str, int, float, bool)) else repr(value))
+def _sort_key(value: object) -> tuple[str, object]:
+    return (
+        type(value).__name__,
+        value if isinstance(value, (str, int, float, bool)) else repr(value),
+    )
 
 
 def first(groups: Groups) -> object:
@@ -77,22 +92,22 @@ def first(groups: Groups) -> object:
     return groups[0][0]
 
 
-def all_values(groups: Groups) -> Tuple[object, ...]:
+def all_values(groups: Groups) -> tuple[object, ...]:
     """Every value, in order, duplicates kept."""
     return tuple(value for group in groups for value in group)
 
 
-def ordered(groups: Groups) -> Tuple[object, ...]:
+def ordered(groups: Groups) -> tuple[object, ...]:
     """Every value once, the first seen first."""
     return tuple(dict.fromkeys(all_values(groups)))
 
 
-def union(groups: Groups) -> Tuple[object, ...]:
+def union(groups: Groups) -> tuple[object, ...]:
     """Every value once, sorted."""
     return tuple(sorted(set(all_values(groups)), key=_sort_key))
 
 
-def intersection(groups: Groups) -> Tuple[object, ...]:
+def intersection(groups: Groups) -> tuple[object, ...]:
     """The values every group holds, sorted."""
     if not groups:
         return ()
@@ -101,7 +116,7 @@ def intersection(groups: Groups) -> Tuple[object, ...]:
 
 
 #: The combines a field can name, and whether each gives a scalar or a tuple.
-COMBINES: Dict[str, Tuple[Combine, bool]] = {
+COMBINES: dict[str, tuple[Combine, bool]] = {
     "first": (first, False),
     "all": (all_values, True),
     "ordered": (ordered, True),
@@ -123,18 +138,23 @@ class Collector(BaseModel):
     target: ClassVar[Target]
 
     @abstractmethod
-    def check(self, schema: GraphQLSchema, registry: "ClassRegistry") -> None:
+    def check(self, schema: GraphQLSchema, registry: ClassRegistry) -> None:
         """Refuse a schema this collector cannot read."""
 
     @abstractmethod
-    def element_annotation(self, schema: GraphQLSchema, registry: "ClassRegistry") -> str:
+    def element_annotation(self, schema: GraphQLSchema, registry: ClassRegistry) -> str:
         """The annotation of one value it collects."""
 
     @abstractmethod
     def default_combine(self, schema: GraphQLSchema) -> str:
         """The combine a field uses when it names none."""
 
-    def collect_type(self, schema: GraphQLSchema, definition: GraphQLNamedType, registry: "ClassRegistry") -> Groups:
+    def collect_type(
+        self,
+        schema: GraphQLSchema,
+        definition: GraphQLNamedType,
+        registry: ClassRegistry,
+    ) -> Groups:
         """The groups ``definition`` contributes; empty when it says nothing."""
         raise NotImplementedError(f"{self.type} collects per operation, not per type")
 
@@ -142,9 +162,9 @@ class Collector(BaseModel):
         self,
         schema: GraphQLSchema,
         operation: OperationDefinitionNode,
-        fragments: Dict[str, FragmentDefinitionNode],
-        registry: "ClassRegistry",
-    ) -> Tuple[object, ...]:
+        fragments: dict[str, FragmentDefinitionNode],
+        registry: ClassRegistry,
+    ) -> tuple[object, ...]:
         """The values one operation contributes."""
         raise NotImplementedError(f"{self.type} collects per type, not per operation")
 
@@ -162,20 +182,30 @@ def _values_of(value: object) -> Iterator[object]:
 class _DirectiveCollector(Collector):
     directive: str
     """The directive's name, without ``@``."""
-    argument: Optional[str] = None
+    argument: str | None = None
     """The argument whose value is collected; ``None`` collects ``True`` for presence."""
 
     #: Whether the applications it reads live in the schema (and so need its SDL).
     reads_schema: ClassVar[bool] = True
 
-    def _argument(self, schema: GraphQLSchema, registry: "ClassRegistry") -> Optional[GraphQLArgument]:
-        return registry.directive_definition(schema, self.directive, self.argument, needs_sdl=self.reads_schema)[1]
+    def _argument(
+        self, schema: GraphQLSchema, registry: ClassRegistry
+    ) -> GraphQLArgument | None:
+        return registry.directive_definition(
+            schema, self.directive, self.argument, needs_sdl=self.reads_schema
+        )[1]
 
-    def check(self, schema: GraphQLSchema, registry: "ClassRegistry") -> None:
+    def check(self, schema: GraphQLSchema, registry: ClassRegistry) -> None:
         self._argument(schema, registry)
 
-    def _applications(self, directives: Optional[Sequence[DirectiveNode]]) -> List[DirectiveNode]:
-        return [application for application in directives or () if application.name.value == self.directive]
+    def _applications(
+        self, directives: Sequence[DirectiveNode] | None
+    ) -> list[DirectiveNode]:
+        return [
+            application
+            for application in directives or ()
+            if application.name.value == self.directive
+        ]
 
 
 class TypeDirectiveCollector(_DirectiveCollector):
@@ -185,17 +215,26 @@ class TypeDirectiveCollector(_DirectiveCollector):
     type: str = "type_directive"
     target: ClassVar[Target] = "type"
 
-    def element_annotation(self, schema: GraphQLSchema, registry: "ClassRegistry") -> str:
+    def element_annotation(self, schema: GraphQLSchema, registry: ClassRegistry) -> str:
         from turms.registry import _class_var_annotation
 
         argument = self._argument(schema, registry)
-        return _class_var_annotation(argument.type, registry) if argument is not None else "bool"
+        return (
+            _class_var_annotation(argument.type, registry)
+            if argument is not None
+            else "bool"
+        )
 
     def default_combine(self, schema: GraphQLSchema) -> str:
         directive = schema.get_directive(self.directive)
         return "all" if directive is not None and directive.is_repeatable else "first"
 
-    def collect_type(self, schema: GraphQLSchema, definition: GraphQLNamedType, registry: "ClassRegistry") -> Groups:
+    def collect_type(
+        self,
+        schema: GraphQLSchema,
+        definition: GraphQLNamedType,
+        registry: ClassRegistry,
+    ) -> Groups:
         from turms.registry import _directive_argument_value
 
         node = definition.ast_node
@@ -204,8 +243,14 @@ class TypeDirectiveCollector(_DirectiveCollector):
         argument = self._argument(schema, registry)
         nodes = [node, *(definition.extension_ast_nodes or ())]
         groups: Groups = []
-        for application in (a for n in nodes for a in self._applications(getattr(n, "directives", None))):
-            value = _directive_argument_value(application, self.argument, argument) if self.argument is not None and argument is not None else True
+        for application in (
+            a for n in nodes for a in self._applications(getattr(n, "directives", None))
+        ):
+            value = (
+                _directive_argument_value(application, self.argument, argument)
+                if self.argument is not None and argument is not None
+                else True
+            )
             groups.append((value,))
         return groups
 
@@ -220,13 +265,16 @@ class RootFieldDirectiveCollector(_DirectiveCollector):
     argument: str
     required: bool = True
 
-    def element_annotation(self, schema: GraphQLSchema, registry: "ClassRegistry") -> str:
-        from turms.registry import _class_var_annotation
+    def element_annotation(self, schema: GraphQLSchema, registry: ClassRegistry) -> str:
         from graphql import GraphQLNonNull
+
+        from turms.registry import _class_var_annotation
 
         argument = self._argument(schema, registry)
         assert argument is not None
-        return _class_var_annotation(GraphQLNonNull(get_named_type(argument.type)), registry)
+        return _class_var_annotation(
+            GraphQLNonNull(get_named_type(argument.type)), registry
+        )
 
     def default_combine(self, schema: GraphQLSchema) -> str:
         return "union"
@@ -235,15 +283,15 @@ class RootFieldDirectiveCollector(_DirectiveCollector):
         self,
         schema: GraphQLSchema,
         operation: OperationDefinitionNode,
-        fragments: Dict[str, FragmentDefinitionNode],
-        registry: "ClassRegistry",
-    ) -> Tuple[object, ...]:
+        fragments: dict[str, FragmentDefinitionNode],
+        registry: ClassRegistry,
+    ) -> tuple[object, ...]:
         from turms.schema_lookup import get_operation_root_type, root_field_nodes
 
         argument = self._argument(schema, registry)
         assert argument is not None
         root = get_operation_root_type(schema, operation)
-        values: List[object] = []
+        values: list[object] = []
         for field_node in root_field_nodes(operation.selection_set, fragments):
             name = field_node.name.value
             field = root.fields.get(name)
@@ -251,13 +299,29 @@ class RootFieldDirectiveCollector(_DirectiveCollector):
                 continue  # __typename
             giving = [
                 application
-                for application in self._applications(field.ast_node.directives if field.ast_node is not None else None)
-                if any(a.name.value == self.argument for a in application.arguments or ())
+                for application in self._applications(
+                    field.ast_node.directives if field.ast_node is not None else None
+                )
+                if any(
+                    a.name.value == self.argument for a in application.arguments or ()
+                )
             ]
             if not giving and self.required:
-                where = f"operation {operation.name.value}" if operation.name else "an anonymous operation"
-                raise GenerationError(f"client_fields: {root.name}.{name} ({where}) gives no @{self.directive}({self.argument}: ...)")
-            values.extend(value for application in giving for value in _values_of(_directive_value(application, self.argument, argument)))
+                where = (
+                    f"operation {operation.name.value}"
+                    if operation.name
+                    else "an anonymous operation"
+                )
+                raise GenerationError(
+                    f"client_fields: {root.name}.{name} ({where}) gives no @{self.directive}({self.argument}: ...)"
+                )
+            values.extend(
+                value
+                for application in giving
+                for value in _values_of(
+                    _directive_value(application, self.argument, argument)
+                )
+            )
         return tuple(values)
 
 
@@ -271,13 +335,16 @@ class OperationDirectiveCollector(_DirectiveCollector):
     required: bool = False
     reads_schema: ClassVar[bool] = False
 
-    def element_annotation(self, schema: GraphQLSchema, registry: "ClassRegistry") -> str:
-        from turms.registry import _class_var_annotation
+    def element_annotation(self, schema: GraphQLSchema, registry: ClassRegistry) -> str:
         from graphql import GraphQLNonNull
+
+        from turms.registry import _class_var_annotation
 
         argument = self._argument(schema, registry)
         assert argument is not None
-        return _class_var_annotation(GraphQLNonNull(get_named_type(argument.type)), registry)
+        return _class_var_annotation(
+            GraphQLNonNull(get_named_type(argument.type)), registry
+        )
 
     def default_combine(self, schema: GraphQLSchema) -> str:
         return "union"
@@ -286,26 +353,36 @@ class OperationDirectiveCollector(_DirectiveCollector):
         self,
         schema: GraphQLSchema,
         operation: OperationDefinitionNode,
-        fragments: Dict[str, FragmentDefinitionNode],
-        registry: "ClassRegistry",
-    ) -> Tuple[object, ...]:
+        fragments: dict[str, FragmentDefinitionNode],
+        registry: ClassRegistry,
+    ) -> tuple[object, ...]:
         argument = self._argument(schema, registry)
         assert argument is not None
         applications = self._applications(operation.directives)
         if not applications and self.required:
             where = operation.name.value if operation.name else "an anonymous operation"
-            raise GenerationError(f"client_fields: {where} gives no @{self.directive}({self.argument}: ...)")
-        return tuple(value for application in applications for value in _values_of(_directive_value(application, self.argument, argument)))
+            raise GenerationError(
+                f"client_fields: {where} gives no @{self.directive}({self.argument}: ...)"
+            )
+        return tuple(
+            value
+            for application in applications
+            for value in _values_of(
+                _directive_value(application, self.argument, argument)
+            )
+        )
 
 
-def _directive_value(application: DirectiveNode, name: str, argument: GraphQLArgument) -> object:
+def _directive_value(
+    application: DirectiveNode, name: str, argument: GraphQLArgument
+) -> object:
     from turms.registry import _directive_argument_value
 
     return _directive_argument_value(application, name, argument)
 
 
 #: The collectors a field can name by a short ``type``; any other is a dotted path.
-COLLECTORS: Dict[str, type] = {
+COLLECTORS: dict[str, type] = {
     "type_directive": TypeDirectiveCollector,
     "root_field_directive": RootFieldDirectiveCollector,
     "operation_directive": OperationDirectiveCollector,
@@ -315,7 +392,17 @@ COLLECTORS: Dict[str, type] = {
 # --- the field ----------------------------------------------------------------------------
 
 #: The names of ``typing`` a kind may use, and so the module they are imported from.
-_TYPING_NAMES = {"Any", "Dict", "FrozenSet", "List", "Literal", "Optional", "Set", "Tuple", "Union"}
+_TYPING_NAMES = {
+    "Any",
+    "Dict",
+    "FrozenSet",
+    "List",
+    "Literal",
+    "Optional",
+    "Set",
+    "Tuple",
+    "Union",
+}
 _LISTS = {"list", "List"}
 _TUPLES = {"tuple", "Tuple"}
 _SETS = {"set", "Set", "frozenset", "FrozenSet"}
@@ -334,13 +421,13 @@ class ClassField(BaseModel):
 
     name: str
     """The class variable's name. A dunder (``__identifier__``) never meets a field."""
-    kind: Optional[str] = None
+    kind: str | None = None
     """Its annotation (``tuple[str, ...]``); inferred from the collector and the combine when unset."""
-    collector: Dict[str, Any]
+    collector: dict[str, Any]
     """What collects its values: ``type`` names a built-in (``type_directive``,
     ``root_field_directive``, ``operation_directive``) or a dotted path to a ``Collector``; the
     other keys are that collector's."""
-    combine: Optional[str] = None
+    combine: str | None = None
     """How the collected values become one: ``first``, ``all``, ``ordered``, ``union``,
     ``intersection``, or a dotted path. Unset: the collector's own default."""
 
@@ -355,7 +442,7 @@ class ClassField(BaseModel):
 
     @field_validator("kind")
     @classmethod
-    def _is_an_annotation(cls, value: Optional[str]) -> Optional[str]:
+    def _is_an_annotation(cls, value: str | None) -> str | None:
         if value is not None:
             try:
                 ast.parse(value, mode="eval")
@@ -364,49 +451,71 @@ class ClassField(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def _build(self) -> "ClassField":
+    def _build(self) -> ClassField:
         spec = dict(self.collector)
         kind = spec.get("type")
         if not isinstance(kind, str):
-            raise ValueError("a collector says its `type`: a built-in name or a dotted path")
+            raise ValueError(
+                "a collector says its `type`: a built-in name or a dotted path"
+            )
         collector_class = COLLECTORS.get(kind) or import_string(kind)
-        if not (isinstance(collector_class, type) and issubclass(collector_class, Collector)):
+        if not (
+            isinstance(collector_class, type) and issubclass(collector_class, Collector)
+        ):
             raise ValueError(f"{kind!r} is not a Collector")
         self._collector = collector_class.model_validate(spec)
 
-        if self.combine is not None and self.combine not in COMBINES and self.kind is None:
-            raise ValueError(f"{self.name}: a combine of your own ({self.combine}) needs the field's `kind`")
+        if (
+            self.combine is not None
+            and self.combine not in COMBINES
+            and self.kind is None
+        ):
+            raise ValueError(
+                f"{self.name}: a combine of your own ({self.combine}) needs the field's `kind`"
+            )
         if self.combine in COMBINES and self.kind is not None:
             sequence = COMBINES[self.combine][1]
             outer = _outer(ast.parse(self.kind, mode="eval").body)
             if sequence and outer not in _LISTS | _TUPLES | _SETS:
-                raise ValueError(f"{self.name}: `{self.combine}` gives several values, but the kind {self.kind} holds one")
+                raise ValueError(
+                    f"{self.name}: `{self.combine}` gives several values, but the kind {self.kind} holds one"
+                )
             if not sequence and outer in _LISTS | _TUPLES | _SETS:
-                raise ValueError(f"{self.name}: `{self.combine}` gives one value, but the kind {self.kind} holds several")
+                raise ValueError(
+                    f"{self.name}: `{self.combine}` gives one value, but the kind {self.kind} holds several"
+                )
         return self
 
     @property
     def collector_instance(self) -> Collector:
         return self._collector
 
-    def combine_function(self, schema: GraphQLSchema) -> Tuple[Combine, Optional[bool]]:
+    def combine_function(self, schema: GraphQLSchema) -> tuple[Combine, bool | None]:
         """The combine to use, and whether it gives a tuple (``None``: one of your own)."""
         name = self.combine or self._collector.default_combine(schema)
         if name in COMBINES:
             return COMBINES[name]
         return import_string(name), None
 
-    def stamp(self, groups: Groups, schema: GraphQLSchema, registry: "ClassRegistry") -> Tuple[str, str, str]:
+    def stamp(
+        self, groups: Groups, schema: GraphQLSchema, registry: ClassRegistry
+    ) -> tuple[str, str, str]:
         """``(name, annotation, value source)`` of the class variable these groups make."""
         combine, sequence = self.combine_function(schema)
         if sequence is False and not groups:
-            raise GenerationError(f"{self.name}: nothing was collected for `{self.combine or 'first'}` to take")
+            raise GenerationError(
+                f"{self.name}: nothing was collected for `{self.combine or 'first'}` to take"
+            )
         value = combine(groups)
         if self.kind is None:
             element = self._collector.element_annotation(schema, registry)
             if sequence:
                 registry.register_import("typing.Tuple")
-                return self.name, f"Tuple[{element}, ...]", repr(_items(self.name, value))
+                return (
+                    self.name,
+                    f"Tuple[{element}, ...]",
+                    repr(_items(self.name, value)),
+                )
             return self.name, registry._literal_or(element, value), repr(value)
 
         parsed = ast.parse(self.kind, mode="eval").body
@@ -427,10 +536,12 @@ class ClassField(BaseModel):
         return self.name, self.kind, source
 
 
-def _items(name: str, value: object) -> Tuple[object, ...]:
+def _items(name: str, value: object) -> tuple[object, ...]:
     if isinstance(value, (list, tuple, set, frozenset)):
         return tuple(value)
-    raise GenerationError(f"{name}: the combine gave {value!r}, but the field holds several values")
+    raise GenerationError(
+        f"{name}: the combine gave {value!r}, but the field holds several values"
+    )
 
 
 def check_target(field: ClassField, target: Target, where: str) -> Collector:

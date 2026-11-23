@@ -79,9 +79,7 @@ def test_input_default_marker(tmp_path):
 def test_input_deprecation_marker(tmp_path):
     generated = parse_to_code(_generate(tmp_path))
     # Marker carries the reason; the DEPRECATED warning is in the inline comment.
-    assert (
-        "old: Annotated[str | None, Deprecated('use limit')] = None" in generated
-    )
+    assert "old: Annotated[str | None, Deprecated('use limit')] = None" in generated
     assert "'DEPRECATED: use limit'" in generated
 
 
@@ -121,7 +119,10 @@ def test_null_and_absent_defaults_have_no_marker(tmp_path):
     )
     assert "with_default: Annotated[int | None, GraphQLDefault('5')]" in generated
     # null / absent defaults: plain optional, no marker.
-    assert "null_default: int | None = Field(alias='nullDefault', default=None)" in generated
+    assert (
+        "null_default: int | None = Field(alias='nullDefault', default=None)"
+        in generated
+    )
     assert "plain: int | None = None" in generated
 
 

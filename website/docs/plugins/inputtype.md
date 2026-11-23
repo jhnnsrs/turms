@@ -65,7 +65,9 @@ serializes to the tagged wire form without any custom serializer:
 ```python
 class FindUserInputEmail(BaseModel):
     """'email' variant of the @oneOf input 'FindUserInput'"""
+
     email: str
+
 
 FindUserInput = Union[FindUserInputId, FindUserInputEmail, FindUserInputUsername]
 

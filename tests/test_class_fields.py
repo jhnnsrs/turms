@@ -137,8 +137,14 @@ mutation Make($input: MakeInput!) {
 }
 """
 
-IDENTIFIED = {"name": "__identifier__", "collector": {"type": "type_directive", "directive": "identified", "argument": "by"}}
-
+IDENTIFIED = {
+    "name": "__identifier__",
+    "collector": {
+        "type": "type_directive",
+        "directive": "identified",
+        "argument": "by",
+    },
+}
 
 
 def _with(field, **collector):
@@ -146,7 +152,9 @@ def _with(field, **collector):
     return {**field, "collector": {**field["collector"], **collector}}
 
 
-def _generate(tmp_path, rules, sdl=schema_sdl, docs=documents, plugins=None, schema=None):
+def _generate(
+    tmp_path, rules, sdl=schema_sdl, docs=documents, plugins=None, schema=None
+):
     (tmp_path / "ops.graphql").write_text(docs)
     config = GeneratorConfig(documents=str(tmp_path / "*.graphql"), class_fields=rules)
     return generate_ast(
@@ -194,10 +202,34 @@ def test_a_repeatable_directive_an_enum_a_default_and_a_marker(tmp_path):
     generated_ast = _generate(
         tmp_path,
         [
-            {"name": "__tags__", "collector": {"type": "type_directive", "directive": "tag", "argument": "name"}},
-            {"name": "__kind__", "collector": {"type": "type_directive", "directive": "kind", "argument": "of"}},
-            {"name": "__level__", "collector": {"type": "type_directive", "directive": "level", "argument": "n"}},
-            {"name": "__marked__", "collector": {"type": "type_directive", "directive": "marked"}},
+            {
+                "name": "__tags__",
+                "collector": {
+                    "type": "type_directive",
+                    "directive": "tag",
+                    "argument": "name",
+                },
+            },
+            {
+                "name": "__kind__",
+                "collector": {
+                    "type": "type_directive",
+                    "directive": "kind",
+                    "argument": "of",
+                },
+            },
+            {
+                "name": "__level__",
+                "collector": {
+                    "type": "type_directive",
+                    "directive": "level",
+                    "argument": "n",
+                },
+            },
+            {
+                "name": "__marked__",
+                "collector": {"type": "type_directive", "directive": "marked"},
+            },
         ],
     )
 
@@ -219,7 +251,12 @@ def test_a_repeatable_directive_an_enum_a_default_and_a_marker(tmp_path):
 
 
 def test_the_objects_plugin_stamps_its_classes_too(tmp_path):
-    generated_ast = _generate(tmp_path, [IDENTIFIED], docs="query GetPlain { plain { id } }", plugins=[EnumsPlugin(), InputsPlugin(), ObjectsPlugin()])
+    generated_ast = _generate(
+        tmp_path,
+        [IDENTIFIED],
+        docs="query GetPlain { plain { id } }",
+        plugins=[EnumsPlugin(), InputsPlugin(), ObjectsPlugin()],
+    )
 
     unit_test_with(
         generated_ast,
@@ -242,7 +279,9 @@ def test_an_argument_the_directive_does_not_take_is_an_error(tmp_path):
 
 
 def test_an_introspected_schema_cannot_show_applications_and_is_an_error(tmp_path):
-    introspected = build_client_schema(introspection_from_schema(build_ast_schema(parse(schema_sdl))))
+    introspected = build_client_schema(
+        introspection_from_schema(build_ast_schema(parse(schema_sdl)))
+    )
     with pytest.raises(RegistryError, match="introspected"):
         _generate(tmp_path, [IDENTIFIED], schema=introspected)
 
@@ -256,26 +295,49 @@ def test_a_stamp_named_like_a_field_is_an_error(tmp_path):
 @pytest.mark.parametrize("attribute", ["not-a-name", "class"])
 def test_a_name_that_is_no_python_identifier_is_refused_by_the_config(attribute):
     with pytest.raises(ValidationError, match="not a python identifier"):
-        GeneratorConfig(documents="*.graphql", class_fields=[{**IDENTIFIED, "name": attribute}])
+        GeneratorConfig(
+            documents="*.graphql", class_fields=[{**IDENTIFIED, "name": attribute}]
+        )
 
 
 def test_a_misspelled_key_is_refused_by_the_config():
     with pytest.raises(ValidationError):
-        GeneratorConfig(documents="*.graphql", class_fields=[{**IDENTIFIED, "nam": "__x__"}])
+        GeneratorConfig(
+            documents="*.graphql", class_fields=[{**IDENTIFIED, "nam": "__x__"}]
+        )
 
 
 def test_a_type_generated_as_no_class_is_an_error(tmp_path):
     """A union, an enum or a scalar is never a class a stamp could land on."""
-    sdl = schema_sdl.replace("union Thing = Dataset | Plain", 'union Thing @tag(name: "u") = Dataset | Plain').replace(
+    sdl = schema_sdl.replace(
+        "union Thing = Dataset | Plain", 'union Thing @tag(name: "u") = Dataset | Plain'
+    ).replace(
         "directive @tag(name: String!) repeatable on OBJECT | INPUT_OBJECT",
         "directive @tag(name: String!) repeatable on OBJECT | INPUT_OBJECT | UNION",
     )
-    with pytest.raises(RegistryError, match="Thing would carry __tags__, but a GraphQLUnionType"):
-        _generate(tmp_path, [{"name": "__tags__", "collector": {"type": "type_directive", "directive": "tag", "argument": "name"}}], sdl=sdl)
+    with pytest.raises(
+        RegistryError, match="Thing would carry __tags__, but a GraphQLUnionType"
+    ):
+        _generate(
+            tmp_path,
+            [
+                {
+                    "name": "__tags__",
+                    "collector": {
+                        "type": "type_directive",
+                        "directive": "tag",
+                        "argument": "name",
+                    },
+                }
+            ],
+            sdl=sdl,
+        )
 
 
 def test_a_oneof_input_is_generated_as_a_union_and_is_an_error(tmp_path):
-    sdl = schema_sdl + """
+    sdl = (
+        schema_sdl
+        + """
 directive @oneOf on INPUT_OBJECT
 
 input PickInput @oneOf @tag(name: "p") {
@@ -287,15 +349,35 @@ extend type Query {
   pick(input: PickInput!): Dataset!
 }
 """
-    docs = documents + """
+    )
+    docs = (
+        documents
+        + """
 query Pick($input: PickInput!) {
   pick(input: $input) {
     id
   }
 }
 """
-    with pytest.raises(GenerationError, match="PickInput would carry __tags__, but a @oneOf input"):
-        _generate(tmp_path, [{"name": "__tags__", "collector": {"type": "type_directive", "directive": "tag", "argument": "name"}}], sdl=sdl, docs=docs)
+    )
+    with pytest.raises(
+        GenerationError, match="PickInput would carry __tags__, but a @oneOf input"
+    ):
+        _generate(
+            tmp_path,
+            [
+                {
+                    "name": "__tags__",
+                    "collector": {
+                        "type": "type_directive",
+                        "directive": "tag",
+                        "argument": "name",
+                    },
+                }
+            ],
+            sdl=sdl,
+            docs=docs,
+        )
 
 
 def test_a_single_value_is_typed_as_its_literal(tmp_path):
@@ -309,10 +391,37 @@ def test_a_single_value_is_typed_as_its_literal(tmp_path):
                     tmp_path,
                     [
                         IDENTIFIED,
-                        {"name": "__kind__", "collector": {"type": "type_directive", "directive": "kind", "argument": "of"}},
-                        {"name": "__level__", "collector": {"type": "type_directive", "directive": "level", "argument": "n"}},
-                        {"name": "__tags__", "collector": {"type": "type_directive", "directive": "tag", "argument": "name"}},
-                        {"name": "__marked__", "collector": {"type": "type_directive", "directive": "marked"}},
+                        {
+                            "name": "__kind__",
+                            "collector": {
+                                "type": "type_directive",
+                                "directive": "kind",
+                                "argument": "of",
+                            },
+                        },
+                        {
+                            "name": "__level__",
+                            "collector": {
+                                "type": "type_directive",
+                                "directive": "level",
+                                "argument": "n",
+                            },
+                        },
+                        {
+                            "name": "__tags__",
+                            "collector": {
+                                "type": "type_directive",
+                                "directive": "tag",
+                                "argument": "name",
+                            },
+                        },
+                        {
+                            "name": "__marked__",
+                            "collector": {
+                                "type": "type_directive",
+                                "directive": "marked",
+                            },
+                        },
                     ],
                 ),
                 type_ignores=[],
@@ -392,7 +501,11 @@ subscription Watch {
 SCOPES = {
     "name": "__scopes__",
     "kind": "tuple[str, ...]",
-    "collector": {"type": "root_field_directive", "directive": "auth", "argument": "required_scopes"},
+    "collector": {
+        "type": "root_field_directive",
+        "directive": "auth",
+        "argument": "required_scopes",
+    },
     "combine": "union",
 }
 
@@ -404,11 +517,21 @@ def _client(tmp_path, fields, docs=client_documents, sdl=client_sdl, schema=None
         config,
         schema if schema is not None else build_ast_schema(parse(sdl)),
         stylers=[DefaultStyler()],
-        plugins=[EnumsPlugin(), InputsPlugin(), FragmentsPlugin(), OperationsPlugin(), ClientPlugin(config=ClientPluginConfig(client_class="ImageApi", client_fields=fields))],
+        plugins=[
+            EnumsPlugin(),
+            InputsPlugin(),
+            FragmentsPlugin(),
+            OperationsPlugin(),
+            ClientPlugin(
+                config=ClientPluginConfig(client_class="ImageApi", client_fields=fields)
+            ),
+        ],
     )
     import ast
 
-    module = ast.unparse(ast.fix_missing_locations(ast.Module(body=tree, type_ignores=[])))
+    module = ast.unparse(
+        ast.fix_missing_locations(ast.Module(body=tree, type_ignores=[]))
+    )
     namespace: dict = {}
     exec(module, namespace)
     return namespace["ImageApi"], module
@@ -421,23 +544,35 @@ def test_root_fields_are_found_through_fragments_spread_or_inlined_on_the_root_t
         "fragment Roots on Query { images { id } ...Deeper } fragment Deeper on Query { open { id } } "
         "query Q { image(id: 1) { id } ...Roots ... on Query { secret { id } } }"
     )
-    fragments = {d.name.value: d for d in document.definitions if d.kind == "fragment_definition"}
-    operation = next(d for d in document.definitions if d.kind == "operation_definition")
-    assert [f.name.value for f in root_field_nodes(operation.selection_set, fragments)] == ["image", "images", "open", "secret"]
+    fragments = {
+        d.name.value: d for d in document.definitions if d.kind == "fragment_definition"
+    }
+    operation = next(
+        d for d in document.definitions if d.kind == "operation_definition"
+    )
+    assert [
+        f.name.value for f in root_field_nodes(operation.selection_set, fragments)
+    ] == ["image", "images", "open", "secret"]
 
 
 def test_the_root_fields_operations_select_are_gathered_onto_the_client_class(tmp_path):
     """Every operation's root fields, a subscription's and an extension's included, a single string a value."""
     api, module = _client(tmp_path, [SCOPES])
     assert api.__scopes__ == ("read", "thumbnail", "watch", "write")
-    assert "__scopes__: ClassVar[tuple[str, ...]] = ('read', 'thumbnail', 'watch', 'write')" in module
+    assert (
+        "__scopes__: ClassVar[tuple[str, ...]] = ('read', 'thumbnail', 'watch', 'write')"
+        in module
+    )
     # What no operation selects is not asked for.
     assert "admin_only" not in api.__scopes__
 
 
 def test_a_selected_root_field_that_says_nothing_fails_generation(tmp_path):
     docs = client_documents + "\nquery Open { open { id } }\n"
-    with pytest.raises(GenerationError, match=r"Query.open \(operation Open\) gives no @auth\(required_scopes"):
+    with pytest.raises(
+        GenerationError,
+        match=r"Query.open \(operation Open\) gives no @auth\(required_scopes",
+    ):
         _client(tmp_path, [SCOPES], docs=docs)
     loose = _with(SCOPES, required=False)
     api, _ = _client(tmp_path, [loose], docs=docs)
@@ -450,7 +585,11 @@ def test_a_selected_root_field_that_says_nothing_fails_generation(tmp_path):
         ("union", "tuple[str, ...]", ("read", "thumbnail", "watch", "write")),
         ("intersection", "tuple[str, ...]", ()),
         ("ordered", "list[str]", ["read", "thumbnail", "write", "watch"]),
-        ("all", "tuple[str, ...]", ("read", "read", "read", "thumbnail", "write", "watch")),
+        (
+            "all",
+            "tuple[str, ...]",
+            ("read", "read", "read", "thumbnail", "write", "watch"),
+        ),
         ("first", "str", "read"),
         ("union", "frozenset[str]", frozenset({"read", "thumbnail", "watch", "write"})),
     ],
@@ -461,12 +600,26 @@ def test_each_combine_and_kind(tmp_path, combine, kind, expected):
 
 
 def test_without_a_kind_it_is_inferred(tmp_path):
-    _, module = _client(tmp_path, [{key: value for key, value in SCOPES.items() if key != "kind"}])
-    assert "__scopes__: ClassVar[tuple[str, ...]] = ('read', 'thumbnail', 'watch', 'write')" in module
+    _, module = _client(
+        tmp_path, [{key: value for key, value in SCOPES.items() if key != "kind"}]
+    )
+    assert (
+        "__scopes__: ClassVar[tuple[str, ...]] = ('read', 'thumbnail', 'watch', 'write')"
+        in module
+    )
 
 
-def test_a_directive_on_the_operation_itself_is_read_off_the_clients_documents(tmp_path):
-    field = {"name": "__needs__", "collector": {"type": "operation_directive", "directive": "needs", "argument": "scopes"}}
+def test_a_directive_on_the_operation_itself_is_read_off_the_clients_documents(
+    tmp_path,
+):
+    field = {
+        "name": "__needs__",
+        "collector": {
+            "type": "operation_directive",
+            "directive": "needs",
+            "argument": "scopes",
+        },
+    }
     api, _ = _client(tmp_path, [field])
     assert api.__needs__ == ("extra",)
 
@@ -499,15 +652,28 @@ class CountingCollector(Collector):
 
 def test_a_collector_and_a_combine_of_ones_own(tmp_path):
     shortest = {**SCOPES, "combine": "tests.test_class_fields.combine_shortest"}
-    counting = {"name": "__roots__", "collector": {"type": "tests.test_class_fields.CountingCollector"}}
+    counting = {
+        "name": "__roots__",
+        "collector": {"type": "tests.test_class_fields.CountingCollector"},
+    }
     api, _ = _client(tmp_path, [shortest, counting])
     assert api.__scopes__ == ("write",)
     assert api.__roots__ == (2, 1, 1, 1)
 
 
-def test_a_type_collector_cannot_stamp_a_client_nor_an_operation_collector_a_type(tmp_path):
+def test_a_type_collector_cannot_stamp_a_client_nor_an_operation_collector_a_type(
+    tmp_path,
+):
     with pytest.raises(GenerationError, match="collected per type"):
-        _client(tmp_path, [{"name": "__x__", "collector": {"type": "type_directive", "directive": "auth"}}])
+        _client(
+            tmp_path,
+            [
+                {
+                    "name": "__x__",
+                    "collector": {"type": "type_directive", "directive": "auth"},
+                }
+            ],
+        )
     with pytest.raises(RegistryError, match="collected per operation"):
         _generate(tmp_path, [SCOPES])
 
@@ -518,12 +684,23 @@ def test_a_type_collector_cannot_stamp_a_client_nor_an_operation_collector_a_typ
 )
 def test_a_kind_that_does_not_hold_what_the_combine_gives_is_refused(combine, kind):
     with pytest.raises(ValidationError, match="gives"):
-        ClientPluginConfig(client_class="ImageApi", client_fields=[{**SCOPES, "combine": combine, "kind": kind}])
+        ClientPluginConfig(
+            client_class="ImageApi",
+            client_fields=[{**SCOPES, "combine": combine, "kind": kind}],
+        )
 
 
 def test_a_combine_of_ones_own_needs_a_kind():
     with pytest.raises(ValidationError, match="needs the field's `kind`"):
-        ClientPluginConfig(client_class="ImageApi", client_fields=[{**{k: v for k, v in SCOPES.items() if k != "kind"}, "combine": "tests.test_class_fields.combine_shortest"}])
+        ClientPluginConfig(
+            client_class="ImageApi",
+            client_fields=[
+                {
+                    **{k: v for k, v in SCOPES.items() if k != "kind"},
+                    "combine": "tests.test_class_fields.combine_shortest",
+                }
+            ],
+        )
 
 
 def test_a_client_field_named_like_a_method_is_refused(tmp_path):
@@ -532,6 +709,8 @@ def test_a_client_field_named_like_a_method_is_refused(tmp_path):
 
 
 def test_client_fields_refuse_an_introspected_schema(tmp_path):
-    introspected = build_client_schema(introspection_from_schema(build_ast_schema(parse(client_sdl))))
+    introspected = build_client_schema(
+        introspection_from_schema(build_ast_schema(parse(client_sdl)))
+    )
     with pytest.raises(GenerationError, match="introspected"):
         _client(tmp_path, [SCOPES], schema=introspected)

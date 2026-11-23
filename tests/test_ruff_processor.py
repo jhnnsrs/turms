@@ -7,12 +7,25 @@ from turms.config import GeneratorConfig
 from turms.processors.command import CommandProcessor, CommandProcessorConfig
 from turms.processors.ruff import RuffProcessor, RuffProcessorConfig
 
-UNFORMATTED = 'import os\nimport sys\nx={ "a":1,   "b":2}\ndef f( a,b ):\n  return a+b\n'
+UNFORMATTED = (
+    'import os\nimport sys\nx={ "a":1,   "b":2}\ndef f( a,b ):\n  return a+b\n'
+)
 
 requires_ruff = pytest.mark.skipif(
     shutil.which("ruff") is None,
     reason="ruff is not installed",
 )
+
+
+@pytest.fixture(autouse=True)
+def outside_this_repo(tmp_path, monkeypatch):
+    """Run ruff where no project config is found.
+
+    ruff reads the ruff.toml of the directory it runs in, and this repo's own
+    (the arkitekt standard, every argument annotated) is not what these tests
+    are about.
+    """
+    monkeypatch.chdir(tmp_path)
 
 
 # --- RuffProcessor -----------------------------------------------------------
@@ -87,9 +100,7 @@ def test_command_processor_raises_on_failure():
 @requires_ruff
 def test_command_processor_with_ruff():
     """End-to-end: run ruff as the external command via the generic processor."""
-    processor = CommandProcessor(
-        config=CommandProcessorConfig(command="ruff format -")
-    )
+    processor = CommandProcessor(config=CommandProcessorConfig(command="ruff format -"))
     result = processor.run(UNFORMATTED, GeneratorConfig())
 
     assert "def f(a, b):" in result

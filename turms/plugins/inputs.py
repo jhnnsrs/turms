@@ -1,28 +1,30 @@
+import ast
 import re
 import textwrap
 from dataclasses import dataclass
+from typing import Any
+
 from graphql import (
     GraphQLInputObjectType,
     GraphQLInputType,
     GraphQLList,
     GraphQLNonNull,
     GraphQLScalarType,
+    GraphQLSchema,
     Undefined,
 )
-from turms.schema_lookup import get_default_value
-from turms.errors import GenerationError
-from pydantic_settings import SettingsConfigDict
-from turms.plugins.base import Plugin, PluginConfig, rename_deprecated_keys
-import ast
-from typing import Any, Dict, List, Optional
-from turms.config import GeneratorConfig
-from graphql import GraphQLSchema
-from pydantic import Field, model_validator
 from graphql.type.definition import (
     GraphQLEnumType,
 )
+from pydantic import Field, model_validator
+from pydantic_settings import SettingsConfigDict
+
+from turms.config import GeneratorConfig, GraphQLTypes
+from turms.errors import GenerationError
+from turms.plugins.base import Plugin, PluginConfig, rename_deprecated_keys
 from turms.referencer import create_reference_registry_from_documents
 from turms.registry import ClassRegistry
+from turms.schema_lookup import get_default_value
 from turms.utils import (
     annotate_field_metadata,
     compose_field_documentation,
@@ -32,7 +34,6 @@ from turms.utils import (
     is_oneof_input_type,
     parse_documents,
 )
-from turms.config import GraphQLTypes
 
 
 class InputsPluginConfig(PluginConfig):
@@ -40,7 +41,7 @@ class InputsPluginConfig(PluginConfig):
         extra="forbid", env_prefix="TURMS_PLUGINS_INPUTS_"
     )
     type: str = "turms.plugins.inputs.InputsPlugin"
-    input_bases: List[str] = ["pydantic.BaseModel"]
+    input_bases: list[str] = ["pydantic.BaseModel"]
     skip_underscore: bool = True
     skip_unreferenced: bool = True
 
@@ -186,7 +187,7 @@ def generate_input_field_value(
     field_name: str,
     value_key: str,
     omittable: bool,
-    description: Optional[str],
+    description: str | None,
     registry: ClassRegistry,
     config: GeneratorConfig,
 ):
@@ -238,7 +239,7 @@ def generate_input_type(
     plugin_config: InputsPluginConfig,
     registry: ClassRegistry,
     key: str,
-    discriminators: Optional[List[Discriminator]] = None,
+    discriminators: list[Discriminator] | None = None,
 ):
     additional_bases = get_additional_bases_for_type(type.name, config, registry)
 
@@ -321,7 +322,9 @@ def generate_input_type(
             annotation,
             registry,
             default_value_ast=(
-                ast.Constant(value=default_string) if default_string is not None else None
+                ast.Constant(value=default_string)
+                if default_string is not None
+                else None
             ),
             deprecation_reason=value.deprecation_reason,
         )
@@ -376,7 +379,9 @@ def generate_input_type(
         body=registry.class_fields_for(
             key,
             fields
-            + generate_pydantic_config(GraphQLTypes.INPUT, config, registry, typename=key),
+            + generate_pydantic_config(
+                GraphQLTypes.INPUT, config, registry, typename=key
+            ),
         ),
     )
 
@@ -400,13 +405,13 @@ def validate_oneof_input_type(type: GraphQLInputObjectType):
 
 def get_oneof_member_map(
     type: GraphQLInputObjectType,
-) -> Optional[Dict[str, GraphQLInputObjectType]]:
+) -> dict[str, GraphQLInputObjectType] | None:
     """Field-name → member-type map when the ``@oneOf`` input follows the tagged
     input-union pattern: every field is a distinct, non-oneOf input object type.
     Returns ``None`` when the type cannot be modelled as a direct union of its
     member models (scalar/enum fields, duplicated member types, or oneOf
     members, whose tag could not be recovered from the value's type)."""
-    members: Dict[str, GraphQLInputObjectType] = {}
+    members: dict[str, GraphQLInputObjectType] = {}
     for value_key, value in type.fields.items():
         member = value.type
         if not isinstance(member, GraphQLInputObjectType) or is_oneof_input_type(
@@ -428,7 +433,9 @@ def _snake(name: str) -> str:
     return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", interim).lower()
 
 
-def generate_union_alias(alias_name: str, member_names: List[str], registry: ClassRegistry):
+def generate_union_alias(
+    alias_name: str, member_names: list[str], registry: ClassRegistry
+):
     if len(member_names) == 1:
         value = ast.Name(id=member_names[0], ctx=ast.Load())
     else:
@@ -501,7 +508,12 @@ def generate_oneof_wrapper_input(
                         target=ast.Name(field_name, ctx=ast.Store()),
                         annotation=annotation,
                         value=generate_input_field_value(
-                            field_name, value_key, False, value.description, registry, config
+                            field_name,
+                            value_key,
+                            False,
+                            value.description,
+                            registry,
+                            config,
                         ),
                         simple=1,
                     ),
@@ -520,7 +532,7 @@ def generate_oneof_wrapper_input(
 def generate_oneof_direct_union(
     key: str,
     type: GraphQLInputObjectType,
-    members: Dict[str, GraphQLInputObjectType],
+    members: dict[str, GraphQLInputObjectType],
     registry: ClassRegistry,
 ):
     """Generate a ``@oneOf`` input following the tagged input-union pattern as a
@@ -608,7 +620,9 @@ def generate_inputs(
         for directive in directives:
             if directive.name.value != "unionElementOf":
                 continue
-            args = {arg.name.value: arg.value.value for arg in directive.arguments or ()}
+            args = {
+                arg.name.value: arg.value.value for arg in directive.arguments or ()
+            }
             union_type = args.get("union")
             discriminator = args.get("discriminator")
             member_key = args.get("key")
@@ -636,7 +650,7 @@ def generate_inputs(
 
         # One Literal field per distinct discriminator name; all unions sharing
         # a discriminator name must agree on this member's key.
-        discriminators: Dict[str, Discriminator] = {}
+        discriminators: dict[str, Discriminator] = {}
         for union_type, discriminator, member_key in memberships:
             existing = discriminators.get(discriminator)
             if existing is not None and existing.value != member_key:
@@ -717,7 +731,8 @@ def generate_inputs(
 
         if is_oneof_input_type(type):
             registry.refuse_class_fields(
-                key, "a @oneOf input is generated as a union of its variants, not a class"
+                key,
+                "a @oneOf input is generated as a union of its variants, not a class",
             )
             validate_oneof_input_type(type)
             members = get_oneof_member_map(type)
@@ -741,7 +756,8 @@ def generate_inputs(
 
         if type.name in union_input_types:
             registry.refuse_class_fields(
-                key, "a @unionElementOf placeholder is generated as a union alias, not a class"
+                key,
+                "a @unionElementOf placeholder is generated as a union alias, not a class",
             )
             registry.register_import("typing.Union")
             registry.register_import("typing.Annotated")
@@ -825,7 +841,9 @@ def generate_inputs(
                 annotation,
                 registry,
                 default_value_ast=(
-                    ast.Constant(value=default_string) if default_string is not None else None
+                    ast.Constant(value=default_string)
+                    if default_string is not None
+                    else None
                 ),
                 deprecation_reason=value.deprecation_reason,
             )
@@ -840,7 +858,12 @@ def generate_inputs(
                 target=ast.Name(field_name, ctx=ast.Store()),
                 annotation=annotation,
                 value=generate_input_field_value(
-                    field_name, value_key, omittable, value.description, registry, config
+                    field_name,
+                    value_key,
+                    omittable,
+                    value.description,
+                    registry,
+                    config,
                 ),
                 simple=1,
             )
@@ -898,7 +921,7 @@ class InputsPlugin(Plugin):
         client_schema: GraphQLSchema,
         config: GeneratorConfig,
         registry: ClassRegistry,
-    ) -> List[ast.AST]:
+    ) -> list[ast.AST]:
         for base in self.config.input_bases:
             registry.register_import(base)
 

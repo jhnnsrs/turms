@@ -12,10 +12,13 @@ from __future__ import annotations
 
 import ast
 import importlib
-from typing import List, Optional
 
 from graphql import GraphQLSchema
-from graphql.language.ast import FragmentDefinitionNode, OperationDefinitionNode, OperationType
+from graphql.language.ast import (
+    FragmentDefinitionNode,
+    OperationDefinitionNode,
+    OperationType,
+)
 from pydantic import model_validator
 from pydantic_settings import SettingsConfigDict
 
@@ -48,10 +51,10 @@ class ClientPluginConfig(OperationFuncsConfig):
     type: str = "turms.plugins.client.ClientPlugin"
     client_class: str
     """The name of the generated class."""
-    client_bases: List[str] = []
+    client_bases: list[str] = []
     """Dotted paths of the bases of the generated class. A base that implements
     the delegate methods makes the class usable on its own."""
-    documents: Optional[str] = None
+    documents: str | None = None
     """A glob of the documents to generate methods for; the project's documents
     by default."""
     sync_methods: bool = True
@@ -72,14 +75,14 @@ class ClientPluginConfig(OperationFuncsConfig):
     """The method of ``self`` an awaitable subscription iterates, as
     ``async for event in self.asubscribe(Operation, variables)``; it yields
     operation models."""
-    reserved_names: List[str] = []
+    reserved_names: list[str] = []
     """Names the generated class must not define (e.g. fields of the class it is
     mixed into). An operation whose method would take one of them is an error."""
-    reserved_from: List[str] = []
+    reserved_from: list[str] = []
     """Dotted paths of classes the generated class will be mixed into. Every
     attribute they have (and every pydantic field they declare) is reserved:
     pydantic lets a field silently hide a same-named method, with only a warning."""
-    client_fields: List[ClassField] = []
+    client_fields: list[ClassField] = []
     """Class variables of the generated class, gathered from its operations: a name, a
     kind, an ``operation`` collector and how its values combine (see
     :mod:`turms.class_fields`). ``root_field_directive`` reads what the server says on
@@ -93,7 +96,7 @@ class ClientPluginConfig(OperationFuncsConfig):
     """
 
     @model_validator(mode="after")
-    def _check(self) -> "ClientPluginConfig":
+    def _check(self) -> ClientPluginConfig:
         if not self.client_class.isidentifier():
             raise ValueError(
                 f"client_class must be an identifier, got {self.client_class!r}"
@@ -121,7 +124,7 @@ class ClientPluginConfig(OperationFuncsConfig):
 
 
 def names_reserved_by(
-    dotted_paths: List[str], generated: str | None = None
+    dotted_paths: list[str], generated: str | None = None
 ) -> set[str]:
     """Every attribute and pydantic field name of the given classes.
 
@@ -255,10 +258,10 @@ def generate_method(
 
 
 def generate_client_class(
-    methods: List[ast.FunctionDef | ast.AsyncFunctionDef],
+    methods: list[ast.FunctionDef | ast.AsyncFunctionDef],
     plugin_config: ClientPluginConfig,
     registry: ClassRegistry,
-    stamps: Optional[List[tuple[str, str, str]]] = None,
+    stamps: list[tuple[str, str, str]] | None = None,
 ) -> ast.ClassDef:
     """Wraps the generated methods in the client class.
 
@@ -333,7 +336,9 @@ def generate_client_class(
         name=plugin_config.client_class,
         bases=bases,
         keywords=[],
-        body=registry.with_class_vars([doc, *methods], stamps) if stamps else [doc, *methods],
+        body=registry.with_class_vars([doc, *methods], stamps)
+        if stamps
+        else [doc, *methods],
         decorator_list=[],
         type_params=[],
     )
@@ -369,7 +374,7 @@ class ClientPlugin(Plugin):
         client_schema: GraphQLSchema,
         config: GeneratorConfig,
         registry: ClassRegistry,
-    ) -> List[ast.AST]:
+    ) -> list[ast.AST]:
         # The global coercible maps are the defaults; this plugin's entries win.
         plugin_config = self.config.model_copy(
             update={
@@ -422,7 +427,9 @@ class ClientPlugin(Plugin):
             collector = check_target(field, "operation", "client_fields")
             collector.check(client_schema, registry)
             groups = [
-                collector.collect_operation(client_schema, operation, fragments, registry)
+                collector.collect_operation(
+                    client_schema, operation, fragments, registry
+                )
                 for operation in operations
             ]
             stamps.append(field.stamp(groups, client_schema, registry))

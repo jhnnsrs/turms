@@ -1,16 +1,17 @@
-from .utils import build_relative_glob, unit_test_with
 from turms.config import GeneratorConfig
-from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
-from turms.plugins.inputs import InputsPlugin
-from turms.plugins.operations import OperationsPlugin
+from turms.plugins.fragments import FragmentsPlugin
 from turms.plugins.funcs import (
     FuncsPlugin,
     FuncsPluginConfig,
     FunctionDefinition,
 )
-from turms.plugins.fragments import FragmentsPlugin
+from turms.plugins.inputs import InputsPlugin
+from turms.plugins.operations import OperationsPlugin
+from turms.run import generate_ast
 from turms.stylers.default import DefaultStyler
+
+from .utils import build_relative_glob, unit_test_with
 
 
 def test_coercible_types_in_funcs(beast_schema):
@@ -182,7 +183,7 @@ def test_coercible_types_optional_and_non_optional(beast_schema):
                         ),
                         FunctionDefinition(
                             type="query",
-                            use="mocks.query", 
+                            use="mocks.query",
                             is_async=False,
                         ),
                     ],

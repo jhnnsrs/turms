@@ -159,7 +159,6 @@ class Get_countries(BaseModel):
 
     class Meta:
         document = "fragment Continent on Continent {\n  code\n  name\n}\n\nquery get_countries($filter: CountryFilterInput) {\n  countries(filter: $filter) {\n    code\n    name\n    continent {\n      ...Continent\n    }\n  }\n}"
-
 ```
 
 In this example we can see that turms not only generated typed models for the query but also for the

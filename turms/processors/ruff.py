@@ -2,8 +2,9 @@ import subprocess
 import sys
 
 from pydantic import Field
-from turms.processors.base import Processor, ProcessorConfig
+
 from turms.config import GeneratorConfig
+from turms.processors.base import Processor, ProcessorConfig
 
 
 class RuffProcessorConfig(ProcessorConfig):

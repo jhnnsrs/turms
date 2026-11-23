@@ -1,10 +1,11 @@
+import pathlib
+
+from graphql import parse
+
 from turms.config import GeneratorConfig
 from turms.plugins.strawberry import StrawberryPlugin
 from turms.processors.isort import IsortProcessor
-from turms.run import build_ast_schema, generate_code, parse_asts_to_string
-from graphql import parse
-import pathlib
-
+from turms.run import build_ast_schema, generate_code
 
 SNAPSHOTS_DIR = pathlib.Path(__file__).parent / "snapshots"
 

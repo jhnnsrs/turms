@@ -1,7 +1,7 @@
 import pytest
 
-from turms.config import GeneratorConfig, Extensions, ConfigProxy
-from turms.run import generate, GraphQLProject
+from turms.config import ConfigProxy, Extensions, GeneratorConfig
+from turms.run import GraphQLProject, generate
 
 
 @pytest.mark.network

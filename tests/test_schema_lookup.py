@@ -6,7 +6,11 @@
 
 from graphql import Undefined, build_schema, parse
 
-from turms.schema_lookup import get_default_value, get_field_def, get_operation_root_type
+from turms.schema_lookup import (
+    get_default_value,
+    get_field_def,
+    get_operation_root_type,
+)
 
 SCHEMA = build_schema(
     """
@@ -39,7 +43,9 @@ def test_no_default_is_undefined_and_a_null_default_is_none():
 
 
 def test_field_and_root_type_lookup():
-    operation = parse("mutation { touch } query { items { id __typename } }").definitions
+    operation = parse(
+        "mutation { touch } query { items { id __typename } }"
+    ).definitions
     mutation, query = operation
 
     assert get_operation_root_type(SCHEMA, mutation) is SCHEMA.mutation_type
@@ -48,4 +54,6 @@ def test_field_and_root_type_lookup():
     items = query.selection_set.selections[0]
     assert str(get_field_def(SCHEMA, SCHEMA.query_type, items).type) == "[Item!]!"
     typename = items.selection_set.selections[1]
-    assert str(get_field_def(SCHEMA, SCHEMA.type_map["Item"], typename).type) == "String!"
+    assert (
+        str(get_field_def(SCHEMA, SCHEMA.type_map["Item"], typename).type) == "String!"
+    )

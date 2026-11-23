@@ -6,8 +6,8 @@ from turms.config import GeneratorConfig
 from turms.plugins.input_funcs import InputFuncsPlugin, InputFuncsPluginConfig
 from turms.plugins.inputs import InputsPlugin, InputsPluginConfig
 from turms.run import generate_ast
-from turms.stylers.snake_case import SnakeCaseStyler
 from turms.stylers.capitalize import CapitalizeStyler
+from turms.stylers.snake_case import SnakeCaseStyler
 
 from .utils import parse_to_code, unit_test_with
 

@@ -1,0 +1,11 @@
+// The arkitekt Python standard for basedpyright.
+//
+// Owned by arkitektio/.github (python/pyright.shared.json) and copied verbatim
+// into each repo by python/sync_quality.py; edit it there, never in a repo. A
+// repo's pyrightconfig.json extends it and names what to check. Errors that
+// predate the standard live in .basedpyright/baseline.json: CI fails only on
+// new ones.
+{
+  "typeCheckingMode": "standard",
+  "reportMissingModuleSource": "none"
+}

@@ -1,6 +1,8 @@
-from pydantic import Field
-from turms.stylers.base import BaseStyler, StylerConfig
 import re
+
+from pydantic import Field
+
+from turms.stylers.base import BaseStyler, StylerConfig
 
 
 def camel_to_snake(name):

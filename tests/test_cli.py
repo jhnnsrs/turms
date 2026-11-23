@@ -1,9 +1,12 @@
-from click.testing import CliRunner
-from turms.cli.main import cli
-import shutil
-from .utils import build_relative_glob
 import os
+import shutil
+
 import pytest
+from click.testing import CliRunner
+
+from turms.cli.main import cli
+
+from .utils import build_relative_glob
 
 
 @pytest.mark.network
@@ -140,12 +143,12 @@ def test_run_download_multiple(tmp_path):
 
         result = runner.invoke(cli, ["download"])
         assert result.exit_code == 0, result.output
-        assert os.path.exists(
-            os.path.join(td, "countries.schema.graphql")
-        ), "countries schema not found"
-        assert os.path.exists(
-            os.path.join(td, "nested_inputs.schema.graphql")
-        ), "nested_inputs schema not found"
+        assert os.path.exists(os.path.join(td, "countries.schema.graphql")), (
+            "countries schema not found"
+        )
+        assert os.path.exists(os.path.join(td, "nested_inputs.schema.graphql")), (
+            "nested_inputs schema not found"
+        )
 
 
 def test_run_init(tmp_path):

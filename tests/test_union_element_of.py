@@ -191,7 +191,9 @@ def _generate_with_external(tmp_path, include):
     doc.write_text(operation)
     config = GeneratorConfig(
         documents=str(tmp_path / "**/*.graphql"),
-        external_modules=[{"module": "transforms", "kinds": ["input"], "include": include}],
+        external_modules=[
+            {"module": "transforms", "kinds": ["input"], "include": include}
+        ],
     )
     return generate_ast(
         config,
@@ -201,7 +203,9 @@ def _generate_with_external(tmp_path, include):
     )
 
 
-def test_an_external_union_imports_the_union_and_generates_none_of_its_members(tmp_path):
+def test_an_external_union_imports_the_union_and_generates_none_of_its_members(
+    tmp_path,
+):
     from turms.run import parse_asts_to_string
 
     generated = parse_asts_to_string(_generate_with_external(tmp_path, TRANSFORM_UNION))

@@ -1,16 +1,17 @@
 import ast
 
 import pytest
-from .utils import build_relative_glob, unit_test_with, ExecuteError
 from pydantic import ValidationError
 
 from turms.config import GeneratorConfig, OptionsConfig
-from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
-from turms.plugins.inputs import InputsPlugin
 from turms.plugins.fragments import FragmentsPlugin
+from turms.plugins.inputs import InputsPlugin
 from turms.plugins.operations import OperationsPlugin
+from turms.run import generate_ast
 from turms.stylers.default import DefaultStyler
+
+from .utils import ExecuteError, build_relative_glob, unit_test_with
 
 
 @pytest.mark.network

@@ -1,30 +1,31 @@
 import importlib.util
 import os
-from typing import Any, Callable, Dict
+from collections.abc import Callable
+from functools import wraps
+from typing import Any
 
+import rich_click as click
 import yaml
+from graphql import print_schema
+from rich import get_console
+from rich.console import Group
+from rich.live import Live
+from rich.panel import Panel
+from rich.tree import Tree
+
 from turms.config import GraphQLProject
 from turms.run import (
+    build_schema_from_schema_type,
     generate,
+    load_projects_from_configpath,
     load_raw_dsl_from_schema_type,
+    scan_folder_for_single_config,
     write_code_to_file,
     write_project,
     write_schema_to_file,
 )
-from rich import get_console
-from rich.panel import Panel
-from rich.live import Live
-from rich.tree import Tree
-from rich.console import Group
-import rich_click as click
-from turms.run import (
-    scan_folder_for_single_config,
-    load_projects_from_configpath,
-    build_schema_from_schema_type,
-)
+
 from .watch import stream_changes
-from graphql import print_schema
-from functools import wraps
 
 click.rich_click.USE_RICH_MARKUP = True
 
@@ -167,7 +168,7 @@ def build_strawberry_template() -> dict:
     return _project(turms, "schema.graphql", None)
 
 
-TEMPLATES: Dict[str, dict] = {
+TEMPLATES: dict[str, dict] = {
     "documents": {
         "build": build_documents_template,
         "hint": "Write your operations in [b]graphql/*.graphql[/b] and run [b]turms gen[/b].",
@@ -195,7 +196,7 @@ def build_default_settings(template: str = "documents") -> str:
     )
 
 
-def generate_projects(projects: Dict[str, GraphQLProject], title: str = "Turms"):
+def generate_projects(projects: dict[str, GraphQLProject], title: str = "Turms"):
     generation_message = f"Generating the {'.'.join(projects.keys())} projects. This may take a while...\n"
 
     tree = Tree("Generating projects", style="bold green")
@@ -400,9 +401,7 @@ def init(config, template):
             get_console().print("Aborting")
             return
 
-    get_console().print(
-        f"Creating {config} in {app_directory} (template: {template})"
-    )
+    get_console().print(f"Creating {config} in {app_directory} (template: {template})")
     with open(os.path.join(app_directory, config), "w") as f:
         f.write(build_default_settings(template))
 

@@ -203,7 +203,8 @@ def test_styled_discriminator_is_refused(tmp_path):
     never carry the alias that would reconcile them."""
     sdl = discriminated_sdl.replace('discriminator: "kind"', 'discriminator: "myKind"')
     sdl = sdl.replace("input LaserInput", "input LaserInput").replace(
-        "    kind: String!\n    powerLevel: Float", "    myKind: String!\n    powerLevel: Float"
+        "    kind: String!\n    powerLevel: Float",
+        "    myKind: String!\n    powerLevel: Float",
     )
     doc = tmp_path / "ops.graphql"
     doc.write_text(discriminated_operation)

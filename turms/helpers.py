@@ -1,7 +1,7 @@
 import glob
 import json
 from importlib import import_module
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from graphql import (
     get_introspection_query,
@@ -10,7 +10,7 @@ from pydantic import AnyHttpUrl
 
 from turms.errors import GenerationError
 
-IntrospectionResult = Dict[str, Any]
+IntrospectionResult = dict[str, Any]
 DSLString = str
 
 
@@ -41,7 +41,7 @@ def import_string(dotted_path: str) -> Any:
 
 
 def load_introspection_from_url(
-    url: AnyHttpUrl, headers: Optional[Dict[str, str]] = None
+    url: AnyHttpUrl, headers: dict[str, str] | None = None
 ) -> IntrospectionResult:
     """Introspect a GraphQL schema using introspection query
 
@@ -85,7 +85,7 @@ def load_introspection_from_url(
 
 
 def load_dsl_from_url(
-    url: AnyHttpUrl, headers: Optional[Dict[str, str]] = None
+    url: AnyHttpUrl, headers: dict[str, str] | None = None
 ) -> DSLString:
     try:  # pragma: no cover
         import requests  # pragma: no cover
@@ -94,7 +94,7 @@ def load_dsl_from_url(
             "The requests library is required to introspect a schema from a url"
         )  # pragma: no cover
 
-    default_headers: Dict[str, str] = {}
+    default_headers: dict[str, str] = {}
     if headers:
         default_headers.update(headers)
     try:
@@ -119,7 +119,7 @@ def load_introspection_from_file(file_path: str) -> IntrospectionResult:
         return json.loads(f.read().decode("utf-8-sig"))
 
 
-ParseResult = Tuple[Optional[DSLString], Optional[IntrospectionResult]]
+ParseResult = tuple[DSLString | None, IntrospectionResult | None]
 
 
 def load_dsl_from_glob(
