@@ -222,7 +222,7 @@ def generate_method(
     )
     if o.operation == OperationType.SUBSCRIPTION:
         iterator = "AsyncIterator" if is_async else "Iterator"
-        registry.register_import(f"typing.{iterator}")
+        registry.register_import(f"collections.abc.{iterator}")
         return_type = ast.Subscript(
             value=ast.Name(id=iterator, ctx=ast.Load()), slice=return_type
         )

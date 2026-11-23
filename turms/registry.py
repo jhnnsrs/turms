@@ -40,16 +40,20 @@ SCALAR_DEFAULTS: dict[str, str] = {
     "Float": "float",
 }
 
-# Annotated metadata markers generated into the output module (unless the user
-# overrides them via config). Authored as source and parsed to AST for clarity.
+# The builtins generated into the output module (unless the user overrides
+# them via config). Authored as source and parsed to AST for clarity. Every
+# argument and return is annotated (no Any), so the generated module passes a
+# strict lint. They are emitted past the annotation modernizer: an annotation
+# naming the class itself is quoted, and one spelled with ``|`` is quoted where
+# the target python predates PEP 604 (see ``ClassRegistry.generate_builtins``).
 _GRAPHQL_DEFAULT_SRC = """
 class GraphQLDefault:
     'Records a GraphQL field schema default value. The client omits the field so the server applies its own default; this preserves the value for introspection.'
 
-    def __init__(self, value):
+    def __init__(self, value: object) -> None:
         self.value = value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'GraphQLDefault(' + repr(self.value) + ')'
 """
 
@@ -57,11 +61,40 @@ _DEPRECATED_SRC = """
 class Deprecated:
     'Marks a field as deprecated, carrying the GraphQL deprecation reason.'
 
-    def __init__(self, reason=None):
+    def __init__(self, reason: str | None = None) -> None:
         self.reason = reason
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'Deprecated(' + repr(self.reason) + ')'
+"""
+
+# Before python 3.10 ``str | None`` raises when the signature is evaluated.
+_DEPRECATED_PRE_PEP604_SRC = _DEPRECATED_SRC.replace(
+    "reason: str | None", "reason: 'str | None'"
+)
+
+# Sentinel distinguishing "argument not provided" (omitted on serialize so the
+# server applies its default) from an explicitly passed ``None``.
+_UNSET_SRC = """
+class UnsetType:
+    'Sentinel for arguments the caller did not provide. Such fields are omitted on serialization so the GraphQL server applies its own default.'
+    _instance: 'UnsetType | None' = None
+
+    def __new__(cls) -> 'UnsetType':
+        instance = cls._instance
+        if instance is None:
+            instance = super().__new__(cls)
+            cls._instance = instance
+        return instance
+
+    def __repr__(self) -> str:
+        return 'UNSET'
+
+    def __bool__(self) -> bool:
+        return False
+
+
+UNSET = UnsetType()
 """
 
 
@@ -110,124 +143,12 @@ built_in_map = {
             ]
         ],
     ),
-    "UNSET": [
-        # Sentinel distinguishing "argument not provided" (omitted on serialize so
-        # the server applies its default) from an explicitly passed ``None``.
-        ast.ClassDef(
-            "UnsetType",
-            bases=[],
-            decorator_list=[],
-            keywords=[],
-            body=[
-                ast.Expr(
-                    value=ast.Constant(
-                        value=(
-                            "Sentinel for arguments the caller did not provide. "
-                            "Such fields are omitted on serialization so the GraphQL "
-                            "server applies its own default."
-                        )
-                    )
-                ),
-                ast.Assign(
-                    targets=[ast.Name(id="_instance", ctx=ast.Store())],
-                    value=ast.Constant(value=None),
-                ),
-                ast.FunctionDef(
-                    "__new__",
-                    args=ast.arguments(
-                        posonlyargs=[],
-                        args=[ast.arg(arg="cls")],
-                        kwonlyargs=[],
-                        kw_defaults=[],
-                        defaults=[],
-                    ),
-                    body=[
-                        ast.If(
-                            test=ast.Compare(
-                                left=ast.Attribute(
-                                    value=ast.Name(id="cls", ctx=ast.Load()),
-                                    attr="_instance",
-                                    ctx=ast.Load(),
-                                ),
-                                ops=[ast.Is()],
-                                comparators=[ast.Constant(value=None)],
-                            ),
-                            body=[
-                                ast.Assign(
-                                    targets=[
-                                        ast.Attribute(
-                                            value=ast.Name(id="cls", ctx=ast.Load()),
-                                            attr="_instance",
-                                            ctx=ast.Store(),
-                                        )
-                                    ],
-                                    value=ast.Call(
-                                        func=ast.Attribute(
-                                            value=ast.Call(
-                                                func=ast.Name(
-                                                    id="super", ctx=ast.Load()
-                                                ),
-                                                args=[],
-                                                keywords=[],
-                                            ),
-                                            attr="__new__",
-                                            ctx=ast.Load(),
-                                        ),
-                                        args=[ast.Name(id="cls", ctx=ast.Load())],
-                                        keywords=[],
-                                    ),
-                                )
-                            ],
-                            orelse=[],
-                        ),
-                        ast.Return(
-                            value=ast.Attribute(
-                                value=ast.Name(id="cls", ctx=ast.Load()),
-                                attr="_instance",
-                                ctx=ast.Load(),
-                            )
-                        ),
-                    ],
-                    decorator_list=[],
-                ),
-                ast.FunctionDef(
-                    "__repr__",
-                    args=ast.arguments(
-                        posonlyargs=[],
-                        args=[ast.arg(arg="self")],
-                        kwonlyargs=[],
-                        kw_defaults=[],
-                        defaults=[],
-                    ),
-                    body=[ast.Return(value=ast.Constant(value="UNSET"))],
-                    decorator_list=[],
-                ),
-                ast.FunctionDef(
-                    "__bool__",
-                    args=ast.arguments(
-                        posonlyargs=[],
-                        args=[ast.arg(arg="self")],
-                        kwonlyargs=[],
-                        kw_defaults=[],
-                        defaults=[],
-                    ),
-                    body=[ast.Return(value=ast.Constant(value=False))],
-                    decorator_list=[],
-                ),
-            ],
-        ),
-        ast.Assign(
-            targets=[ast.Name(id="UNSET", ctx=ast.Store())],
-            value=ast.Call(
-                func=ast.Name(id="UnsetType", ctx=ast.Load()),
-                args=[],
-                keywords=[],
-            ),
-        ),
-    ],
+    "UNSET": ast.parse(_UNSET_SRC).body,
     "GraphQLDefault": ast.parse(_GRAPHQL_DEFAULT_SRC).body[0],
     "Deprecated": ast.parse(_DEPRECATED_SRC).body[0],
 }  # builtin map provides the default types for any schema if they are referenced
+
+_DEPRECATED_PRE_PEP604 = ast.parse(_DEPRECATED_PRE_PEP604_SRC).body[0]
 
 
 class ClassRegistry:
@@ -603,8 +524,9 @@ class ClassRegistry:
         self, typename: str, parent: str, allow_forward: bool = True
     ) -> ast.Constant | ast.Name:
         if typename in built_in_map:
-            # Builtin enums
+            # Builtin enums (`class __TypeKind(str, Enum)`)
             self._builtins.add(typename)
+            self.register_import("enum.Enum")
             self.forward_references.add(parent)
             return ast.Constant(value=typename)
 
@@ -923,6 +845,8 @@ class ClassRegistry:
         # Sorted for the same reason as the imports above: `_builtins` is a set.
         for built_in in sorted(self._builtins):
             node = built_in_map[built_in]
+            if built_in == "Deprecated" and not self.config.use_union_operator:
+                node = _DEPRECATED_PRE_PEP604
             if isinstance(node, list):
                 builtins.extend(node)
             else:

@@ -43,7 +43,8 @@ def test_allow_population_by_field_name(countries_schema: GraphQLSchema) -> None
         generated_ast,
         "Countries(countries=[CountriesCountries(emoji_u='soinsisn',phone='sdf', capital='dfsdf')]).countries[0].emoji_u",
     )
-    assert "from enum import Enum" in generated, "EnumPlugin not working"
+    # Enum is imported exactly when an enum is generated.
+    assert ("from enum import Enum" in generated) == ("(str, Enum)" in generated)
 
 
 @pytest.mark.network

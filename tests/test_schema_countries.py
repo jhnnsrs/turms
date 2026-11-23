@@ -32,5 +32,6 @@ def test_complex_operations(countries_schema: GraphQLSchema) -> None:
 
     md = ast.Module(body=generated_ast, type_ignores=[])
     generated = ast.unparse(ast.fix_missing_locations(md))
-    assert "from enum import Enum" in generated, "EnumPlugin not working"
+    # Enum is imported exactly when an enum is generated.
+    assert ("from enum import Enum" in generated) == ("(str, Enum)" in generated)
     assert "class Query(BaseModel)" in generated, "No Query was detected"

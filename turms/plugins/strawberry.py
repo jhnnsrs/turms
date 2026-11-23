@@ -1042,7 +1042,7 @@ def generate_types(
                     function_def = ast.FunctionDef
                     returns = returns
                 elif key == "Subscription":
-                    registry.register_import("typing.AsyncGenerator")
+                    registry.register_import("collections.abc.AsyncGenerator")
                     decorator_name = ast.Name(
                         id="strawberry.subscription", ctx=ast.Load()
                     )

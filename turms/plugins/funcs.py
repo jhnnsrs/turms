@@ -260,7 +260,7 @@ def generate_input_annotation(
         )
 
     if isinstance(type, GraphQLList):
-        registry.register_import("typing.Iterable")
+        registry.register_import("collections.abc.Iterable")
 
         def list_builder(x: ast.expr) -> ast.Subscript:
             return ast.Subscript(
@@ -1288,7 +1288,7 @@ def generate_operation_func(
 
     if definition.is_async:
         if o.operation == OperationType.SUBSCRIPTION:
-            registry.register_import("typing.AsyncIterator")
+            registry.register_import("collections.abc.AsyncIterator")
 
         tree.append(
             ast.AsyncFunctionDef(
@@ -1335,7 +1335,7 @@ def generate_operation_func(
 
     if not definition.is_async:
         if o.operation == OperationType.SUBSCRIPTION:
-            registry.register_import("typing.Iterator")
+            registry.register_import("collections.abc.Iterator")
 
         tree.append(
             ast.FunctionDef(

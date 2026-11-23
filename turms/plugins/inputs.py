@@ -361,8 +361,11 @@ def generate_input_type(
         # but the server needs it to discriminate. Mark it as set on every
         # construction so it always serializes.
         names = ", ".join(repr(d.discriminator) for d in discriminators)
+        # ``context: object``: pydantic declares it ``Any``, and a generated
+        # module carries no lint suppression (comments do not survive the AST), so the
+        # override takes the widest honest type, which it may (it never reads it).
         fields += ast.parse(
-            "def model_post_init(self, context):\n"
+            "def model_post_init(self, context: object, /) -> None:\n"
             f"    self.__pydantic_fields_set__.update({{{names}}})\n"
         ).body
 
@@ -555,11 +558,15 @@ def generate_oneof_direct_union(
         union = f"Union[{union}]"
 
     registry.register_import("typing.Annotated")
+    registry.register_import("typing.Dict")
     registry.register_import("pydantic.WrapSerializer")
+    registry.register_import("pydantic.SerializerFunctionWrapHandler")
 
     source = textwrap.dedent(
         f'''
-        def {serializer_name}(value, handler):
+        def {serializer_name}(
+            value: {union}, handler: SerializerFunctionWrapHandler
+        ) -> Dict[str, object]:
             """Wire serializer for the @oneOf input '{type.name}': wraps the
             serialized member under its field tag."""
             tags = {{{tags}}}

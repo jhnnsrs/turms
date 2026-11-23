@@ -150,6 +150,9 @@ class EnumsPlugin(Plugin):
         config: GeneratorConfig,
         registry: ClassRegistry,
     ) -> Sequence[ast.AST]:
-        registry.register_import("enum.Enum")
-
-        return generate_enums(client_schema, config, self.config, registry)
+        enums = generate_enums(client_schema, config, self.config, registry)
+        if enums:
+            # Only when an enum is emitted: an unused import fails the
+            # generated module's lint (F401).
+            registry.register_import("enum.Enum")
+        return enums

@@ -69,7 +69,8 @@ def test_beast_styler(beast_schema: GraphQLSchema) -> None:
 
     md = ast.Module(body=generated_ast, type_ignores=[])
     generated = ast.unparse(ast.fix_missing_locations(md))
-    assert "from enum import Enum" in generated, "EnumPlugin not working"
+    # The beasts schema declares no enum: no (unused) import of Enum either.
+    assert "Enum" not in generated
 
 
 def test_beast_operations(beast_schema: GraphQLSchema) -> None:
@@ -85,7 +86,7 @@ def test_beast_operations(beast_schema: GraphQLSchema) -> None:
 
     md = ast.Module(body=generated_ast, type_ignores=[])
     generated = ast.unparse(ast.fix_missing_locations(md))
-    assert "from enum import Enum" in generated, "EnumPlugin not working"
+    assert "Enum" not in generated  # the beasts schema declares no enum
     assert "class Get_beasts(BaseModel):" in generated, "OpertiationsPlugin not working"
     assert "common_name: str | None" in generated, "SnakeNodeName not working"
 
