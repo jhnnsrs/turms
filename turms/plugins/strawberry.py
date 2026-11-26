@@ -383,6 +383,7 @@ class StrawberryPluginConfig(PluginConfig):
 
     skip_underscore: bool = False
     skip_double_underscore: bool = True
+    resolver_info_argument: bool = False
 
     # Functional configuration:
     generate_directives_func: StrawberryGenerateFunc = default_generate_directives
@@ -1065,11 +1066,20 @@ def generate_types(
                     args=[],
                 )
 
+                info_args = []
+                if plugin_config.resolver_info_argument:
+                    registry.register_import("strawberry.types.Info")
+                    info_args = [
+                        ast.arg(
+                            arg="info", annotation=ast.Name(id="Info", ctx=ast.Load())
+                        )
+                    ]
+
                 assign = function_def(
                     name=registry.generate_node_name(value_key),
                     returns=returns,
                     args=ast.arguments(
-                        args=[ast.arg(arg="self")] + additional_args,
+                        args=[ast.arg(arg="self")] + info_args + additional_args,
                         posonlyargs=[],
                         kwonlyargs=[],
                         kw_defaults=[],

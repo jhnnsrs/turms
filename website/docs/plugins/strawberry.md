@@ -39,6 +39,7 @@ project:
             input_bases: [] # additional input type bases
             skip_underscore: False # skip generated underscored types
             skip_double_underscore: True # skip generatind double underscored types
+            resolver_info_argument: False # add an `info: Info` argument to generated resolvers
 ```
 
 

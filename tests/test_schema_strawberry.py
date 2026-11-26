@@ -1,12 +1,12 @@
 import pytest
 from graphql import GraphQLSchema
 
-from turms.config import GeneratorConfig
+from turms.config import GeneratorConfig, PythonType
 from turms.plugins.strawberry import StrawberryPlugin, StrawberryPluginConfig
 from turms.run import generate_ast
 from turms.stylers.default import DefaultStyler
 
-from .utils import unit_test_with
+from .utils import parse_to_code, unit_test_with
 
 
 @pytest.mark.network
@@ -130,6 +130,35 @@ def test_custom_scalar_generation(scalar_schema: GraphQLSchema) -> None:
         ],
         skip_forwards=True,
     )
+
+    unit_test_with(generated_ast, "")
+
+
+def test_resolver_info_argument(arkitekt_schema: GraphQLSchema) -> None:
+    config = GeneratorConfig(
+        scalar_definitions={
+            "QString": PythonType("str"),
+            "Any": PythonType("str"),
+            "UUID": PythonType("pydantic.UUID4"),
+            "Callback": PythonType("str"),
+        }
+    )
+
+    generated_ast = generate_ast(
+        config,
+        arkitekt_schema,
+        stylers=[DefaultStyler()],
+        plugins=[
+            StrawberryPlugin(
+                config=StrawberryPluginConfig(resolver_info_argument=True)
+            ),
+        ],
+        skip_forwards=True,
+    )
+
+    source = parse_to_code(generated_ast)
+    assert "from strawberry.types import Info" in source
+    assert "info: Info" in source
 
     unit_test_with(generated_ast, "")
 
