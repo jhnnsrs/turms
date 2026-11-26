@@ -1,3 +1,7 @@
+import ast
+
+from graphql import GraphQLSchema
+
 from turms.config import GeneratorConfig
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.fragments import FragmentsPlugin
@@ -10,7 +14,7 @@ from turms.stylers.snake_case import SnakeCaseStyler
 from .utils import build_relative_glob, unit_test_with
 
 
-def _generate(hello_world_schema):
+def _generate(hello_world_schema: GraphQLSchema) -> list[ast.AST]:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/root_typename/*.graphql"),
     )
@@ -27,7 +31,7 @@ def _generate(hello_world_schema):
     )
 
 
-def test_root_typename_is_a_real_field(hello_world_schema):
+def test_root_typename_is_a_real_field(hello_world_schema: GraphQLSchema) -> None:
     """A ``__typename`` selected at the operation root must survive as a field.
 
     Emitting it verbatim would give the class a ``__typename`` attribute, which
@@ -46,7 +50,7 @@ def test_root_typename_is_a_real_field(hello_world_schema):
     )
 
 
-def test_root_typename_round_trips(hello_world_schema):
+def test_root_typename_round_trips(hello_world_schema: GraphQLSchema) -> None:
     generated_ast = _generate(hello_world_schema)
 
     unit_test_with(

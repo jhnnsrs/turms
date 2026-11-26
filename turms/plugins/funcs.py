@@ -3,20 +3,20 @@ from __future__ import annotations
 import ast
 import logging
 import re
-from typing import Any, List, Optional, Tuple
-
+from typing import Any
 
 from graphql import (
     FragmentSpreadNode,
     GraphQLInputObjectType,
     GraphQLInputType,
+    GraphQLList,
+    GraphQLNonNull,
     GraphQLObjectType,
+    GraphQLScalarType,
+    GraphQLSchema,
     NamedTypeNode,
     VariableNode,
     get_named_type,
-)
-from graphql.type.definition import (
-    GraphQLEnumType,
 )
 from graphql.language.ast import (
     FieldNode,
@@ -25,14 +25,20 @@ from graphql.language.ast import (
     OperationType,
     TypeNode,
 )
-from graphql import GraphQLSchema
-from graphql.utilities.get_operation_root_type import get_operation_root_type
-from graphql.utilities.type_info import get_field_def
+from graphql.type.definition import (
+    GraphQLEnumType,
+)
 from pydantic import BaseModel, Field
 from pydantic_settings import SettingsConfigDict
+
 from turms.config import GeneratorConfig, PythonType
 from turms.plugins.base import Plugin, PluginConfig
 from turms.registry import ClassRegistry
+from turms.schema_lookup import (
+    get_field_def,
+    get_operation_root_type,
+    input_field_is_required,
+)
 from turms.utils import (
     capitalize_first,
     inspect_operation_for_documentation,
@@ -44,11 +50,6 @@ from turms.utils import (
     recurse_type_annotation,
     recurse_type_label,
     target_from_node,
-)
-from graphql import (
-    GraphQLList,
-    GraphQLNonNull,
-    GraphQLScalarType,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,32 +68,49 @@ class Arg(BaseModel):
     description: str = "Specify that in turms.plugin.funcs.OperationsFuncPlugin"
 
 
-class FunctionDefinition(BaseModel):
+class OperationExtras(BaseModel):
+    """Extra parameters a generated function takes and forwards on the call."""
+
+    extra_args: list[Arg] = []
+    extra_kwargs: list[Kwarg] = []
+
+
+NO_EXTRAS = OperationExtras()
+
+
+class FunctionDefinition(OperationExtras):
     type: OperationType
     is_async: bool = False
-    extra_args: List[Arg] = []
-    extra_kwargs: List[Kwarg] = []
     use: str
 
 
-class FuncsPluginConfig(PluginConfig):
-    model_config = SettingsConfigDict(extra="forbid", env_prefix="TURMS_PLUGINS_FUNCS_")
-    type: str = "turms.plugins.funcs.FuncsPlugin"
-    funcs_glob: Optional[str] = None
+class OperationFuncsConfig(PluginConfig):
+    """What turning an operation into a typed python function needs.
+
+    Shared by the funcs plugin (free functions calling a configured proxy) and
+    the client plugin (methods of one class calling methods of ``self``).
+    """
+
     prepend_sync: str = ""
     prepend_async: str = "a"
     collapse_lonely: bool = True
-    global_args: List[Arg] = []
-    global_kwargs: List[Kwarg] = []
-    definitions: List[FunctionDefinition] = []
+    global_args: list[Arg] = []
+    global_kwargs: list[Kwarg] = []
     extract_documentation: bool = True
-    expand_input_types: List[str] = []
+    expand_input_types: list[str] = []
     coercible_scalars: dict[str, PythonType] = {}
     coercible_inputs: dict[str, PythonType] = {}
     """Map of input type names to an additional python type accepted in generated
     function parameters. The annotation is generated as a Union of the input model
     and the given type (e.g. AxisInput: str -> Union[AxisInput, str]); the input
     model performs the actual coercion (e.g. via a before-validator)."""
+
+
+class FuncsPluginConfig(OperationFuncsConfig):
+    model_config = SettingsConfigDict(extra="forbid", env_prefix="TURMS_PLUGINS_FUNCS_")
+    type: str = "turms.plugins.funcs.FuncsPlugin"
+    funcs_glob: str | None = None
+    definitions: list[FunctionDefinition] = []
 
 
 def camel_to_snake(name: str) -> str:
@@ -102,10 +120,10 @@ def camel_to_snake(name: str) -> str:
 
 def generate_async_func_name(
     o: OperationDefinitionNode,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     config: GeneratorConfig,
     registry: ClassRegistry,
-):
+) -> str:
     if not o.name:
         raise Exception("Operation name is None")
     return f"{plugin_config.prepend_async}{camel_to_snake(o.name.value)}"
@@ -113,26 +131,26 @@ def generate_async_func_name(
 
 def generate_sync_func_name(
     o: OperationDefinitionNode,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     config: GeneratorConfig,
     registry: ClassRegistry,
-):
+) -> str:
     if not o.name:  # pragma: no cover
         raise Exception("Operation name is None")
     return f"{plugin_config.prepend_sync}{camel_to_snake(o.name.value)}"
 
 
 def get_extra_args_for_onode(
-    definition: FunctionDefinition,
-    plugin_config: FuncsPluginConfig,
-) -> List[Arg]:
+    definition: OperationExtras,
+    plugin_config: OperationFuncsConfig,
+) -> list[Arg]:
     args = plugin_config.global_args
     return args + definition.extra_args
 
 
 def generate_passing_extra_args_for_onode(
-    definition: FunctionDefinition, plugin_config: FuncsPluginConfig
-):
+    definition: OperationExtras, plugin_config: OperationFuncsConfig
+) -> list[ast.Name]:
     return [
         ast.Name(id=arg.key, ctx=ast.Load())
         for arg in get_extra_args_for_onode(definition, plugin_config)
@@ -140,8 +158,8 @@ def generate_passing_extra_args_for_onode(
 
 
 def generate_passing_extra_kwargs_for_onode(
-    definition: FunctionDefinition, plugin_config: FuncsPluginConfig
-):
+    definition: OperationExtras, plugin_config: OperationFuncsConfig
+) -> list[ast.keyword]:
     return [
         ast.keyword(arg=kwarg.key, value=ast.Name(id=kwarg.key, ctx=ast.Load()))
         for kwarg in get_extra_kwargs_for_onode(definition, plugin_config)
@@ -149,9 +167,9 @@ def generate_passing_extra_kwargs_for_onode(
 
 
 def get_extra_kwargs_for_onode(
-    definition: FunctionDefinition,
-    plugin_config: FuncsPluginConfig,
-) -> List[Kwarg]:
+    definition: OperationExtras,
+    plugin_config: OperationFuncsConfig,
+) -> list[Kwarg]:
     kwargs = plugin_config.global_kwargs
 
     return kwargs + definition.extra_kwargs
@@ -160,7 +178,7 @@ def get_extra_kwargs_for_onode(
 def get_definitions_for_onode(
     operation_definition: OperationDefinitionNode,
     plugin_config: FuncsPluginConfig,
-) -> List[FunctionDefinition]:
+) -> list[FunctionDefinition]:
     """Checks the Plugin Config if the operation definition should be included
     in the generated functions
 
@@ -184,9 +202,9 @@ def get_definitions_for_onode(
 def generate_input_annotation(
     type: GraphQLInputType,
     registry: ClassRegistry,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     is_optional: bool = True,
-):
+) -> ast.expr:
     if isinstance(type, GraphQLScalarType):
         if type.name in plugin_config.coercible_scalars:
             registry.register_import(plugin_config.coercible_scalars[type.name])
@@ -242,9 +260,9 @@ def generate_input_annotation(
         )
 
     if isinstance(type, GraphQLList):
-        registry.register_import("typing.Iterable")
+        registry.register_import("collections.abc.Iterable")
 
-        def list_builder(x):
+        def list_builder(x: ast.expr) -> ast.Subscript:
             return ast.Subscript(
                 value=ast.Name("Iterable", ctx=ast.Load()), slice=x, ctx=ast.Load()
             )
@@ -276,8 +294,8 @@ def generate_input_annotation(
 def generate_input_description(
     type: GraphQLInputObjectType,
     registry: ClassRegistry,
-    is_optional=True,
-):
+    is_optional: bool = True,
+) -> str:
     if isinstance(type, GraphQLScalarType):
         return type.description or ""
 
@@ -304,7 +322,7 @@ def generate_input_description(
 
 def generate_input_type_descriptions(
     input_type: GraphQLInputObjectType, registry: ClassRegistry
-):
+) -> str:
     description = ""
 
     for value_key, value in input_type.fields.items():
@@ -338,7 +356,7 @@ def coercible_input_union(
 def generate_variable_annotation(
     type_node: TypeNode,
     registry: ClassRegistry,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
 ) -> ast.expr:
     """The annotation for a non-expanded operation variable, honoring
     coercible_scalars and coercible_inputs on the final named type (the
@@ -381,25 +399,50 @@ def unset_union_annotation(annotation: ast.expr, registry: ClassRegistry) -> ast
     )
 
 
-def dict_str_any_annotation(registry: ClassRegistry) -> ast.expr:
-    """Returns a ``Dict[str, Any]`` annotation for the loosely-typed variables dict."""
+def dict_str_object_annotation(registry: ClassRegistry) -> ast.expr:
+    """Returns a ``Dict[str, object]`` annotation for an argument-assembly dict.
+
+    ``object`` rather than ``Any``: these dicts are write-only buffers whose values come straight
+    from the enclosing function's already-typed parameters, and whose keys are literals this
+    generator emits -- so ``Any`` bought no checking and only disabled it. ``object`` still
+    satisfies a ``Dict[str, Any]``/``Mapping[str, Any]`` parameter, so callers are unaffected;
+    what it does refuse is ``**``-unpacking the buffer into a typed signature, which is why
+    :mod:`turms.plugins.input_funcs` validates its dict instead of splatting it.
+
+    Spelled ``builtins.object`` because a bare ``object`` is shadowable: a schema is free to name
+    a field ``object`` (kraph's ``assertStructure`` does), which makes it a *parameter* of the
+    generated function and turns the annotation into a reference to that parameter rather than
+    the type. Qualifying it is the only spelling no field name can capture.
+    """
     registry.register_import("typing.Dict")
-    registry.register_import("typing.Any")
+    registry.register_import("builtins")
     return ast.Subscript(
         value=ast.Name(id="Dict", ctx=ast.Load()),
         slice=ast.Tuple(
-            elts=[ast.Name(id="str", ctx=ast.Load()), ast.Name(id="Any", ctx=ast.Load())],
+            elts=[
+                ast.Name(id="str", ctx=ast.Load()),
+                ast.Attribute(
+                    value=ast.Name(id="builtins", ctx=ast.Load()),
+                    attr="object",
+                    ctx=ast.Load(),
+                ),
+            ],
             ctx=ast.Load(),
         ),
         ctx=ast.Load(),
     )
 
 
+#: Kept for third-party plugins that imported the old name. turms is published and this name
+#: carries no underscore, so removing it outright would break them on upgrade.
+dict_str_any_annotation = dict_str_object_annotation
+
+
 def generate_input_type_params(
     input_type: GraphQLInputObjectType,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
-):
+) -> tuple[list[ast.arg], list[ast.arg], list[ast.expr]]:
     pos_args = []
     kw_args = []
     kw_values = []
@@ -407,7 +450,7 @@ def generate_input_type_params(
     for value_key, value in input_type.fields.items():
         field_name = registry.generate_node_name(value_key)
 
-        if isinstance(value.type, GraphQLNonNull):
+        if input_field_is_required(value):
             pos_args.append(
                 ast.arg(
                     arg=field_name,
@@ -440,13 +483,13 @@ def generate_input_type_params(
 
 
 def generate_parameters(
-    definition: FunctionDefinition,
+    definition: OperationExtras,
     operation_definition: OperationDefinitionNode,
     config: GeneratorConfig,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
     client_schema: GraphQLSchema,
-):
+) -> ast.arguments:
     pos_args = []
     kw_args = []
     kw_values = []
@@ -467,12 +510,12 @@ def generate_parameters(
 
     arg_variables = [
         v
-        for v in operation_definition.variable_definitions
+        for v in operation_definition.variable_definitions or ()
         if isinstance(v.type, NonNullTypeNode) and not v.default_value
     ]
     kwarg_variables = [
         v
-        for v in operation_definition.variable_definitions
+        for v in operation_definition.variable_definitions or ()
         if not isinstance(v.type, NonNullTypeNode) or v.default_value
     ]
 
@@ -577,10 +620,10 @@ def _guarded_variable_assign(
 
 def generate_variable_assignments(
     o: OperationDefinitionNode,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
     client_schema: GraphQLSchema,
-):
+) -> list[ast.stmt]:
     """Builds the statements that assemble the ``variables`` dict for an
     operation, omitting any argument the caller left as ``UNSET``. Combined with
     ``exclude_unset`` serialization this lets the server apply its own defaults
@@ -589,13 +632,13 @@ def generate_variable_assignments(
     stmts.append(
         ast.AnnAssign(
             target=ast.Name(id="variables", ctx=ast.Store()),
-            annotation=dict_str_any_annotation(registry),
+            annotation=dict_str_object_annotation(registry),
             value=ast.Dict(keys=[], values=[]),
             simple=1,
         )
     )
 
-    for v in o.variable_definitions:
+    for v in o.variable_definitions or ():
         gql_name = v.variable.name.value
         is_required = isinstance(v.type, NonNullTypeNode) and not v.default_value
 
@@ -619,7 +662,7 @@ def generate_variable_assignments(
             stmts.append(
                 ast.AnnAssign(
                     target=ast.Name(id=inner_name, ctx=ast.Store()),
-                    annotation=dict_str_any_annotation(registry),
+                    annotation=dict_str_object_annotation(registry),
                     value=ast.Dict(keys=[], values=[]),
                     simple=1,
                 )
@@ -632,7 +675,7 @@ def generate_variable_assignments(
                     ctx=ast.Store(),
                 )
                 field_value = ast.Name(id=field_param, ctx=ast.Load())
-                if isinstance(field.type, GraphQLNonNull):
+                if input_field_is_required(field):
                     # required field → always present (positional parameter)
                     stmts.append(
                         ast.Assign(targets=[field_subscript], value=field_value)
@@ -654,9 +697,7 @@ def generate_variable_assignments(
             param_value = ast.Name(id=param, ctx=ast.Load())
             if is_required:
                 # required positional argument → always present
-                stmts.append(
-                    ast.Assign(targets=[outer_subscript], value=param_value)
-                )
+                stmts.append(ast.Assign(targets=[outer_subscript], value=param_value))
             else:
                 stmts.append(
                     _guarded_variable_assign(
@@ -667,7 +708,9 @@ def generate_variable_assignments(
     return stmts
 
 
-def generate_document_arg(o: OperationDefinitionNode, registry: ClassRegistry):
+def generate_document_arg(
+    o: OperationDefinitionNode, registry: ClassRegistry
+) -> ast.Name:
     return ast.Name(id=get_operation_class_name(o, registry), ctx=ast.Load())
 
 
@@ -736,11 +779,9 @@ def get_return_type_annotation(
             if isinstance(
                 collapsable_fragment_field, FragmentSpreadNode
             ):  # Dealing with a on element fragment
-                implementation = (
-                    registry.get_interface_fragment_implementation_or_none(
-                        collapsable_fragment_field.name.value,
-                        get_named_type(field_definition.type).name,
-                    )
+                implementation = registry.get_interface_fragment_implementation_or_none(
+                    collapsable_fragment_field.name.value,
+                    get_named_type(field_definition.type).name,
                 )
                 overwrite_final = (
                     implementation
@@ -777,8 +818,8 @@ def get_return_type_string(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     registry: ClassRegistry,
-    collapse=True,
-) -> Tuple[str, bool]:
+    collapse: bool = True,
+) -> tuple[str, bool]:
     o_name = get_operation_class_name(o, registry)
 
     root = get_operation_root_type(client_schema, o)
@@ -800,11 +841,9 @@ def get_return_type_string(
             if isinstance(
                 collapsable_fragment_field, FragmentSpreadNode
             ):  # Dealing with a on element fragment
-                implementation = (
-                    registry.get_interface_fragment_implementation_or_none(
-                        collapsable_fragment_field.name.value,
-                        get_named_type(potential_return_type.type).name,
-                    )
+                implementation = registry.get_interface_fragment_implementation_or_none(
+                    collapsable_fragment_field.name.value,
+                    get_named_type(potential_return_type.type).name,
                 )
                 overwrite_final = (
                     implementation
@@ -834,12 +873,12 @@ def estimate_variable_name(
     client_schema: GraphQLSchema,
     root: GraphQLObjectType,
     description_map: dict,
-):
+) -> None:
     if o.selection_set is None:
         return
     for field in o.selection_set.selections:
         if isinstance(field, FieldNode):
-            for arg in field.arguments:
+            for arg in field.arguments or ():
                 the_field = get_field_def(client_schema, root, field)
                 if isinstance(arg.value, VariableNode):
                     if arg.value.name.value in the_field.args:
@@ -868,14 +907,14 @@ def estimate_variable_name(
 
 
 def generate_query_doc(
-    definition: FunctionDefinition,
+    definition: OperationExtras,
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
-    collapse=False,
-):
+    collapse: bool = False,
+) -> ast.Expr:
     x = get_operation_root_type(client_schema, o)
 
     get_operation_class_name(o, registry)
@@ -921,7 +960,7 @@ def generate_query_doc(
     for arg in extra_args:
         description += f"    {arg.key} ({arg.type}): {arg.description}\n"
 
-    for v in o.variable_definitions:
+    for v in o.variable_definitions or ():
         if v.variable.name.value in plugin_config.expand_input_types:
             input_type = v.type
 
@@ -937,7 +976,7 @@ def generate_query_doc(
             if isinstance(v.type, NonNullTypeNode) and not v.default_value:
                 description += f"    {registry.generate_parameter_name(v.variable.name.value)} ({recurse_type_label(v.type, registry)}): {field_description}\n"
 
-    for v in o.variable_definitions:
+    for v in o.variable_definitions or ():
         field_description = description_map.get(v.variable.name.value, "No description")
 
         if not isinstance(v.type, NonNullTypeNode) or v.default_value:
@@ -960,10 +999,10 @@ def genereate_async_call(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
-    collapse=False,
-):
+    collapse: bool = False,
+) -> ast.Return:
     registry.register_import(definition.use)
 
     if not collapse:
@@ -1025,10 +1064,10 @@ def genereate_sync_call(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
-    collapse=False,
-):
+    collapse: bool = False,
+) -> ast.Return:
     registry.register_import(definition.use)
     if not collapse:
         return ast.Return(
@@ -1083,10 +1122,10 @@ def genereate_async_iterator(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
-    collapse=False,
-):
+    collapse: bool = False,
+) -> ast.AsyncFor:
     registry.register_import(definition.use)
     if not collapse:
         return ast.AsyncFor(
@@ -1153,10 +1192,10 @@ def genereate_sync_iterator(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
-    collapse=False,
-):
+    collapse: bool = False,
+) -> ast.For:
     registry.register_import(definition.use)
     if not collapse:
         return ast.For(
@@ -1218,7 +1257,7 @@ def genereate_sync_iterator(
         )
 
 
-def is_collapsable(o: OperationDefinitionNode):
+def is_collapsable(o: OperationDefinitionNode) -> bool:
     assert o.selection_set is not None, "Operation needs to have at least a selection"
     return len(o.selection_set.selections) == 1
 
@@ -1228,9 +1267,9 @@ def generate_operation_func(
     o: OperationDefinitionNode,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    plugin_config: FuncsPluginConfig,
+    plugin_config: OperationFuncsConfig,
     registry: ClassRegistry,
-):
+) -> list[ast.stmt]:
     tree = []
 
     collapse = plugin_config.collapse_lonely and is_collapsable(o)
@@ -1249,7 +1288,7 @@ def generate_operation_func(
 
     if definition.is_async:
         if o.operation == OperationType.SUBSCRIPTION:
-            registry.register_import("typing.AsyncIterator")
+            registry.register_import("collections.abc.AsyncIterator")
 
         tree.append(
             ast.AsyncFunctionDef(
@@ -1296,7 +1335,7 @@ def generate_operation_func(
 
     if not definition.is_async:
         if o.operation == OperationType.SUBSCRIPTION:
-            registry.register_import("typing.Iterator")
+            registry.register_import("collections.abc.Iterator")
 
         tree.append(
             ast.FunctionDef(
@@ -1383,7 +1422,7 @@ class FuncsPlugin(Plugin):
         client_schema: GraphQLSchema,
         config: GeneratorConfig,
         registry: ClassRegistry,
-    ) -> List[ast.AST]:
+    ) -> list[ast.AST]:
         plugin_tree = []
 
         # Merge the global coercible_scalars/coercible_inputs with this plugin's

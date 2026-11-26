@@ -1,6 +1,7 @@
 from pydantic import Field
-from turms.processors.base import Processor, ProcessorConfig
+
 from turms.config import GeneratorConfig
+from turms.processors.base import Processor, ProcessorConfig
 
 
 class DisclaimerProcessorConfig(ProcessorConfig):
@@ -14,5 +15,5 @@ class DisclaimerProcessor(Processor):
 
     config: DisclaimerProcessorConfig = Field(default_factory=DisclaimerProcessorConfig)
 
-    def run(self, gen_file: str, config: GeneratorConfig):
+    def run(self, gen_file: str, config: GeneratorConfig) -> str:
         return self.config.disclaimer + "\n" + gen_file

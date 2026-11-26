@@ -1,27 +1,29 @@
+import ast
 import re
 import textwrap
 from dataclasses import dataclass
+
 from graphql import (
     GraphQLInputObjectType,
     GraphQLInputType,
     GraphQLList,
     GraphQLNonNull,
     GraphQLScalarType,
+    GraphQLSchema,
     Undefined,
 )
-from turms.errors import GenerationError
-from pydantic_settings import SettingsConfigDict
-from turms.plugins.base import Plugin, PluginConfig, rename_deprecated_keys
-import ast
-from typing import Any, Dict, List, Optional
-from turms.config import GeneratorConfig
-from graphql import GraphQLSchema
-from pydantic import Field, model_validator
 from graphql.type.definition import (
     GraphQLEnumType,
 )
+from pydantic import Field, model_validator
+from pydantic_settings import SettingsConfigDict
+
+from turms.config import GeneratorConfig, GraphQLTypes
+from turms.errors import GenerationError
+from turms.plugins.base import Plugin, PluginConfig, rename_deprecated_keys
 from turms.referencer import create_reference_registry_from_documents
 from turms.registry import ClassRegistry
+from turms.schema_lookup import get_default_value
 from turms.utils import (
     annotate_field_metadata,
     compose_field_documentation,
@@ -31,7 +33,6 @@ from turms.utils import (
     is_oneof_input_type,
     parse_documents,
 )
-from turms.config import GraphQLTypes
 
 
 class InputsPluginConfig(PluginConfig):
@@ -39,18 +40,18 @@ class InputsPluginConfig(PluginConfig):
         extra="forbid", env_prefix="TURMS_PLUGINS_INPUTS_"
     )
     type: str = "turms.plugins.inputs.InputsPlugin"
-    input_bases: List[str] = ["pydantic.BaseModel"]
+    input_bases: list[str] = ["pydantic.BaseModel"]
     skip_underscore: bool = True
     skip_unreferenced: bool = True
 
     @model_validator(mode="before")
     @classmethod
-    def _rename_deprecated(cls, values: Any) -> Any:
+    def _rename_deprecated(cls, values: object) -> object:
         return rename_deprecated_keys(values, {"inputtype_bases": "input_bases"})
 
     @model_validator(mode="before")
     @classmethod
-    def _reject_removed_options(cls, values: Any) -> Any:
+    def _reject_removed_options(cls, values: object) -> object:
         if isinstance(values, dict) and "allow_population_by_field_name" in values:
             raise ValueError(
                 "'allow_population_by_field_name' was never read by the inputs "
@@ -66,8 +67,8 @@ def generate_input_annotation(
     config: GeneratorConfig,
     plugin_config: InputsPluginConfig,
     registry: ClassRegistry,
-    is_optional=True,
-):
+    is_optional: bool = True,
+) -> ast.expr:
     if isinstance(type, GraphQLScalarType):
         if is_optional:
             registry.register_import("typing.Optional")
@@ -115,7 +116,7 @@ def generate_input_annotation(
         ):
             registry.register_import("typing.Tuple")
 
-            def list_builder(x):
+            def list_builder(x: ast.expr) -> ast.Subscript:
                 return ast.Subscript(
                     value=ast.Name("Tuple", ctx=ast.Load()),
                     slice=ast.Tuple(elts=[x, ast.Constant(value=...)], ctx=ast.Load()),
@@ -125,7 +126,7 @@ def generate_input_annotation(
         else:
             registry.register_import("typing.List")
 
-            def list_builder(x):
+            def list_builder(x: ast.expr) -> ast.Subscript:
                 return ast.Subscript(
                     value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
                 )
@@ -163,7 +164,7 @@ def generate_input_field_annotation(
     plugin_config: InputsPluginConfig,
     registry: ClassRegistry,
     omittable: bool,
-):
+) -> ast.expr:
     """Builds an input field's annotation. A NonNull field that is nonetheless
     omittable on the client (because it carries a schema default) defaults to
     ``None``, so its annotation must be wrapped in ``Optional[...]`` even though
@@ -185,10 +186,10 @@ def generate_input_field_value(
     field_name: str,
     value_key: str,
     omittable: bool,
-    description: Optional[str],
+    description: str | None,
     registry: ClassRegistry,
     config: GeneratorConfig,
-):
+) -> ast.expr | None:
     """Builds the AnnAssign value for an input field. Emits a ``Field(...)`` call
     carrying the alias, the ``None`` default (for omittable fields) and the GraphQL
     field description; falls back to a bare ``None``/required value when no
@@ -237,8 +238,8 @@ def generate_input_type(
     plugin_config: InputsPluginConfig,
     registry: ClassRegistry,
     key: str,
-    discriminators: Optional[List[Discriminator]] = None,
-):
+    discriminators: list[Discriminator] | None = None,
+) -> ast.ClassDef:
     additional_bases = get_additional_bases_for_type(type.name, config, registry)
 
     fields = (
@@ -302,11 +303,11 @@ def generate_input_type(
         # nullable OR carries a schema default. For a default we no longer bake the
         # value: the field is omitted on serialization (exclude_unset) so the
         # server applies its own default.
-        has_default = value.default_value is not Undefined
+        has_default = get_default_value(value) is not Undefined
         # A null default carries no useful information; only mark non-null defaults.
         default_string = (
-            str(value.default_value)
-            if has_default and value.default_value is not None
+            str(get_default_value(value))
+            if has_default and get_default_value(value) is not None
             else None
         )
         omittable = has_default or not isinstance(value.type, GraphQLNonNull)
@@ -320,7 +321,9 @@ def generate_input_type(
             annotation,
             registry,
             default_value_ast=(
-                ast.Constant(value=default_string) if default_string is not None else None
+                ast.Constant(value=default_string)
+                if default_string is not None
+                else None
             ),
             deprecation_reason=value.deprecation_reason,
         )
@@ -358,8 +361,11 @@ def generate_input_type(
         # but the server needs it to discriminate. Mark it as set on every
         # construction so it always serializes.
         names = ", ".join(repr(d.discriminator) for d in discriminators)
+        # ``context: object``: pydantic declares it ``Any``, and a generated
+        # module carries no lint suppression (comments do not survive the AST), so the
+        # override takes the widest honest type, which it may (it never reads it).
         fields += ast.parse(
-            "def model_post_init(self, context):\n"
+            "def model_post_init(self, context: object, /) -> None:\n"
             f"    self.__pydantic_fields_set__.update({{{names}}})\n"
         ).body
 
@@ -372,12 +378,17 @@ def generate_input_type(
         ],
         decorator_list=[],
         keywords=[],
-        body=fields
-        + generate_pydantic_config(GraphQLTypes.INPUT, config, registry, typename=key),
+        body=registry.class_fields_for(
+            key,
+            fields
+            + generate_pydantic_config(
+                GraphQLTypes.INPUT, config, registry, typename=key
+            ),
+        ),
     )
 
 
-def validate_oneof_input_type(type: GraphQLInputObjectType):
+def validate_oneof_input_type(type: GraphQLInputObjectType) -> None:
     """Enforce the spec constraints on a ``@oneOf`` input: every field must be
     nullable and must not carry a default value."""
     for value_key, value in type.fields.items():
@@ -387,7 +398,7 @@ def validate_oneof_input_type(type: GraphQLInputObjectType):
                 f"'{value_key}'. The spec requires all fields of a @oneOf input "
                 "to be nullable."
             )
-        if value.default_value is not Undefined:
+        if get_default_value(value) is not Undefined:
             raise GenerationError(
                 f"@oneOf input type '{type.name}' has a default value on field "
                 f"'{value_key}'. The spec forbids defaults on @oneOf input fields."
@@ -396,13 +407,13 @@ def validate_oneof_input_type(type: GraphQLInputObjectType):
 
 def get_oneof_member_map(
     type: GraphQLInputObjectType,
-) -> Optional[Dict[str, GraphQLInputObjectType]]:
+) -> dict[str, GraphQLInputObjectType] | None:
     """Field-name → member-type map when the ``@oneOf`` input follows the tagged
     input-union pattern: every field is a distinct, non-oneOf input object type.
     Returns ``None`` when the type cannot be modelled as a direct union of its
     member models (scalar/enum fields, duplicated member types, or oneOf
     members, whose tag could not be recovered from the value's type)."""
-    members: Dict[str, GraphQLInputObjectType] = {}
+    members: dict[str, GraphQLInputObjectType] = {}
     for value_key, value in type.fields.items():
         member = value.type
         if not isinstance(member, GraphQLInputObjectType) or is_oneof_input_type(
@@ -424,7 +435,9 @@ def _snake(name: str) -> str:
     return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", interim).lower()
 
 
-def generate_union_alias(alias_name: str, member_names: List[str], registry: ClassRegistry):
+def generate_union_alias(
+    alias_name: str, member_names: list[str], registry: ClassRegistry
+) -> ast.Assign:
     if len(member_names) == 1:
         value = ast.Name(id=member_names[0], ctx=ast.Load())
     else:
@@ -449,7 +462,7 @@ def generate_oneof_wrapper_input(
     config: GeneratorConfig,
     plugin_config: InputsPluginConfig,
     registry: ClassRegistry,
-):
+) -> list[ast.AST]:
     """Generate a ``@oneOf`` input as a union of per-field wrapper classes, each
     carrying its single field as required. A wrapper serializes to the tagged
     wire form ``{fieldName: value}`` through the ordinary
@@ -497,7 +510,12 @@ def generate_oneof_wrapper_input(
                         target=ast.Name(field_name, ctx=ast.Store()),
                         annotation=annotation,
                         value=generate_input_field_value(
-                            field_name, value_key, False, value.description, registry, config
+                            field_name,
+                            value_key,
+                            False,
+                            value.description,
+                            registry,
+                            config,
                         ),
                         simple=1,
                     ),
@@ -516,9 +534,9 @@ def generate_oneof_wrapper_input(
 def generate_oneof_direct_union(
     key: str,
     type: GraphQLInputObjectType,
-    members: Dict[str, GraphQLInputObjectType],
+    members: dict[str, GraphQLInputObjectType],
     registry: ClassRegistry,
-):
+) -> list[ast.stmt]:
     """Generate a ``@oneOf`` input following the tagged input-union pattern as a
     direct union of the member models, with a ``WrapSerializer`` restoring the
     ``{fieldName: memberDict}`` wire form. Must be emitted after all member
@@ -540,11 +558,15 @@ def generate_oneof_direct_union(
         union = f"Union[{union}]"
 
     registry.register_import("typing.Annotated")
+    registry.register_import("typing.Dict")
     registry.register_import("pydantic.WrapSerializer")
+    registry.register_import("pydantic.SerializerFunctionWrapHandler")
 
     source = textwrap.dedent(
         f'''
-        def {serializer_name}(value, handler):
+        def {serializer_name}(
+            value: {union}, handler: SerializerFunctionWrapHandler
+        ) -> Dict[str, object]:
             """Wire serializer for the @oneOf input '{type.name}': wraps the
             serialized member under its field tag."""
             tags = {{{tags}}}
@@ -572,7 +594,7 @@ def generate_inputs(
     config: GeneratorConfig,
     plugin_config: InputsPluginConfig,
     registry: ClassRegistry,
-):
+) -> list[ast.AST]:
     tree = []
 
     inputobjects_type = {
@@ -598,13 +620,15 @@ def generate_inputs(
     union_member_types = set()
 
     for type_key, type in inputobjects_type.items():
-        directives = type.ast_node.directives if type.ast_node else []
+        directives = (type.ast_node.directives or ()) if type.ast_node else ()
         # unionElementOf is repeatable: a member may belong to several unions.
         memberships = []
         for directive in directives:
             if directive.name.value != "unionElementOf":
                 continue
-            args = {arg.name.value: arg.value.value for arg in directive.arguments}
+            args = {
+                arg.name.value: arg.value.value for arg in directive.arguments or ()
+            }
             union_type = args.get("union")
             discriminator = args.get("discriminator")
             member_key = args.get("key")
@@ -632,8 +656,8 @@ def generate_inputs(
 
         # One Literal field per distinct discriminator name; all unions sharing
         # a discriminator name must agree on this member's key.
-        discriminators: Dict[str, Discriminator] = {}
-        for union_type, discriminator, member_key in memberships:
+        discriminators: dict[str, Discriminator] = {}
+        for _union_type, discriminator, member_key in memberships:
             existing = discriminators.get(discriminator)
             if existing is not None and existing.value != member_key:
                 raise GenerationError(
@@ -642,6 +666,36 @@ def generate_inputs(
                 )
             discriminators[discriminator] = Discriminator(
                 discriminator=discriminator, value=member_key
+            )
+
+        if type_key in registry.external_module_map:
+            # Owned by an external module. Its unions must be too: a generated
+            # union alias names its members as bare classes of this module, and
+            # an external union's members are the external module's classes.
+            generated_unions = [
+                union_type
+                for union_type, _, _ in memberships
+                if union_type not in registry.external_module_map
+            ]
+            if generated_unions:
+                raise GenerationError(
+                    f"'{type.name}' comes from {registry.external_module_map[type_key]} "
+                    f"but its union(s) {generated_unions} are generated here. A "
+                    "@unionElementOf union and its members must come from the same place."
+                )
+            union_member_types.add(type_key)
+            continue
+
+        external_unions = [
+            union_type
+            for union_type, _, _ in memberships
+            if union_type in registry.external_module_map
+        ]
+        if external_unions:
+            raise GenerationError(
+                f"'{type.name}' is generated here but its union(s) {external_unions} "
+                "come from an external module. A @unionElementOf union and its "
+                "members must come from the same place."
             )
 
         name = registry.generate_inputtype(type.name)
@@ -668,6 +722,10 @@ def generate_inputs(
     deferred_oneof_unions = []
 
     for key, type in inputobjects_type.items():
+        if key in registry.external_module_map:
+            # Another project owns it; referencing it will import it.
+            continue
+
         if key in union_member_types:
             continue
 
@@ -678,6 +736,10 @@ def generate_inputs(
             continue
 
         if is_oneof_input_type(type):
+            registry.refuse_class_fields(
+                key,
+                "a @oneOf input is generated as a union of its variants, not a class",
+            )
             validate_oneof_input_type(type)
             members = get_oneof_member_map(type)
             if members is not None and any(
@@ -699,6 +761,10 @@ def generate_inputs(
             continue
 
         if type.name in union_input_types:
+            registry.refuse_class_fields(
+                key,
+                "a @unionElementOf placeholder is generated as a union alias, not a class",
+            )
             registry.register_import("typing.Union")
             registry.register_import("typing.Annotated")
             registry.register_import("pydantic.Field")
@@ -763,11 +829,11 @@ def generate_inputs(
             field_name = registry.generate_node_name(value_key)
             # Omittable (optional, default None) when nullable OR carrying a schema
             # default; defaults are deferred to the server via exclude_unset.
-            has_default = value.default_value is not Undefined
+            has_default = get_default_value(value) is not Undefined
             # A null default carries no useful information; only mark non-null defaults.
             default_string = (
-                str(value.default_value)
-                if has_default and value.default_value is not None
+                str(get_default_value(value))
+                if has_default and get_default_value(value) is not None
                 else None
             )
             omittable = has_default or not isinstance(value.type, GraphQLNonNull)
@@ -781,7 +847,9 @@ def generate_inputs(
                 annotation,
                 registry,
                 default_value_ast=(
-                    ast.Constant(value=default_string) if default_string is not None else None
+                    ast.Constant(value=default_string)
+                    if default_string is not None
+                    else None
                 ),
                 deprecation_reason=value.deprecation_reason,
             )
@@ -796,7 +864,12 @@ def generate_inputs(
                 target=ast.Name(field_name, ctx=ast.Store()),
                 annotation=annotation,
                 value=generate_input_field_value(
-                    field_name, value_key, omittable, value.description, registry, config
+                    field_name,
+                    value_key,
+                    omittable,
+                    value.description,
+                    registry,
+                    config,
                 ),
                 simple=1,
             )
@@ -823,9 +896,12 @@ def generate_inputs(
                 ],
                 decorator_list=[],
                 keywords=[],
-                body=fields
-                + generate_pydantic_config(
-                    GraphQLTypes.INPUT, config, registry, typename=key
+                body=registry.class_fields_for(
+                    key,
+                    fields
+                    + generate_pydantic_config(
+                        GraphQLTypes.INPUT, config, registry, typename=key
+                    ),
                 ),
             )
         )
@@ -851,7 +927,7 @@ class InputsPlugin(Plugin):
         client_schema: GraphQLSchema,
         config: GeneratorConfig,
         registry: ClassRegistry,
-    ) -> List[ast.AST]:
+    ) -> list[ast.AST]:
         for base in self.config.input_bases:
             registry.register_import(base)
 

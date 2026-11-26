@@ -1,3 +1,5 @@
+import ast
+
 from graphql import (
     GraphQLField,
     GraphQLInputObjectType,
@@ -9,17 +11,16 @@ from graphql import (
     GraphQLType,
     GraphQLUnionType,
 )
-from pydantic_settings import SettingsConfigDict
-from turms.errors import GenerationError
-from turms.plugins.base import Plugin, PluginConfig, rename_deprecated_keys
-import ast
-from typing import Any, Dict, List
-from turms.config import GeneratorConfig
-from graphql.utilities.build_client_schema import GraphQLSchema
-from pydantic import Field, model_validator
 from graphql.type.definition import (
     GraphQLEnumType,
 )
+from graphql.utilities.build_client_schema import GraphQLSchema
+from pydantic import Field, model_validator
+from pydantic_settings import SettingsConfigDict
+
+from turms.config import GeneratorConfig, GraphQLTypes
+from turms.errors import GenerationError
+from turms.plugins.base import Plugin, PluginConfig, rename_deprecated_keys
 from turms.registry import ClassRegistry
 from turms.utils import (
     annotate_field_metadata,
@@ -28,19 +29,18 @@ from turms.utils import (
     get_additional_bases_for_type,
     interface_is_extended_by_other_interfaces,
 )
-from turms.config import GraphQLTypes
 
 
 class ObjectsPluginConfig(PluginConfig):
     model_config = SettingsConfigDict(env_prefix="TURMS_PLUGINS_OBJECTS_")
     type: str = "turms.plugins.objects.ObjectsPlugin"
-    object_bases: List[str] = ["pydantic.BaseModel"]
+    object_bases: list[str] = ["pydantic.BaseModel"]
     skip_underscore: bool = False
     skip_double_underscore: bool = True
 
     @model_validator(mode="before")
     @classmethod
-    def _rename_deprecated(cls, values: Any) -> Any:
+    def _rename_deprecated(cls, values: object) -> object:
         return rename_deprecated_keys(values, {"types_bases": "object_bases"})
 
 
@@ -50,8 +50,8 @@ def generate_object_field_annotation(
     config: GeneratorConfig,
     plugin_config: ObjectsPluginConfig,
     registry: ClassRegistry,
-    is_optional=True,
-):
+    is_optional: bool = True,
+) -> ast.expr:
     if isinstance(graphql_type, GraphQLScalarType):
         if is_optional:
             registry.register_import("typing.Optional")
@@ -164,7 +164,7 @@ def generate_object_field_annotation(
         ):
             registry.register_import("typing.Tuple")
 
-            def list_builder(x):
+            def list_builder(x: ast.expr) -> ast.Subscript:
                 return ast.Subscript(
                     value=ast.Name("Tuple", ctx=ast.Load()),
                     slice=ast.Tuple(elts=[x, ast.Constant(value=...)], ctx=ast.Load()),
@@ -172,10 +172,9 @@ def generate_object_field_annotation(
                 )
 
         else:
-
             registry.register_import("typing.List")
 
-            def list_builder(x):
+            def list_builder(x: ast.expr) -> ast.Subscript:
                 return ast.Subscript(
                     value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
                 )
@@ -217,7 +216,7 @@ def generate_types(
     config: GeneratorConfig,
     plugin_config: ObjectsPluginConfig,
     registry: ClassRegistry,
-):
+) -> list[ast.AST]:
 
     tree = []
 
@@ -238,18 +237,17 @@ def generate_types(
         )
     }
 
-    interface_map: Dict[str, List[str]] = (
-        {}
-    )  # A list of interfaces with the union classes attached
-    interface_base_map: Dict[str, str] = (
-        {}
-    )  # A list of interfaces with its respective base
+    interface_map: dict[
+        str, list[str]
+    ] = {}  # A list of interfaces with the union classes attached
+    interface_base_map: dict[
+        str, str
+    ] = {}  # A list of interfaces with its respective base
 
     for base in plugin_config.object_bases:
         registry.register_import(base)
 
     for key, object_type in sorted_objects.items():
-
         additional_bases = get_additional_bases_for_type(
             object_type.name, config, registry
         )
@@ -373,8 +371,13 @@ def generate_types(
                 ],
                 decorator_list=[],
                 keywords=[],
-                body=fields
-                + generate_pydantic_config(GraphQLTypes.OBJECT, config, registry, key),
+                body=registry.class_fields_for(
+                    key,
+                    fields
+                    + generate_pydantic_config(
+                        GraphQLTypes.OBJECT, config, registry, key
+                    ),
+                ),
             )
         )
 
@@ -439,6 +442,6 @@ class ObjectsPlugin(Plugin):
         client_schema: GraphQLSchema,
         config: GeneratorConfig,
         registry: ClassRegistry,
-    ) -> List[ast.AST]:
+    ) -> list[ast.AST]:
 
         return generate_types(client_schema, config, self.config, registry)

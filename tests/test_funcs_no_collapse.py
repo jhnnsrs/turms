@@ -1,10 +1,8 @@
+from graphql import GraphQLSchema
 
-from .utils import build_relative_glob, unit_test_with
 from turms.config import GeneratorConfig
-from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
-from turms.plugins.inputs import InputsPlugin
-from turms.plugins.operations import OperationsPlugin
+from turms.plugins.fragments import FragmentsPlugin
 from turms.plugins.funcs import (
     Arg,
     FuncsPlugin,
@@ -12,12 +10,15 @@ from turms.plugins.funcs import (
     FunctionDefinition,
     Kwarg,
 )
-from turms.plugins.fragments import FragmentsPlugin
-from turms.stylers.default import DefaultStyler
+from turms.plugins.inputs import InputsPlugin
+from turms.plugins.operations import OperationsPlugin
 from turms.run import generate_ast
+from turms.stylers.default import DefaultStyler
+
+from .utils import build_relative_glob, unit_test_with
 
 
-def test_arkitekt_schema(arkitekt_schema):
+def test_arkitekt_schema(arkitekt_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/arkitekt/**/*.graphql"),
         scalar_definitions={
@@ -84,7 +85,7 @@ def test_arkitekt_schema(arkitekt_schema):
     )
 
 
-def test_beasts_schema(beast_schema):
+def test_beasts_schema(beast_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/beasts/**/*.graphql"),
         scalar_definitions={
@@ -151,7 +152,7 @@ def test_beasts_schema(beast_schema):
     )
 
 
-def test_extra_args(beast_schema):
+def test_extra_args(beast_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/beasts/**/*.graphql"),
     )

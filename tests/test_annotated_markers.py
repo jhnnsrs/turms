@@ -7,6 +7,10 @@ and the old `DEPRECATED:` prefix is dropped. Both marker classes are generated i
 the module by default, or imported from a user override via config.
 """
 
+import ast
+from pathlib import Path
+from typing import Any
+
 from graphql import build_ast_schema, parse
 
 from turms.config import GeneratorConfig
@@ -43,7 +47,7 @@ query GetCountries($filter: FilterInput, $page: Int = 1) {
 """
 
 
-def _generate(tmp_path, **config_kwargs):
+def _generate(tmp_path: Path, **config_kwargs: Any) -> list[ast.AST]:
     doc = tmp_path / "ops.graphql"
     doc.write_text(operation)
     config = GeneratorConfig(
@@ -58,14 +62,14 @@ def _generate(tmp_path, **config_kwargs):
     )
 
 
-def test_markers_are_generated(tmp_path):
+def test_markers_are_generated(tmp_path: Path) -> None:
     generated = parse_to_code(_generate(tmp_path))
     # Marker classes are emitted at module top.
     assert "class GraphQLDefault:" in generated
     assert "class Deprecated:" in generated
 
 
-def test_input_default_marker(tmp_path):
+def test_input_default_marker(tmp_path: Path) -> None:
     generated = parse_to_code(_generate(tmp_path))
     # The Field description stays the plain GraphQL description; the default is a
     # string on the marker and folded into the inline comment instead.
@@ -76,27 +80,25 @@ def test_input_default_marker(tmp_path):
     assert "'the limit\\nDefault: 10'" in generated
 
 
-def test_input_deprecation_marker(tmp_path):
+def test_input_deprecation_marker(tmp_path: Path) -> None:
     generated = parse_to_code(_generate(tmp_path))
     # Marker carries the reason; the DEPRECATED warning is in the inline comment.
-    assert (
-        "old: Annotated[str | None, Deprecated('use limit')] = None" in generated
-    )
+    assert "old: Annotated[str | None, Deprecated('use limit')] = None" in generated
     assert "'DEPRECATED: use limit'" in generated
 
 
-def test_object_field_deprecation_marker(tmp_path):
+def test_object_field_deprecation_marker(tmp_path: Path) -> None:
     generated = parse_to_code(_generate(tmp_path))
     assert "name: Annotated[str | None, Deprecated('renamed')]" in generated
 
 
-def test_operation_variable_default_marker(tmp_path):
+def test_operation_variable_default_marker(tmp_path: Path) -> None:
     generated = parse_to_code(_generate(tmp_path))
     # $page: Int = 1 -> the Arguments field carries the GraphQLDefault marker.
     assert "Annotated[int | None, GraphQLDefault('1')]" in generated
 
 
-def test_null_and_absent_defaults_have_no_marker(tmp_path):
+def test_null_and_absent_defaults_have_no_marker(tmp_path: Path) -> None:
     """A field with no default, or an explicit null default, gets no GraphQLDefault
     marker."""
     doc = tmp_path / "ops.graphql"
@@ -121,11 +123,14 @@ def test_null_and_absent_defaults_have_no_marker(tmp_path):
     )
     assert "with_default: Annotated[int | None, GraphQLDefault('5')]" in generated
     # null / absent defaults: plain optional, no marker.
-    assert "null_default: int | None = Field(alias='nullDefault', default=None)" in generated
+    assert (
+        "null_default: int | None = Field(alias='nullDefault', default=None)"
+        in generated
+    )
     assert "plain: int | None = None" in generated
 
 
-def test_opt_out_of_documentation(tmp_path):
+def test_opt_out_of_documentation(tmp_path: Path) -> None:
     """document_field_metadata=False keeps the markers but drops the deprecation /
     default text from the human-readable documentation."""
     generated = parse_to_code(_generate(tmp_path, document_field_metadata=False))
@@ -137,7 +142,7 @@ def test_opt_out_of_documentation(tmp_path):
     assert "Default: 10" not in generated
 
 
-def test_generated_code_executes(tmp_path):
+def test_generated_code_executes(tmp_path: Path) -> None:
     """pydantic must accept the Annotated metadata at runtime."""
     generated_ast = _generate(tmp_path)
     unit_test_with(
@@ -150,7 +155,7 @@ def test_generated_code_executes(tmp_path):
     )
 
 
-def test_config_override_imports_instead_of_generating(tmp_path):
+def test_config_override_imports_instead_of_generating(tmp_path: Path) -> None:
     """When the marker classes are overridden via config, they are imported, not
     generated."""
     generated = parse_to_code(
@@ -168,7 +173,7 @@ def test_config_override_imports_instead_of_generating(tmp_path):
     assert "class Deprecated:" not in generated
 
 
-def test_config_override_executes(tmp_path):
+def test_config_override_executes(tmp_path: Path) -> None:
     """The overridden markers resolve and the module runs (mocks defines them)."""
     generated_ast = _generate(
         tmp_path,

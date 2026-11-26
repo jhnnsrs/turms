@@ -1,12 +1,14 @@
 import os
+
 import pytest
-from .utils import DIR_NAME
 
 from turms.helpers import import_string
 from turms.run import build_schema_from_schema_type
 
+from .utils import DIR_NAME
 
-def test_faulty_import():
+
+def test_faulty_import() -> None:
     with pytest.raises(ImportError):
         import_string("invalid")
 
@@ -14,7 +16,7 @@ def test_faulty_import():
         import_string("turms.plugins.base.RandomClass")
 
 
-def test_schema_from_introspection_json():
+def test_schema_from_introspection_json() -> None:
     """
     Tests that the result of an introspection query can be read from a file.
     """
@@ -23,7 +25,7 @@ def test_schema_from_introspection_json():
     )
 
 
-def test_utf8_bom():
+def test_utf8_bom() -> None:
     """
     Tests that the files with UTF8-BOM are readable.
     """

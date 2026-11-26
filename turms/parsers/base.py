@@ -1,6 +1,5 @@
 import ast
 from abc import abstractmethod
-from typing import List
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -31,8 +30,8 @@ class Parser(BaseModel):
     @abstractmethod
     def parse_ast(
         self,
-        asts: List[ast.AST],
-    ) -> List[ast.AST]:
+        asts: list[ast.AST],
+    ) -> list[ast.AST]:
         """Transform the generated AST and return it.
 
         The return value replaces the tree, so an implementation must return the

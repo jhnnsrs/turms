@@ -1,17 +1,18 @@
 import ast
 
+from graphql import GraphQLSchema
 
-from .utils import (
-    unit_test_with,
-)
 from turms.config import GeneratorConfig
-from turms.run import generate_ast
 from turms.plugins.objects import ObjectsPlugin
 from turms.run import generate_ast
 from turms.stylers.default import DefaultStyler
 
+from .utils import (
+    unit_test_with,
+)
 
-def test_generation(multiple_forward_references_schema):
+
+def test_generation(multiple_forward_references_schema: GraphQLSchema) -> None:
     config = GeneratorConfig()
 
     generated_ast = generate_ast(

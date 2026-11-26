@@ -1,25 +1,27 @@
 import ast
-from graphql import parse, build_ast_schema
+
+from graphql import build_ast_schema, parse
+from pytest_snapshot.plugin import Snapshot
+
 from turms.config import GeneratorConfig
-from turms.run import generate_ast
-from turms.stylers.snake_case import SnakeCaseStyler
 from turms.plugins.inputs import InputsPlugin
 from turms.plugins.objects import ObjectsPlugin
+from turms.run import generate_ast
+from turms.stylers.snake_case import SnakeCaseStyler
+
 from .utils import unit_test_with
 
-inputs = '''
+inputs = """
 input X {
     mandatory: String!
     otherMandatory: String!
     optional: String
     otherOptional: String
 }
-'''
+"""
 
 
-
-
-def test_generates_schema(snapshot):
+def test_generates_schema(snapshot: Snapshot) -> None:
     config = GeneratorConfig()
 
     schema = build_ast_schema(parse(inputs))
@@ -34,10 +36,12 @@ def test_generates_schema(snapshot):
         ],
     )
 
-    unit_test_with(generated_ast, '')
+    unit_test_with(generated_ast, "")
 
-    without_imports = [node for node in generated_ast if not isinstance(node, ast.ImportFrom)]
+    without_imports = [
+        node for node in generated_ast if not isinstance(node, ast.ImportFrom)
+    ]
     md = ast.Module(body=without_imports, type_ignores=[])
     generated = ast.unparse(ast.fix_missing_locations(md))
-    snapshot.snapshot_dir = 'snapshots'  # This line is optional.
-    snapshot.assert_match(generated, 'test_py.txt')
+    snapshot.snapshot_dir = "snapshots"  # This line is optional.
+    snapshot.assert_match(generated, "test_py.txt")

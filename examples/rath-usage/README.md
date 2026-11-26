@@ -53,11 +53,11 @@ projects:
           - type: turms.plugins.inputs.InputsPlugin
           - type: turms.plugins.fragments.FragmentsPlugin
           - type: turms.plugins.operations.OperationsPlugin
-         - type: turms.plugins.funcs.FuncsPlugin
-            global_kwargs: # Kwargs that will be passed to all generated functions (rath sets a context var that we can use to avoid explicitly passing this)
+          - type: turms.plugins.funcs.FuncsPlugin
+            global_kwargs: # Kwargs added to every generated function and forwarded on the call
               - type: rath.Rath
                 key: rath
-                description: "The client we want to use (defaults to the currently active client)"
+                description: "The client to run the operation on"
             definitions:
               - type: subscription # The type of operation we want to generate a function for
                 is_async: True # We can specify to generate async functions (typed support)

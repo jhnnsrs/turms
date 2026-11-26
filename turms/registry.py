@@ -1,8 +1,25 @@
 import ast
+from collections.abc import Callable
 from keyword import iskeyword
-from typing import Callable, Dict, List, Optional, Set
 
-from graphql import GraphQLNamedType
+from graphql import (
+    GraphQLArgument,
+    GraphQLDirective,
+    GraphQLEnumType,
+    GraphQLInputObjectType,
+    GraphQLInputType,
+    GraphQLInterfaceType,
+    GraphQLNamedType,
+    GraphQLObjectType,
+    GraphQLSchema,
+    Undefined,
+    get_nullable_type,
+    is_enum_type,
+    is_input_object_type,
+    is_list_type,
+    is_non_null_type,
+    value_from_ast,
+)
 
 from turms.config import GeneratorConfig, LogFunction
 from turms.errors import (
@@ -13,7 +30,7 @@ from turms.errors import (
 )
 from turms.stylers.base import Styler
 
-SCALAR_DEFAULTS: Dict[str, str] = {
+SCALAR_DEFAULTS: dict[str, str] = {
     "ID": "str",
     "String": "str",
     "Int": "int",
@@ -23,16 +40,20 @@ SCALAR_DEFAULTS: Dict[str, str] = {
     "Float": "float",
 }
 
-# Annotated metadata markers generated into the output module (unless the user
-# overrides them via config). Authored as source and parsed to AST for clarity.
+# The builtins generated into the output module (unless the user overrides
+# them via config). Authored as source and parsed to AST for clarity. Every
+# argument and return is annotated (no Any), so the generated module passes a
+# strict lint. They are emitted past the annotation modernizer: an annotation
+# naming the class itself is quoted, and one spelled with ``|`` is quoted where
+# the target python predates PEP 604 (see ``ClassRegistry.generate_builtins``).
 _GRAPHQL_DEFAULT_SRC = """
 class GraphQLDefault:
     'Records a GraphQL field schema default value. The client omits the field so the server applies its own default; this preserves the value for introspection.'
 
-    def __init__(self, value):
+    def __init__(self, value: object) -> None:
         self.value = value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'GraphQLDefault(' + repr(self.value) + ')'
 """
 
@@ -40,11 +61,40 @@ _DEPRECATED_SRC = """
 class Deprecated:
     'Marks a field as deprecated, carrying the GraphQL deprecation reason.'
 
-    def __init__(self, reason=None):
+    def __init__(self, reason: str | None = None) -> None:
         self.reason = reason
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'Deprecated(' + repr(self.reason) + ')'
+"""
+
+# Before python 3.10 ``str | None`` raises when the signature is evaluated.
+_DEPRECATED_PRE_PEP604_SRC = _DEPRECATED_SRC.replace(
+    "reason: str | None", "reason: 'str | None'"
+)
+
+# Sentinel distinguishing "argument not provided" (omitted on serialize so the
+# server applies its default) from an explicitly passed ``None``.
+_UNSET_SRC = """
+class UnsetType:
+    'Sentinel for arguments the caller did not provide. Such fields are omitted on serialization so the GraphQL server applies its own default.'
+    _instance: 'UnsetType | None' = None
+
+    def __new__(cls) -> 'UnsetType':
+        instance = cls._instance
+        if instance is None:
+            instance = super().__new__(cls)
+            cls._instance = instance
+        return instance
+
+    def __repr__(self) -> str:
+        return 'UNSET'
+
+    def __bool__(self) -> bool:
+        return False
+
+
+UNSET = UnsetType()
 """
 
 
@@ -93,125 +143,15 @@ built_in_map = {
             ]
         ],
     ),
-    "UNSET": [
-        # Sentinel distinguishing "argument not provided" (omitted on serialize so
-        # the server applies its default) from an explicitly passed ``None``.
-        ast.ClassDef(
-            "UnsetType",
-            bases=[],
-            decorator_list=[],
-            keywords=[],
-            body=[
-                ast.Expr(
-                    value=ast.Constant(
-                        value=(
-                            "Sentinel for arguments the caller did not provide. "
-                            "Such fields are omitted on serialization so the GraphQL "
-                            "server applies its own default."
-                        )
-                    )
-                ),
-                ast.Assign(
-                    targets=[ast.Name(id="_instance", ctx=ast.Store())],
-                    value=ast.Constant(value=None),
-                ),
-                ast.FunctionDef(
-                    "__new__",
-                    args=ast.arguments(
-                        posonlyargs=[],
-                        args=[ast.arg(arg="cls")],
-                        kwonlyargs=[],
-                        kw_defaults=[],
-                        defaults=[],
-                    ),
-                    body=[
-                        ast.If(
-                            test=ast.Compare(
-                                left=ast.Attribute(
-                                    value=ast.Name(id="cls", ctx=ast.Load()),
-                                    attr="_instance",
-                                    ctx=ast.Load(),
-                                ),
-                                ops=[ast.Is()],
-                                comparators=[ast.Constant(value=None)],
-                            ),
-                            body=[
-                                ast.Assign(
-                                    targets=[
-                                        ast.Attribute(
-                                            value=ast.Name(id="cls", ctx=ast.Load()),
-                                            attr="_instance",
-                                            ctx=ast.Store(),
-                                        )
-                                    ],
-                                    value=ast.Call(
-                                        func=ast.Attribute(
-                                            value=ast.Call(
-                                                func=ast.Name(id="super", ctx=ast.Load()),
-                                                args=[],
-                                                keywords=[],
-                                            ),
-                                            attr="__new__",
-                                            ctx=ast.Load(),
-                                        ),
-                                        args=[ast.Name(id="cls", ctx=ast.Load())],
-                                        keywords=[],
-                                    ),
-                                )
-                            ],
-                            orelse=[],
-                        ),
-                        ast.Return(
-                            value=ast.Attribute(
-                                value=ast.Name(id="cls", ctx=ast.Load()),
-                                attr="_instance",
-                                ctx=ast.Load(),
-                            )
-                        ),
-                    ],
-                    decorator_list=[],
-                ),
-                ast.FunctionDef(
-                    "__repr__",
-                    args=ast.arguments(
-                        posonlyargs=[],
-                        args=[ast.arg(arg="self")],
-                        kwonlyargs=[],
-                        kw_defaults=[],
-                        defaults=[],
-                    ),
-                    body=[ast.Return(value=ast.Constant(value="UNSET"))],
-                    decorator_list=[],
-                ),
-                ast.FunctionDef(
-                    "__bool__",
-                    args=ast.arguments(
-                        posonlyargs=[],
-                        args=[ast.arg(arg="self")],
-                        kwonlyargs=[],
-                        kw_defaults=[],
-                        defaults=[],
-                    ),
-                    body=[ast.Return(value=ast.Constant(value=False))],
-                    decorator_list=[],
-                ),
-            ],
-        ),
-        ast.Assign(
-            targets=[ast.Name(id="UNSET", ctx=ast.Store())],
-            value=ast.Call(
-                func=ast.Name(id="UnsetType", ctx=ast.Load()),
-                args=[],
-                keywords=[],
-            ),
-        ),
-    ],
+    "UNSET": ast.parse(_UNSET_SRC).body,
     "GraphQLDefault": ast.parse(_GRAPHQL_DEFAULT_SRC).body[0],
     "Deprecated": ast.parse(_DEPRECATED_SRC).body[0],
 }  # builtin map provides the default types for any schema if they are referenced
 
+_DEPRECATED_PRE_PEP604 = ast.parse(_DEPRECATED_PRE_PEP604_SRC).body[0]
 
-class ClassRegistry(object):
+
+class ClassRegistry:
     """Class Registry is responsible for keeping track of all the classes that are generated
     as well as their names. It also keeps track of all the imports that are required for the
     generated code to work, as well as all the forward references that are required
@@ -220,66 +160,312 @@ class ClassRegistry(object):
     the logic behind the stylers."""
 
     def __init__(
-        self, config: GeneratorConfig, stylers: List[Styler], log: LogFunction
-    ):
-        self.stylers: List[Styler] = stylers
-        self._imports: Set[str] = set()
-        self._builtins: Set[str] = set()
+        self, config: GeneratorConfig, stylers: list[Styler], log: LogFunction
+    ) -> None:
+        self.stylers: list[Styler] = stylers
+        self._imports: set[str] = set()
+        self._builtins: set[str] = set()
         self.config: GeneratorConfig = config
 
-        self.scalar_map: Dict[str, str] = {
+        self.scalar_map: dict[str, str] = {
             **SCALAR_DEFAULTS,
             **config.scalar_definitions,
         }
         # map of fragment typename to the strinigify graphql document
-        self.fragment_document_map: Dict[str, str] = {}
+        self.fragment_document_map: dict[str, str] = {}
 
-        self.enum_class_map: Dict[str, str] = {}
-        self.inputtype_class_map: Dict[str, str] = {}
-        self.object_class_map: Dict[str, str] = {}
-        self.interface_reference_map: Dict[str, str] = {}
-        self.interface_baseclass_map: Dict[str, str] = {}
+        self.enum_class_map: dict[str, str] = {}
+        self.inputtype_class_map: dict[str, str] = {}
+        self.object_class_map: dict[str, str] = {}
+        self.interface_reference_map: dict[str, str] = {}
+        self.interface_baseclass_map: dict[str, str] = {}
 
-        self.operation_class_map: Dict[str, str] = {}
-        self.fragment_class_map: Dict[str, str] = {}
-        self.query_class_map: Dict[str, str] = {}
-        self.subscription_class_map: Dict[str, str] = {}
-        self.mutation_class_map: Dict[str, str] = {}
+        self.operation_class_map: dict[str, str] = {}
+        self.fragment_class_map: dict[str, str] = {}
+        self.query_class_map: dict[str, str] = {}
+        self.subscription_class_map: dict[str, str] = {}
+        self.mutation_class_map: dict[str, str] = {}
 
-        self.registered_union_fragments: Dict[str, str] = {}
-        self.forward_references: Set[str] = set()
-        self.fragment_type_map: Dict[str, GraphQLNamedType] = {}
+        self.registered_union_fragments: dict[str, str] = {}
+        self.forward_references: set[str] = set()
+        self.fragment_type_map: dict[str, GraphQLNamedType] = {}
 
         # Maps for the interface fragments and union fragments
-        self.interfacefragments_impl_map: Dict[str, Dict[str, str]] = {}
-        self.unionfragment_members_map: Dict[str, Dict[str, str]] = {}
+        self.interfacefragments_impl_map: dict[str, dict[str, str]] = {}
+        self.unionfragment_members_map: dict[str, dict[str, str]] = {}
 
-        self.operation_single_operation_map: Dict[
+        self.operation_single_operation_map: dict[
             str, ast.AST
         ] = {}  # This is used to store the operation name and the root operation class name if single
+
+        #: GraphQL typename -> the module another project already generated it into.
+        #: Filled by :meth:`seed_external`, read on the resolved branch of
+        #: ``reference_inputtype``/``reference_enum``.
+        self.external_module_map: dict[str, str] = {}
+
+        #: GraphQL typename -> ``(name, annotation, value source)`` per ``class_fields`` entry
+        #: that collected something for it. Filled by :meth:`seed_class_fields`.
+        self.class_field_map: dict[str, list[tuple[str, str, str]]] = {}
+
         self.log = log
 
-    def register_operation_single(self, operation_name: str, annotation_ast: ast.AST):
+    def seed_external(self, schema: GraphQLSchema) -> None:
+        """Adopt the types ``config.external_modules`` says another project owns.
+
+        Must run **before any plugin**. Left to referencing time, a missing input
+        or enum does not fail loudly: ``recurse_type_annotation`` raises an opaque
+        "did you register this scalar?", a fragment's enum field silently becomes
+        a string annotation whose ``model_rebuild()`` then fails at import, and
+        ``funcs`` forward-references the literal placeholder ``SHOULD_NOT_BE_USED``
+        into a module-level ``SHOULD_NOT_BE_USED.model_rebuild()``.
+
+        Seeding every type of the declared kinds is deliberate: an unreferenced
+        one costs nothing, because the import is registered where the type is
+        *referenced*, not here. ``include`` narrows that to the named types, and
+        the project generates the rest itself -- or, when another external module
+        declares no ``include``, that module takes the rest: modules with an
+        ``include`` claim their names first, so a catch-all module never collides
+        with them. Two claims on one name that are both explicit still collide.
+        """
+        explicit = [m for m in self.config.external_modules if m.include is not None]
+        catch_all = [m for m in self.config.external_modules if m.include is None]
+        claimed_explicitly: set[str] = set()
+        for external in [*explicit, *catch_all]:
+            include = set(external.include) if external.include is not None else None
+            seeded: set[str] = set()
+            for kind in external.kinds:
+                if kind == "enum":
+                    graphql_type, class_map, style = (
+                        GraphQLEnumType,
+                        self.enum_class_map,
+                        self.style_enum_class,
+                    )
+                else:
+                    graphql_type, class_map, style = (
+                        GraphQLInputObjectType,
+                        self.inputtype_class_map,
+                        self.style_inputtype_class,
+                    )
+
+                for typename, definition in schema.type_map.items():
+                    if typename.startswith("__") or not isinstance(
+                        definition, graphql_type
+                    ):
+                        continue
+                    if include is not None and typename not in include:
+                        continue
+                    if include is None and typename in claimed_explicitly:
+                        continue
+                    seeded.add(typename)
+                    if typename in self.external_module_map:
+                        raise RegistryError(
+                            f"{typename} is provided by both "
+                            f"{self.external_module_map[typename]} and "
+                            f"{external.module}. A type can only come from one "
+                            "external module."
+                        )
+                    class_map[typename] = external.names.get(typename) or style(
+                        typename
+                    )
+                    self.external_module_map[typename] = external.module
+
+            if include is not None:
+                claimed_explicitly |= seeded
+            if include is not None and include - seeded:
+                raise RegistryError(
+                    f"external module {external.module} includes "
+                    f"{sorted(include - seeded)}, which are not "
+                    f"{' or '.join(external.kinds)} types of this schema."
+                )
+
+    def directive_definition(
+        self,
+        schema: GraphQLSchema,
+        directive: str,
+        argument: str | None,
+        needs_sdl: bool = True,
+    ) -> tuple[GraphQLDirective, GraphQLArgument | None]:
+        """The directive and its argument a class field reads, refused when the schema cannot give them.
+
+        Fails closed: a directive or an argument the schema does not declare is an error, and so
+        is a schema that cannot show where a directive is applied (an introspected one), when the
+        applications to read are the schema's own (``needs_sdl``).
+        """
+        definition = schema.get_directive(directive)
+        if definition is None:
+            raise RegistryError(
+                f"class_fields: the schema declares no directive @{directive}"
+            )
+        if needs_sdl and definition.ast_node is None:
+            raise RegistryError(
+                f"class_fields: @{directive} has no SDL definition, so its applications are "
+                "invisible (an introspected schema carries none). Generate from the SDL the server prints."
+            )
+        if argument is None:
+            return definition, None
+        found = definition.args.get(argument)
+        if found is None:
+            raise RegistryError(
+                f"class_fields: @{directive} has no argument {argument!r} (it has {sorted(definition.args)})"
+            )
+        return definition, found
+
+    def seed_class_fields(self, schema: GraphQLSchema) -> None:
+        """Collect every ``config.class_fields`` entry off the schema's types, once.
+
+        Must run **before any plugin**: every class a plugin generates for a type asks
+        :meth:`class_fields_for` for its stamps. A type that collects nothing gets no stamp;
+        one that is generated as no class (a union, an enum, a scalar) and collects something
+        is an error.
+        """
+        from turms.class_fields import check_target
+
+        for field in self.config.class_fields:
+            collector = check_target(field, "type", "class_fields")
+            collector.check(schema, self)
+            for typename, definition in schema.type_map.items():
+                if (
+                    typename.startswith("__")
+                    or getattr(definition, "ast_node", None) is None
+                ):
+                    continue
+                groups = collector.collect_type(schema, definition, self)
+                if not groups:
+                    continue
+                if not isinstance(
+                    definition,
+                    (GraphQLObjectType, GraphQLInterfaceType, GraphQLInputObjectType),
+                ):
+                    raise RegistryError(
+                        f"class_fields: {typename} would carry {field.name}, but a "
+                        f"{type(definition).__name__} is generated as no class to stamp"
+                    )
+                self.class_field_map.setdefault(typename, []).append(
+                    field.stamp(groups, schema, self)
+                )
+
+    def _literal_or(self, annotation: str, value: object) -> str:
+        """``Literal[value]`` for a single string, integer or boolean, else ``annotation``.
+
+        The precise type is what lets a checker tell the stamped classes apart: a
+        ``Protocol`` declaring ``__identifier__: ClassVar[Literal["@x/dataset"]]`` matches
+        the dataset's classes and no lens's, where ``ClassVar[str]`` would match both.
+        A float has no ``Literal``; a tuple keeps its element type.
+        """
+        if isinstance(value, (str, int, bool)):
+            self.register_import("typing.Literal")
+            return f"Literal[{value!r}]"
+        return annotation
+
+    def refuse_class_fields(self, typename: str, reason: str) -> None:
+        """Fail where a type with stamps is generated as something other than a class.
+
+        Called by the sites that emit a type as an alias (a ``@oneOf`` input, a
+        ``@unionElementOf`` placeholder): the stamps would otherwise vanish silently.
+        """
+        stamps = self.class_field_map.get(typename)
+        if stamps:
+            raise RegistryError(
+                f"class_fields: {typename} would carry "
+                f"{', '.join(name for name, _, _ in stamps)}, but {reason}"
+            )
+
+    def class_fields_for(self, typename: str, body: list[ast.stmt]) -> list[ast.stmt]:
+        """``body`` with the class variables ``typename``'s class fields stamp, after its docstring.
+
+        Every site that builds a class *for a GraphQL type* passes its body through
+        here, so a nested selection carries the same stamps as the type's fragment.
+        A stamp named like one of the class's own fields is an error: pydantic would
+        read the class variable as the field's default.
+        """
+        stamps = self.class_field_map.get(typename)
+        if not stamps:
+            return body
+
+        fields = {
+            statement.target.id
+            for statement in body
+            if isinstance(statement, ast.AnnAssign)
+            and isinstance(statement.target, ast.Name)
+        }
+        for name, _, _ in stamps:
+            if name in fields:
+                raise RegistryError(
+                    f"class_fields: {name!r} is also a field of the class "
+                    f"generated for {typename}. Pick a name no field takes (a dunder)."
+                )
+        return self.with_class_vars(body, stamps)
+
+    def with_class_vars(
+        self, body: list[ast.stmt], stamps: list[tuple[str, str, str]]
+    ) -> list[ast.stmt]:
+        """``body`` with ``name: ClassVar[annotation] = value`` per stamp, right after its docstring."""
+        self.register_import("typing.ClassVar")
+        statements: list[ast.stmt] = [
+            ast.AnnAssign(
+                target=ast.Name(id=name, ctx=ast.Store()),
+                annotation=ast.Subscript(
+                    value=ast.Name(id="ClassVar", ctx=ast.Load()),
+                    slice=ast.parse(annotation, mode="eval").body,
+                    ctx=ast.Load(),
+                ),
+                value=ast.parse(source, mode="eval").body,
+                simple=1,
+            )
+            for name, annotation, source in stamps
+        ]
+
+        body = [statement for statement in body if not isinstance(statement, ast.Pass)]
+        has_docstring = (
+            bool(body)
+            and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, ast.Constant)
+            and isinstance(body[0].value.value, str)
+        )
+        if has_docstring:
+            return [body[0], *statements, *body[1:]]
+        return [*statements, *body]
+
+    def _reference_external(self, typename: str, classname: str) -> None:
+        """Register the import a reference to an external type needs.
+
+        Lazily, at reference time: registering every seeded name up front would
+        put all of them in the generated import block whether used or not.
+        """
+        module = self.external_module_map.get(typename)
+        if module:
+            self.register_import(f"{module}.{classname}")
+
+    def register_operation_single(
+        self, operation_name: str, annotation_ast: ast.AST
+    ) -> None:
         self.operation_single_operation_map[operation_name] = annotation_ast
 
-    def get_operation_single_or_none(self, operation_name: str):
+    def get_operation_single_or_none(self, operation_name: str) -> ast.AST | None:
         return (
             self.operation_single_operation_map[operation_name]
             if operation_name in self.operation_single_operation_map
             else None
         )
 
-    def style_inputtype_class(self, typename: str):
+    def style_inputtype_class(self, typename: str) -> str:
         for styler in self.stylers:
             typename = styler.style_input_name(typename)
         if iskeyword(typename):
             typename += "_"
         return typename
 
-    def generate_inputtype(self, typename: str):
-        assert typename not in self.inputtype_class_map, (
-            "Type was already registered, cannot register annew"
-        )
+    def generate_inputtype(self, typename: str) -> str:
+        if typename in self.external_module_map:
+            raise RegistryError(
+                f"{typename} is generated here and also declared as coming from "
+                f"{self.external_module_map[typename]}. Drop it from "
+                "external_modules, or drop the plugin that generates it."
+            )
+        if typename in self.inputtype_class_map:
+            raise RegistryError(
+                f"{typename} was already registered; it cannot be registered anew."
+            )
         classname = self.style_inputtype_class(typename)
         self.inputtype_class_map[typename] = classname
         return classname
@@ -291,6 +477,13 @@ class ClassRegistry(object):
         self, typename: str, parent: str, allow_forward: bool = True
     ) -> ast.Name | ast.Constant:
         classname = self.style_inputtype_class(typename)
+        if typename in self.external_module_map:
+            # Another project generated it; it is imported, so it is already bound
+            # by the time this module's body runs and can never be a forward
+            # reference -- not even to a class of the same name being generated here.
+            classname = self.inputtype_class_map[typename]
+            self._reference_external(typename, classname)
+            return ast.Name(id=classname, ctx=ast.Load())
         if typename not in self.inputtype_class_map or parent == classname:
             if not allow_forward:
                 raise NoInputTypeFound(
@@ -300,17 +493,24 @@ class ClassRegistry(object):
             return ast.Constant(value=classname)
         return ast.Name(id=self.inputtype_class_map[typename], ctx=ast.Load())
 
-    def style_enum_class(self, typename: str):
+    def style_enum_class(self, typename: str) -> str:
         for styler in self.stylers:
             typename = styler.style_enum_name(typename)
         if iskeyword(typename):
             typename += "_"
         return typename
 
-    def generate_enum(self, typename: str):
-        assert typename not in self.enum_class_map, (
-            "Type was already registered, cannot register annew"
-        )
+    def generate_enum(self, typename: str) -> str:
+        if typename in self.external_module_map:
+            raise RegistryError(
+                f"{typename} is generated here and also declared as coming from "
+                f"{self.external_module_map[typename]}. Drop it from "
+                "external_modules, or drop the plugin that generates it."
+            )
+        if typename in self.enum_class_map:
+            raise RegistryError(
+                f"{typename} was already registered; it cannot be registered anew."
+            )
         classname = self.style_enum_class(typename)
         self.enum_class_map[typename] = classname
         return classname
@@ -320,17 +520,22 @@ class ClassRegistry(object):
         the top of the generated module. Deduplicated via the builtins set."""
         self._builtins.add(typename)
 
-
     def reference_enum(
         self, typename: str, parent: str, allow_forward: bool = True
     ) -> ast.Constant | ast.Name:
         if typename in built_in_map:
-            # Builtin enums
+            # Builtin enums (`class __TypeKind(str, Enum)`)
             self._builtins.add(typename)
+            self.register_import("enum.Enum")
             self.forward_references.add(parent)
             return ast.Constant(value=typename)
 
         classname = self.style_enum_class(typename)
+        if typename in self.external_module_map:
+            # See reference_inputtype: an imported name is never a forward reference.
+            classname = self.enum_class_map[typename]
+            self._reference_external(typename, classname)
+            return ast.Name(id=classname, ctx=ast.Load())
         if typename not in self.enum_class_map or parent == classname:
             if not allow_forward:
                 raise NoEnumFound(
@@ -338,16 +543,18 @@ class ClassRegistry(object):
                 )
             self.forward_references.add(parent)
             return ast.Constant(value=classname)
-        return ast.Name(id=classname, ctx=ast.Load())
+        # The map, not the freshly styled name: they agree unless an override
+        # renamed the class, and then the map is the one that is right.
+        return ast.Name(id=self.enum_class_map[typename], ctx=ast.Load())
 
-    def style_objecttype_class(self, typename: str):
+    def style_objecttype_class(self, typename: str) -> str:
         for styler in self.stylers:
             typename = styler.style_object_name(typename)
         if iskeyword(typename):
             typename += "_"
         return typename
 
-    def generate_objecttype(self, typename: str):
+    def generate_objecttype(self, typename: str) -> str:
         assert typename not in self.object_class_map, (
             "Type was already registered, cannot register annew"
         )
@@ -357,7 +564,7 @@ class ClassRegistry(object):
 
     def reference_object(
         self, typename: str, parent: str, allow_forward: bool = True
-    ) -> ast.AST:
+    ) -> ast.Name | ast.Constant:
         return self._reference_generic(
             typename,
             parent,
@@ -372,7 +579,7 @@ class ClassRegistry(object):
         typename: str,
         parent: str,
         style_func: Callable[[str], str],
-        class_map: Dict[str, str],
+        class_map: dict[str, str],
         error_class: str,
         allow_forward: bool = True,
     ) -> ast.Name | ast.Constant:
@@ -386,14 +593,14 @@ class ClassRegistry(object):
             return ast.Constant(value=classname)
         return ast.Name(id=classname, ctx=ast.Load())
 
-    def style_interface_class(self, typename: str):
+    def style_interface_class(self, typename: str) -> str:
         for styler in self.stylers:
             typename = styler.style_object_name(typename)
         if iskeyword(typename):
             typename += "_"
         return typename
 
-    def generate_interface(self, typename: str, with_base: bool = True):
+    def generate_interface(self, typename: str, with_base: bool = True) -> str:
         assert typename not in self.interface_baseclass_map, (
             "Type was already registered, cannot register annew"
         )
@@ -414,20 +621,20 @@ class ClassRegistry(object):
 
     def reference_interface(
         self, typename: str, parent: str, allow_forward: bool = True
-    ) -> ast.AST:
+    ) -> ast.Constant:
         # Interface need always be udpated later
         classname = self.style_interface_class(typename)
         self.forward_references.add(parent)
         return ast.Constant(value=classname)
 
-    def style_fragment_class(self, typename: str):
+    def style_fragment_class(self, typename: str) -> str:
         for styler in self.stylers:
             typename = styler.style_fragment_name(typename)
         if iskeyword(typename):
             typename += "_"
         return typename
 
-    def generate_fragment(self, fragmentname: str, is_interface: bool = False):
+    def generate_fragment(self, fragmentname: str, is_interface: bool = False) -> str:
         assert fragmentname not in self.fragment_class_map, (
             f"Fragment {fragmentname} was already registered, cannot register annew"
         )
@@ -436,26 +643,30 @@ class ClassRegistry(object):
         self.fragment_class_map[fragmentname] = real_classname
         return real_classname
 
-    def register_fragment_type(self, fragmentname: str, typename: GraphQLNamedType):
+    def register_fragment_type(
+        self, fragmentname: str, typename: GraphQLNamedType
+    ) -> None:
         self.fragment_type_map[fragmentname] = typename
 
     def register_interface_fragment_implementations(
-        self, fragmentname: str, implementationMap: Dict[str, str]
-    ):
+        self, fragmentname: str, implementationMap: dict[str, str]
+    ) -> None:
         self.interfacefragments_impl_map[fragmentname] = implementationMap
 
-    def get_interface_fragment_implementations(self, fragmentname: str):
+    def get_interface_fragment_implementations(
+        self, fragmentname: str
+    ) -> dict[str, str]:
         return self.interfacefragments_impl_map[fragmentname]
 
     def register_union_fragment_members(
-        self, fragmentname: str, membersMap: Dict[str, str]
-    ):
+        self, fragmentname: str, membersMap: dict[str, str]
+    ) -> None:
         self.unionfragment_members_map[fragmentname] = membersMap
 
-    def get_union_fragment_members(self, fragmentname: str):
+    def get_union_fragment_members(self, fragmentname: str) -> dict[str, str]:
         return self.unionfragment_members_map[fragmentname]
 
-    def get_fragment_type(self, fragmentname: str):
+    def get_fragment_type(self, fragmentname: str) -> GraphQLNamedType:
         return self.fragment_type_map[fragmentname]
 
     def reference_fragment(
@@ -472,7 +683,7 @@ class ClassRegistry(object):
 
     def get_interface_fragment_implementation_or_none(
         self, fragmentname: str, typename: str
-    ) -> Optional[str]:
+    ) -> str | None:
         """Resolve an interface fragment spread against a concrete object type.
 
         A fragment defined on an interface (e.g. ``fragment Layer on Layer``)
@@ -514,7 +725,7 @@ class ClassRegistry(object):
             )
         return self.fragment_class_map[typename]
 
-    def generate_node_name(self, node_name: str):
+    def generate_node_name(self, node_name: str) -> str:
         for styler in self.stylers:
             node_name = styler.style_node_name(node_name)
 
@@ -523,7 +734,7 @@ class ClassRegistry(object):
 
         return node_name
 
-    def generate_parameter_name(self, node_name: str):
+    def generate_parameter_name(self, node_name: str) -> str:
         for styler in self.stylers:
             node_name = styler.style_parameter_name(node_name)
 
@@ -532,14 +743,14 @@ class ClassRegistry(object):
 
         return node_name
 
-    def style_query_class(self, typename: str):
+    def style_query_class(self, typename: str) -> str:
         for styler in self.stylers:
             typename = styler.style_query_name(typename)
         if iskeyword(typename):
             typename += "_"
         return typename
 
-    def generate_query(self, typename: str):
+    def generate_query(self, typename: str) -> str:
         assert typename not in self.query_class_map, (
             f"Type {typename} was already registered, cannot register annew"
         )
@@ -547,15 +758,14 @@ class ClassRegistry(object):
         self.query_class_map[typename] = classname
         return classname
 
-
-    def style_mutation_class(self, typename: str):
+    def style_mutation_class(self, typename: str) -> str:
         for styler in self.stylers:
             typename = styler.style_mutation_name(typename)
         if iskeyword(typename):
             typename += "_"
         return typename
 
-    def generate_mutation(self, typename: str):
+    def generate_mutation(self, typename: str) -> str:
         assert typename not in self.mutation_class_map, (
             f"Type {typename} was already registered, cannot register annew"
         )
@@ -563,22 +773,20 @@ class ClassRegistry(object):
         self.mutation_class_map[typename] = classname
         return classname
 
-
-    def style_subscription_class(self, typename: str):
+    def style_subscription_class(self, typename: str) -> str:
         for styler in self.stylers:
             typename = styler.style_subscription_name(typename)
         if iskeyword(typename):
             typename += "_"
         return typename
 
-    def generate_subscription(self, typename: str):
+    def generate_subscription(self, typename: str) -> str:
         assert typename not in self.subscription_class_map, (
             f"Type {typename} was already registered, cannot register annew"
         )
         classname = self.style_subscription_class(typename)
         self.subscription_class_map[typename] = classname
         return classname
-
 
     def register_import(self, name: str) -> None:
         if name in ("bool", "str", "int", "float", "dict", "list", "tuple"):
@@ -592,15 +800,15 @@ class ClassRegistry(object):
         self._imports.discard(name)
 
     @property
-    def registered_imports(self) -> Set[str]:
+    def registered_imports(self) -> set[str]:
         return set(self._imports)
 
-    def generate_imports(self) -> List[ast.AST]:
+    def generate_imports(self) -> list[ast.AST]:
         """Generate the imports for the generated code. This is used to generate the"""
-        imports: List[ast.AST] = []
+        imports: list[ast.AST] = []
 
-        lone_top_imports: Set[str] = set()
-        top_level: Dict[str, Set[str]] = {}
+        lone_top_imports: set[str] = set()
+        top_level: dict[str, set[str]] = {}
         for name in self._imports:
             if "." not in name:
                 lone_top_imports.add(name)
@@ -620,20 +828,25 @@ class ClassRegistry(object):
             imports.append(
                 ast.ImportFrom(
                     module=top_level_name,
-                    names=[ast.alias(name=name) for name in sorted(top_level[top_level_name])],
+                    names=[
+                        ast.alias(name=name)
+                        for name in sorted(top_level[top_level_name])
+                    ],
                     level=0,
                 )
             )
 
         return imports
 
-    def generate_builtins(self) -> List[ast.AST]:
+    def generate_builtins(self) -> list[ast.AST]:
         """Generate the builtins for the generated code. This is used to generate the"""
         builtins: list[ast.AST] = []
 
         # Sorted for the same reason as the imports above: `_builtins` is a set.
         for built_in in sorted(self._builtins):
             node = built_in_map[built_in]
+            if built_in == "Deprecated" and not self.config.use_union_operator:
+                node = _DEPRECATED_PRE_PEP604
             if isinstance(node, list):
                 builtins.extend(node)
             else:
@@ -641,7 +854,7 @@ class ClassRegistry(object):
 
         return builtins
 
-    def generate_forward_refs(self) -> List[ast.AST]:
+    def generate_forward_refs(self) -> list[ast.AST]:
         tree: list[ast.AST] = []
 
         for reference in sorted(self.forward_references):
@@ -713,10 +926,10 @@ class ClassRegistry(object):
         self.register_builtin("Deprecated")
         return ast.Name(id="Deprecated", ctx=ast.Load())
 
-    def register_scalar(self, scalar_type: str, python_type: str):
+    def register_scalar(self, scalar_type: str, python_type: str) -> None:
         self.scalar_map[scalar_type] = python_type
 
-    def reference_scalar(self, scalar_type: str):
+    def reference_scalar(self, scalar_type: str) -> ast.Name:
         if scalar_type in self.scalar_map:
             python_type = self.scalar_map[scalar_type]
             if "." in python_type:
@@ -733,3 +946,73 @@ class ClassRegistry(object):
 
     def warn(self, message: str) -> None:
         self.log(message, level="WARNING")
+
+
+#: The python type a stamped directive argument of a builtin scalar holds.
+_SCALAR_CLASS_VAR_TYPES = {
+    "String": "str",
+    "ID": "str",
+    "Int": "int",
+    "Float": "float",
+    "Boolean": "bool",
+}
+
+
+def _class_var_annotation(type_: GraphQLInputType, registry: "ClassRegistry") -> str:
+    """The annotation of a class variable holding a value of the GraphQL input type ``type_``."""
+    nullable = not is_non_null_type(type_)
+    inner = get_nullable_type(type_)
+    if is_list_type(inner):
+        registry.register_import("typing.Tuple")
+        annotation = f"Tuple[{_class_var_annotation(inner.of_type, registry)}, ...]"
+    elif is_enum_type(inner):
+        annotation = "str"
+    elif is_input_object_type(inner):
+        registry.register_import("typing.Dict")
+        registry.register_import("typing.Any")
+        annotation = "Dict[str, Any]"
+    else:
+        annotation = _SCALAR_CLASS_VAR_TYPES.get(inner.name)
+        if annotation is None:
+            registry.register_import("typing.Any")
+            annotation = "Any"
+    if nullable:
+        registry.register_import("typing.Optional")
+        return f"Optional[{annotation}]"
+    return annotation
+
+
+def _frozen(value: object) -> object:
+    """``value`` with every list a tuple, so its ``repr`` is a literal of an immutable value."""
+    if isinstance(value, list):
+        return tuple(_frozen(v) for v in value)
+    if isinstance(value, dict):
+        return {k: _frozen(v) for k, v in value.items()}
+    return value
+
+
+def _directive_argument_value(application, name: str, argument) -> object:  # noqa: ANN001 - graphql-core nodes
+    """The python value of argument ``name`` of one directive application.
+
+    An enum value is its name. An omitted argument takes the definition's default.
+    """
+    from turms.schema_lookup import get_default_value
+
+    node = next(
+        (a.value for a in application.arguments or () if a.name.value == name), None
+    )
+    if node is None:
+        value = get_default_value(argument)
+        if value is Undefined:
+            raise RegistryError(
+                f"class_fields: an application of @{application.name.value} gives no "
+                f"{name!r} and the directive declares no default for it"
+            )
+    else:
+        value = value_from_ast(node, argument.type)
+        if value is Undefined:
+            raise RegistryError(
+                f"class_fields: @{application.name.value}({name}: ...) is not a valid "
+                f"{argument.type}"
+            )
+    return _frozen(value)

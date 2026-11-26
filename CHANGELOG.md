@@ -1,6 +1,368 @@
 # CHANGELOG
 
 
+## v3.1.0 (2026-11-23)
+
+### Features
+
+- Generated code meets the arkitekt Python standard
+  ([`5abc449`](https://github.com/jhnnsrs/turms/commit/5abc44926ddb4190d7e5389aeb13ca581c731ae0))
+
+A project on the standard (every argument and return annotated, no Any, collections.abc, sorted and
+  used imports) runs turms with RuffProcessor(fix: true). ruff fixes what it can and fails on the
+  rest, so everything turms emits that ruff cannot fix has to be right already:
+
+- The generated builtins are annotated: GraphQLDefault(value: object), Deprecated(reason: str |
+  None), UnsetType.__new__/__repr__/__bool__ and its _instance (no Self: the class name, quoted).
+  They are now authored as source like the markers. Deprecated quotes `str | None` where the target
+  python predates PEP 604. - The discriminator's model_post_init is `(self, context: object, /) ->
+  None`. pydantic declares the context Any, but a generated module cannot carry a noqa (comments do
+  not survive the AST), and object is the widest honest type for an argument the override never
+  reads. - The @oneOf wire serializer takes the member union and a SerializerFunctionWrapHandler and
+  returns dict[str, object]. - Iterator, AsyncIterator, Iterable (funcs, client) and AsyncGenerator
+  (strawberry) come from collections.abc. - EnumsPlugin imports Enum only when it emits an enum; a
+  builtin introspection enum (__TypeKind) now imports it itself (it was undefined).
+
+tests/test_generated_standard.py generates client, funcs, oneOf, discriminated-input and strawberry
+  modules, runs them through RuffProcessor(fix, format) under this repo's copy of the standard and
+  lints and format-checks the result (fails on the previous turms, passes now). No snapshot changed:
+  none covers the builtins, the imports or the iterators. The tests that asserted an Enum import for
+  schemas without an enum now assert the import follows the enums.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_011cg5eFTPpZkvu6HSjH3Bwp
+
+
+## v3.0.2 (2026-11-23)
+
+### Bug Fixes
+
+- Every argument and return annotated, no Any; bugbear findings fixed
+  ([`8a8ba61`](https://github.com/jhnnsrs/turms/commit/8a8ba6157a80ad1482eba7be8a1c7f2d1036a13a))
+
+The rest of the arkitekt standard by hand, across the package, the tests and the hand-written
+  examples (generated code stays excluded).
+
+Package: the AST builders return the ast node types they build (ast.expr, ast.Subscript,
+  list[ast.AST], ...), stylers and processors take and return str, the CLI commands take the
+  projects dict with_projects injects (its own signature is now Callable[..., None], which it always
+  was), and reference_object / reference_interface return Name | Constant / Constant. The
+  before-validators of the plugin configs take and return object. The runtime type aliases
+  (ParsedValue, BoundType, ExtraOptions, SchemaField, SchemaType) are TypeAliases spelled with |.
+  import_class, import_string and instantiate keep Any for what a dotted path names, with a noqa
+  saying so. The rich log closure binds its tree per project, retry/lookup failures raise from their
+  cause, unused loop variables are underscored; replace_iteratively keeps its public [] default
+  (only read) under a noqa, and stream_changes keeps its loop rather than yield from.
+
+Tests: fixtures, parametrized values and helpers typed; two tests expect pydantic's ValidationError
+  instead of any Exception; a glob variant of test_build_multiple_files was shadowed by its namesake
+  and never ran: it is renamed and runs (and passes). No behaviour change: the suite passes (323
+  passed; 3.10 without network tests: 295 passed, 2 skipped).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+### Code Style
+
+- Adopt the arkitekt Python standard (ruff format, safe fixes)
+  ([`a29891d`](https://github.com/jhnnsrs/turms/commit/a29891d4a109280fcb7b080f57f81fdbd9c2f58b))
+
+ruff.shared.toml / pyright.shared.json synced from arkitektio/.github; the repo's own settings go to
+  ruff.toml / pyrightconfig.json, which exclude the generated code (turms output in the examples,
+  the merge fixtures and the strawberry snapshots); the dev dependencies move from [tool.uv] to the
+  dev group, where ruff and basedpyright are pinned; a new quality.yaml calls the shared
+  python-quality workflow. The code (and the Python in the docs) is reformatted (line length 88, as
+  Black) and ruff's safe fixes applied (import order, modern annotations). The pydantic-basic
+  example had a stray closing parenthesis, a syntax error ruff cannot format around; it is gone. The
+  RuffProcessor tests run ruff in a temporary directory: ruff reads the ruff.toml of where it runs,
+  and the repo's own is not what they test. No behaviour change: the suite passes as before (322
+  passed).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+### Continuous Integration
+
+- The shared quality workflow, required, with a type-check baseline
+  ([`89a4a2c`](https://github.com/jhnnsrs/turms/commit/89a4a2c98872b2c7da4e39af8479a81807f59180))
+
+.basedpyright/baseline.json holds the 853 errors (and 1 warning) the repo had when it adopted the
+  standard (871 before it; most are list[ast.AST] passed where the ast constructors want
+  list[stmt]/list[expr], and raw values the tests hand pydantic to validate): CI fails on any other.
+  .git-blame-ignore-revs lists the formatting-only commit.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+
+## v3.0.1 (2026-10-28)
+
+### Bug Fixes
+
+- An expanded input field with a default is an optional parameter
+  ([`a2dd787`](https://github.com/jhnnsrs/turms/commit/a2dd7876c793ea1d20a555367a86156a7830c4ff))
+
+A non-null input field with a default (`allowMesh: Boolean! = false`) may be left out: the server
+  applies the default. The funcs and client plugins made it a required positional parameter, so a
+  server adding such a field broke every caller. It is now an UNSET keyword parameter, and it isn't
+  sent unless the caller gives it. The inputs plugin already treated it this way.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+
+## v3.0.0 (2026-10-28)
+
+### Chores
+
+- Lock 2.3.0
+  ([`502d063`](https://github.com/jhnnsrs/turms/commit/502d063ba5016fc9708c84df8d8e45e499ea185b))
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+### Features
+
+- Class fields: a name, a kind, a collector and a combine
+  ([`715ee19`](https://github.com/jhnnsrs/turms/commit/715ee197783e7ce0e00ca33fb4e3ccdd752839bb))
+
+A class variable of a generated class is now declared as a policy. It has a `name` and a `kind`
+  (inferred when unset), a `collector` that gathers values, and a `combine` that reduces them
+  (`first`, `all`, `ordered`, `union`, `intersection`, or a dotted path).
+
+It is used in two places: - `class_fields` stamps every class generated for a GraphQL type, with
+  collectors that read a type (`type_directive`). - `ClientPlugin.client_fields` stamps the
+  generated client class, with collectors that read an operation (`root_field_directive`,
+  `operation_directive`). For example, the scopes every root field the client selects needs.
+  `required` fails generation on a selected field that names none.
+
+A collector can be your own, given as a dotted path. Collectors that read the schema's directives
+  still refuse an introspected schema, an undeclared directive or an unknown argument
+  (`directive_definition`).
+
+BREAKING CHANGE: `directive_class_vars` is replaced by `class_fields`. `{directive, argument,
+  attribute}` becomes `{name: attribute, collector: {type: type_directive, directive, argument}}`,
+  with the same
+
+output. The `ScopesPlugin` is gone: use `client_fields`.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+- Scopesplugin gathers the scopes a client's operations need
+  ([`1307e8a`](https://github.com/jhnnsrs/turms/commit/1307e8aa531bf90ddc2dbaeb3960f63456ed920f))
+
+It reads `@auth(required_scopes: ...)` (the directive and arguments are configurable) off the root
+  fields every operation of the project selects, including through fragments on the root type, and
+  emits them as one module-level `SCOPES: List[str]`. A schema that doesn't declare the directive,
+  or that came from introspection and so carries no applications, is refused rather than producing
+  an empty list.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+### Breaking Changes
+
+- `directive_class_vars` is replaced by `class_fields`. `{directive, argument, attribute}` becomes
+  `{name: attribute, collector: {type: type_directive, directive, argument}}`, with the same
+
+
+## v2.3.0 (2026-10-19)
+
+### Build System
+
+- **deps**: Lock graphql-core 3.3.0
+  ([`643c777`](https://github.com/jhnnsrs/turms/commit/643c77757e7d09276d79d6fc5b3848f5e7c987de))
+
+The floor stays >=3.2.0: schema_lookup keeps the 3.2/3.3 shims. Under 3.3, print_ast writes object
+  literals with inner spaces (`{ search: $search }`), so a client regenerated with it re-spaces its
+  stored documents; they are semantically identical.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+### Chores
+
+- The lockfile names turms 2.2.1
+  ([`011b96b`](https://github.com/jhnnsrs/turms/commit/011b96befa6bcd79cf457713e449bac1f1143251))
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- Directive_class_vars stamps a type's directive applications onto every class generated for it
+  ([`3bae587`](https://github.com/jhnnsrs/turms/commit/3bae587bfee4bd0a3f00f3fb2ad2a16d6625129e))
+
+`type Dataset @identified(by: "@x/dataset")` with the rule {directive: identified, argument: by,
+  attribute: __identifier__} gives `__identifier__: ClassVar[Literal["@x/dataset"]]` on the
+  fragment, on every nested selection of the type (a class of its own, not a subclass of the
+  fragment), on inline fragments, interface implementations, objects and inputs. A single string,
+  integer, boolean or enum value is typed as its Literal, so a Protocol can tell the types apart; a
+  repeatable directive gives a tuple, a rule without an argument a True marker.
+
+It fails closed: a directive or argument the schema does not declare, a stamp named like a field, a
+  type generated as no class (union, enum, scalar, @oneOf input, @unionElementOf placeholder) and an
+  introspected schema, whose directive applications are invisible, are errors.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+
+## v2.2.1 (2026-09-30)
+
+### Bug Fixes
+
+- Work against graphql-core 3.3
+  ([`f3cd0af`](https://github.com/jhnnsrs/turms/commit/f3cd0af412813aa4ddf2cce31b08878ee9e44373))
+
+3.3 removed get_field_def and get_operation_root_type and moved defaults from default_value to
+  default. turms.schema_lookup provides versions that work on 3.2 and 3.3, and optional AST lists
+  are treated as empty.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+
+
+## v2.2.0 (2026-09-29)
+
+### Features
+
+- **external_modules**: A module without include takes what explicit includes leave
+  ([`7e563fd`](https://github.com/jhnnsrs/turms/commit/7e563fd33cf03c2cfdbada088f0d4363903be2d1))
+
+Modules that name their types claim them first, so a catch-all module (the project's own protocol
+  module) and a partial one (a spec package) can split one kind between them. Two explicit claims on
+  one name still collide.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+
+- **external_modules**: Take part of a schema's vocabulary with `include`
+  ([`ef9840a`](https://github.com/jhnnsrs/turms/commit/ef9840a23c6b389d8f691f2673dd4c4448ed61d6))
+
+An external module used to claim every enum and input of its kinds, so a package could not own some
+  of the vocabulary while the project generated the rest. `include` names the types it provides; an
+  included name the schema lacks is an error rather than a silent fallback to generating it.
+
+The @unionElementOf pre-pass also generated external members (raising in generate_inputtype), and a
+  union alias on one side with members on the other produced bare, unimported names. A union and its
+  members must now come from the same place, and a split is a clear error.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+
+
+## v2.1.2 (2026-09-22)
+
+### Bug Fixes
+
+- **funcs**: Type argument buffers as object and stop them being shadowed
+  ([`654be27`](https://github.com/jhnnsrs/turms/commit/654be277cab8a3a14437f75259e1fa90ff55e213))
+
+The generated argument-assembly dicts were `Dict[str, Any]`, which bought no checking and disabled
+  what there was. They are write-only buffers whose values come from the enclosing function's
+  already-typed parameters, so `Dict[str, builtins.object]` is both accurate and still assignable to
+  a `Mapping[str, Any]` parameter.
+
+`builtins.object` rather than a bare `object`, because a schema may name a field `object` -- kraph's
+  `assertStructure` does -- which makes it a parameter of the generated function and captures the
+  annotation. Qualifying it is the only spelling no field name can take.
+
+For the same reason the input-funcs local is `_data` now: an input type with a `data` field shadowed
+  it.
+
+`object` is not assignable to a typed field, so `Cls(**data)` would no longer check; input funcs
+  call `Cls.model_validate(_data)` instead, which takes the mapping whole, resolves the same aliases
+  and leaves `exclude_unset` reporting exactly the keys that were set -- the @oneOf branch already
+  worked this way.
+
+`dict_str_any_annotation` stays as an alias, since turms is published and third-party plugins import
+  it.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01QEr4a9XNWRms96tmxUPXmz
+
+
+## v2.1.1 (2026-09-21)
+
+### Bug Fixes
+
+- **ci**: Publish only when semantic-release actually cut a release
+  ([`5454b2f`](https://github.com/jhnnsrs/turms/commit/5454b2f61492ee874b4e8051619116d0b6e5a6e8))
+
+`uv publish` ran unconditionally. `semantic-release version` builds only when it cuts a release, so
+  any push carrying nothing releasable -- a `build:`, `chore:` or `docs:` change -- left `dist/`
+  empty and failed the job on the publish step. Both publish steps are now guarded on
+  `hashFiles('dist/**')`, which is the same shape as the guard the tag-only repos get from the
+  semantic-release action's `released` output.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01QEr4a9XNWRms96tmxUPXmz
+
+
+## v2.1.0 (2026-09-21)
+
+### Documentation
+
+- **examples**: Repair the rath-usage example
+  ([`65513cc`](https://github.com/jhnnsrs/turms/commit/65513cc445d15694e24936ba8bf9da11dde81bcd))
+
+`your_library/proxies.py` imported `current_rath` from `rath.rath` and used it as the fallback in
+  all four proxies. That contextvar is gone, so the module raised on import and took `main.py` with
+  it.
+
+There is no implicit client to fall back to any more, so the proxies take their rath outright and
+  `main.py` passes the one it opened. The generated `your_library/schema.py` is hand-edited to match
+  rather than regenerated -- its schema is `countries.trevorblades.com`, so regenerating needs the
+  network -- and the same two-line change appears in `README.md` here and in the root `README.md`,
+  which repeated "defaults to the currently active client" as if it still meant something.
+
+Also fixes a 9-space list item in the README's config block, which made the YAML it tells you to
+  copy invalid.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- Client-class generation
+  ([`59d8a4a`](https://github.com/jhnnsrs/turms/commit/59d8a4ae510a943ce3e3430f79a90a1432a09cb6))
+
+Baseline commit of the in-flight `client-class` work: `FuncsPlugin` can generate one client class
+  per SDK, with `client_class`, `client_bases`, `bound_kwargs`, `reserved_names` and
+  `reserved_from`.
+
+Tests: 268 pass, 2 skipped.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+- External_modules, so one project can generate over another's types
+  ([`1235f47`](https://github.com/jhnnsrs/turms/commit/1235f477a3f39b76dc5d765ebf20f8428fcda716))
+
+Lets a package ship its wire vocabulary in one module and its fragments, operations and client in a
+  second that *imports* the first, instead of regenerating every enum and input into both.
+
+external_modules: - module: rekuest.protocol.schema kinds: [enum, input] from_project:
+  rekuest_protocol # optional
+
+Class names are **derived**, not listed: `style_enum_class` and `style_inputtype_class` are pure
+  functions of the GraphQL typename and the styler list, so a project declaring the same `stylers:`
+  computes exactly the names the other one exported. Nothing reads the other project's output, so
+  there is no ordering dependency and no artifact to go stale. `from_project` checks the two styler
+  lists agree, which is the only way they can disagree; `names:` is the override when they must.
+
+`ClassRegistry.seed_external` runs before the plugin loop, which is correctness rather than
+  tidiness. Left to reference time, a missing input or enum fails quietly: `recurse_type_annotation`
+  raises an opaque "did you register this scalar?", a fragment's enum field becomes a string
+  annotation whose `model_rebuild()` then fails at import, and `funcs` forward-references its
+  literal placeholder into a module-level `SHOULD_NOT_BE_USED.model_rebuild()`.
+
+Imports are registered where a type is *referenced*, not where it is seeded, so an unreferenced
+  external type costs nothing.
+
+Two fixes it needed on the way:
+
+- `reference_enum` returned the freshly styled name where `reference_inputtype` returns the map's.
+  Identical until a `names:` override exists, wrong the moment one does. -
+  `generate_enum`/`generate_inputtype` opened with a bare `assert`, which `run.py` wrapped into an
+  unhelpful "EnumsPlugin failed!". They raise a `RegistryError` naming the type now, and the plugins
+  skip external types outright rather than colliding.
+
+turms: 277 pass, 2 skipped (268 + 9).
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
+
 ## v2.0.2 (2026-09-01)
 
 ### Bug Fixes

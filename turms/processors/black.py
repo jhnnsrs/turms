@@ -1,6 +1,7 @@
 from pydantic import Field
-from turms.processors.base import Processor, ProcessorConfig
+
 from turms.config import GeneratorConfig
+from turms.processors.base import Processor, ProcessorConfig
 
 
 class BlackProcessorConfig(ProcessorConfig):
@@ -16,7 +17,7 @@ class BlackProcessor(Processor):
 
     config: BlackProcessorConfig = Field(default_factory=BlackProcessorConfig)
 
-    def run(self, gen_file: str, config: GeneratorConfig):
-        from black import format_str, FileMode
+    def run(self, gen_file: str, config: GeneratorConfig) -> str:
+        from black import FileMode, format_str
 
         return format_str(gen_file, mode=FileMode())

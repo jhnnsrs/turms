@@ -1,0 +1,5 @@
+subscription watchBeast($id: ID!) {
+  watchBeast(id: $id) {
+    ...Beast
+  }
+}

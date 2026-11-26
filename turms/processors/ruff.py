@@ -2,8 +2,9 @@ import subprocess
 import sys
 
 from pydantic import Field
-from turms.processors.base import Processor, ProcessorConfig
+
 from turms.config import GeneratorConfig
+from turms.processors.base import Processor, ProcessorConfig
 
 
 class RuffProcessorConfig(ProcessorConfig):
@@ -20,13 +21,21 @@ class RuffProcessor(Processor):
     Ruff is an extremely fast python linter and code formatter. It needs to be
     separately installed via 'pip install ruff'.
 
+    Ruff runs with the configuration of the directory turms runs in. The code
+    turms generates has every argument and return annotated, so under a
+    strict project configuration (flake8-annotations, pyupgrade, isort,
+    pyflakes, bugbear) ``fix`` only has to sort and prune imports. With
+    ``fix`` on, a finding ruff cannot fix fails the run: a scalar mapped to
+    ``typing.Any`` in ``scalar_definitions`` puts ``Any`` into method
+    signatures (ANN401); map it to a typed alias instead.
+
     To run ruff on-demand (e.g. via uvx) without installing it as a dependency, use the
     generic `turms.processors.command.CommandProcessor` with `command: "uvx ruff format -"`.
     """
 
     config: RuffProcessorConfig = Field(default_factory=RuffProcessorConfig)
 
-    def _run_ruff(self, args, gen_file: str) -> str:
+    def _run_ruff(self, args: list[str], gen_file: str) -> str:
         result = subprocess.run(
             [sys.executable, "-m", "ruff", *args, "-"],
             input=gen_file,
@@ -39,7 +48,7 @@ class RuffProcessor(Processor):
             )
         return result.stdout
 
-    def run(self, gen_file: str, config: GeneratorConfig):
+    def run(self, gen_file: str, config: GeneratorConfig) -> str:
         if self.config.fix:
             gen_file = self._run_ruff(
                 ["check", "--fix", "--quiet", "--stdin-filename", "generated.py"],

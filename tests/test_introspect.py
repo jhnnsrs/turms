@@ -1,10 +1,12 @@
 import pytest
+from graphql import build_client_schema
+from pydantic import BaseModel
+
 from turms.errors import GenerationError
 from turms.helpers import load_introspection_from_url
-from turms.run import build_schema_from_schema_type, SchemaType
-from graphql import build_client_schema
+from turms.run import SchemaType, build_schema_from_schema_type
+
 from .utils import build_relative_glob
-from pydantic import BaseModel
 
 
 class Schema(BaseModel):
@@ -12,36 +14,36 @@ class Schema(BaseModel):
 
 
 @pytest.mark.network
-def test_introspect():
+def test_introspect() -> None:
     build_client_schema(
         load_introspection_from_url("https://countries.trevorblades.com/")
     )
 
 
 @pytest.mark.network
-def test_introspect_wrong():
+def test_introspect_wrong() -> None:
     with pytest.raises(GenerationError):
-        return build_client_schema(
+        build_client_schema(
             load_introspection_from_url("https://countries.sddfdf.com/")
         )
 
 
 @pytest.mark.network
-def test_do_not_allow_schema_introspection():
+def test_do_not_allow_schema_introspection() -> None:
     s = Schema(schema_url="https://countries.trevorblades.com/")
 
     with pytest.raises(GenerationError):
-        return build_schema_from_schema_type(s.schema_url, allow_introspection=False)
+        build_schema_from_schema_type(s.schema_url, allow_introspection=False)
 
 
 @pytest.mark.network
-def test_with_schema_intrsopection():
+def test_with_schema_intrsopection() -> None:
     s = Schema(schema_url="https://countries.trevorblades.com/")
 
     build_schema_from_schema_type(s.schema_url, allow_introspection=True)
 
 
-def test_build_multiple_files():
+def test_build_multiple_files_from_a_glob() -> None:
     t = build_relative_glob("/schemas/multi_schema/*.graphql")
 
     s = Schema(schema_url=t)
@@ -49,7 +51,7 @@ def test_build_multiple_files():
     build_schema_from_schema_type(s.schema_url, allow_introspection=True)
 
 
-def test_build_multiple_files():
+def test_build_multiple_files() -> None:
     t = [
         build_relative_glob("/schemas/multi_schema/beast_duo.graphql"),
         build_relative_glob("/schemas/multi_schema/beast_uno.graphql"),
@@ -60,7 +62,7 @@ def test_build_multiple_files():
     build_schema_from_schema_type(s.schema_url, allow_introspection=True)
 
 
-def test_build_multiple_files_error():
+def test_build_multiple_files_error() -> None:
     t = [
         build_relative_glob("/schemas/multi_schema/beast_duo.graphql"),
         build_relative_glob(

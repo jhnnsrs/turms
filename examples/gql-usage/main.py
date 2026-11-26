@@ -12,5 +12,4 @@ client = Client(transport=transport, fetch_schema_from_transport=True)
 # This here is the actual query execution with turms of the schema
 t = get_capsules(client)
 for i in t:
-    print(i.name) # Typesafe access to the data
-
+    print(i.name)  # Typesafe access to the data

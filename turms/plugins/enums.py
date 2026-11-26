@@ -1,17 +1,19 @@
-from pydantic_settings import SettingsConfigDict
-from turms.plugins.base import Plugin, PluginConfig
 import ast
-from typing import List, Sequence
-from turms.config import GeneratorConfig
+from collections.abc import Sequence
+
 from graphql import GraphQLSchema
-from pydantic import Field
 from graphql.type.definition import (
     GraphQLEnumType,
 )
-from turms.referencer import create_reference_registry_from_documents
-from turms.utils import parse_documents
-from turms.registry import ClassRegistry
+from pydantic import Field
+from pydantic_settings import SettingsConfigDict
+
+from turms.config import GeneratorConfig
 from turms.errors import GenerationError
+from turms.plugins.base import Plugin, PluginConfig
+from turms.referencer import create_reference_registry_from_documents
+from turms.registry import ClassRegistry
+from turms.utils import parse_documents
 
 
 class EnumsPluginsError(GenerationError):
@@ -33,8 +35,8 @@ def generate_enums(
     config: GeneratorConfig,
     plugin_config: EnumsPluginConfig,
     registry: ClassRegistry,
-) -> List[ast.ClassDef]:
-    tree: List[ast.ClassDef] = []
+) -> list[ast.ClassDef]:
+    tree: list[ast.ClassDef] = []
 
     enum_types = {
         key: value
@@ -50,6 +52,10 @@ def generate_enums(
         ref_registry = None
 
     for key, type in enum_types.items():
+        if key in registry.external_module_map:
+            # Another project owns it; referencing it will import it.
+            continue
+
         if ref_registry and key not in ref_registry.enums:
             continue
 
@@ -144,6 +150,9 @@ class EnumsPlugin(Plugin):
         config: GeneratorConfig,
         registry: ClassRegistry,
     ) -> Sequence[ast.AST]:
-        registry.register_import("enum.Enum")
-
-        return generate_enums(client_schema, config, self.config, registry)
+        enums = generate_enums(client_schema, config, self.config, registry)
+        if enums:
+            # Only when an enum is emitted: an unused import fails the
+            # generated module's lint (F401).
+            registry.register_import("enum.Enum")
+        return enums

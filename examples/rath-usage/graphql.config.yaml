@@ -18,7 +18,7 @@ projects:
             global_kwargs:
               - type: rath.Rath
                 key: rath
-                description: "The client we want to use (defaults to the currently active client)"
+                description: "The client to run the operation on"
             definitions:
               - type: subscription
                 is_async: True

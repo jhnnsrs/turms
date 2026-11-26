@@ -97,6 +97,7 @@ validated by pydantic — unknown keys are rejected, so typos fail loudly.
 | `unset_instance` | `str` | – | Dotted path to your own UNSET sentinel **instance**. If unset, one is generated. Must be set with `unset_type_class` |
 | `additional_bases` | `Dict[str, List[str]]` | `{}` | Extra base classes per GraphQL type name (dotted import paths) |
 | `additional_config` | `Dict[str, Dict]` | `{}` | Extra pydantic config attributes per GraphQL type name |
+| `directive_class_vars` | `List[DirectiveClassVar]` | `[]` | Directive applications on a GraphQL type, stamped as class variables onto every class generated for it |
 | `force_plugin_order` | `bool` | `true` | Run plugins strictly in their configured order |
 | `omitted_document_rules` | `List[str]` | `[]` | GraphQL document validation rules to skip |
 
@@ -183,6 +184,41 @@ Use traits to add **validators**, **computed properties and methods**, and to en
 **`isinstance` checks** across all generated variants of a type. Traits are prepended to the base
 list, so their method resolution order beats the generated defaults. See
 [Traits](design/traits) for details.
+
+### Directives as class variables (`directive_class_vars`)
+
+A schema can say something about a type with a directive application that no field carries:
+`type Dataset @identified(by: "@x/dataset")`. `directive_class_vars` stamps it, as a `ClassVar`,
+onto **every** class generated for that type: its fragments, the nested classes inside operation
+results and other fragments, inline fragments, interface implementations, objects and inputs. A
+nested selection (`lens { dataset { id } }`) is a class of its own, not a subclass of the
+`Dataset` fragment, so a trait or an `isinstance` check cannot tell what it is; the stamp can.
+
+```yaml
+directive_class_vars:
+  - directive: identified        # @identified(by: "@x/dataset")
+    argument: by
+    attribute: __identifier__    # __identifier__: ClassVar[Literal["@x/dataset"]] = "@x/dataset"
+  - directive: tag               # repeatable: always a tuple, one entry per application
+    argument: name
+    attribute: __tags__          # __tags__: ClassVar[tuple[str, ...]] = ("a", "b")
+  - directive: marked            # no argument: a presence marker
+    attribute: __marked__        # __marked__: ClassVar[bool] = True
+```
+
+- The value is read against the directive's argument type: an enum value is its name, a list a
+  tuple. An omitted argument takes the directive definition's default.
+- A single string, integer, boolean or enum value is typed as its `Literal`, so a checker can tell
+  stamped classes apart: a `Protocol` declaring `__identifier__: ClassVar[Literal["@x/dataset"]]`
+  matches the dataset's classes and nothing else.
+- A type without the directive gets **no** attribute; read it with
+  `getattr(type(obj), "__identifier__", None)`, or match it with a `Protocol` as above.
+- An interface's own directives land on its base class, and its implementations inherit them
+  unless their own type stamps the same attribute.
+- It fails closed. A directive or argument the schema does not declare, a stamp named like a field
+  of a class it lands on, a stamp on a type generated as no class (a union, enum or scalar, a
+  `@oneOf` input, a `@unionElementOf` placeholder), or a schema whose directive applications are
+  invisible (an **introspected** schema carries none: generate from SDL) is an error.
 
 ### Freezing models (`freeze`)
 

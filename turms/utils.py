@@ -1,22 +1,25 @@
 import ast
 import glob
 import re
-from typing import List, Optional, Sequence, Set, Union
+from collections.abc import Sequence
+from typing import Any, TypeAlias, TypeVar
 
 from graphql import (
     BooleanValueNode,
+    EnumValueNode,
     FloatValueNode,
     FragmentDefinitionNode,
     GraphQLEnumType,
     GraphQLInterfaceType,
     GraphQLList,
     GraphQLNamedOutputType,
+    GraphQLNamedType,
     GraphQLNonNull,
     GraphQLObjectType,
     GraphQLOutputType,
     GraphQLScalarType,
+    GraphQLSchema,
     GraphQLUnionType,
-    EnumValueNode,
     InlineFragmentNode,
     IntValueNode,
     ListTypeNode,
@@ -37,27 +40,28 @@ from graphql import (
     validate,
 )
 from graphql.error.graphql_error import GraphQLError
-from graphql.language.ast import DocumentNode, FieldNode, NameNode
-from graphql import GraphQLSchema
+from graphql.language.ast import DocumentNode, FieldNode, NameNode, Node
 
 from turms.annotations import list_label, optional_label
 from turms.config import GeneratorConfig
 from turms.errors import (  # noqa: F401  (re-exported: see note below)
-    GenerationError,
-    NoEnumFound,
-    NoInputTypeFound,
-    NoScalarFound,
     # These four live in turms.errors alongside the rest of the hierarchy, but
     # stay importable from here because plugins have always imported them from
     # turms.utils.
     FragmentNotFoundError,
+    GenerationError,
     InvalidDocuments,
     NoDocumentsFoundError,
+    NoEnumFound,
+    NoInputTypeFound,
     NoScalarEquivalentDefined,
+    NoScalarFound,
 )
 from turms.registry import ClassRegistry
 
 from .config import GraphQLTypes
+
+NodeT = TypeVar("NodeT", bound=Node)
 
 commentline_regex = re.compile(r"^.*#(.*)")
 #: A line that is *only* a comment. Used to walk back over the block of `#` lines above an
@@ -106,7 +110,7 @@ def capitalize_first(name: str) -> str:
     return name[0].upper() + name[1:]
 
 
-def field_is_conditional(node: Union[FieldNode, InlineFragmentNode]) -> bool:
+def field_is_conditional(node: FieldNode | InlineFragmentNode) -> bool:
     """Whether ``@skip`` / ``@include`` can make this selection absent.
 
     Accepts a field or an inline fragment: a directive on the fragment applies
@@ -120,13 +124,13 @@ def field_is_conditional(node: Union[FieldNode, InlineFragmentNode]) -> bool:
     ``@include(if: true)``) are recognised so they do not widen the type
     needlessly.
     """
-    for directive in node.directives:
+    for directive in node.directives or ():
         name = directive.name.value
         if name not in ("skip", "include"):
             continue
 
         condition = next(
-            (arg.value for arg in directive.arguments if arg.name.value == "if"),
+            (arg.value for arg in directive.arguments or () if arg.name.value == "if"),
             None,
         )
         if isinstance(condition, BooleanValueNode):
@@ -143,7 +147,7 @@ def field_is_conditional(node: Union[FieldNode, InlineFragmentNode]) -> bool:
 
 def non_typename_fields(
     node: FieldNode | FragmentDefinitionNode | OperationDefinitionNode,
-) -> List[FieldNode | SelectionNode]:
+) -> list[FieldNode | SelectionNode]:
     """Returns all selections on a node that are not __typename.
 
     ``__typename`` is re-emitted separately as a ``Literal`` discriminator
@@ -160,7 +164,9 @@ def non_typename_fields(
     ]
 
 
-def inspect_operation_for_documentation(operation: OperationDefinitionNode):
+def inspect_operation_for_documentation(
+    operation: OperationDefinitionNode,
+) -> str | None:
     """Checks for operation level documentatoin"""
 
     if not operation.loc:
@@ -204,7 +210,7 @@ def inspect_operation_for_documentation(operation: OperationDefinitionNode):
 
 def generate_typename_field(
     typename: str, registry: ClassRegistry, config: GeneratorConfig
-):
+) -> ast.AnnAssign:
     """Generates the typename field a specific type, this will be used to determine the type of the object in the response"""
 
     registry.register_import("pydantic.Field")
@@ -239,7 +245,7 @@ def generate_alias_keywords(
     graphql_name: str,
     config: GeneratorConfig,
     registry: ClassRegistry,
-) -> List[ast.keyword]:
+) -> list[ast.keyword]:
     """The ``Field(...)`` keywords that carry a field's GraphQL name.
 
     Only called when the python name and the GraphQL name actually differ.
@@ -280,7 +286,9 @@ def generate_alias_keywords(
     return [ast.keyword(arg="alias", value=ast.Constant(value=graphql_name))]
 
 
-def generate_generic_typename_field(registry: ClassRegistry, config: GeneratorConfig):
+def generate_generic_typename_field(
+    registry: ClassRegistry, config: GeneratorConfig
+) -> ast.AnnAssign:
     """Generates the typename field a specific type, this will be used to determine the type of the object in the response"""
 
     registry.register_import("pydantic.Field")
@@ -309,7 +317,7 @@ def generate_pydantic_config(
     graphQLType: GraphQLTypes,
     config: GeneratorConfig,
     registry: ClassRegistry,
-    typename: Optional[str] = None,
+    typename: str | None = None,
 ) -> list[ast.Assign]:
     """Generates the ``model_config`` assignment for a specific type
 
@@ -322,7 +330,7 @@ def generate_pydantic_config(
 
     """
 
-    config_keywords: List[ast.keyword] = []
+    config_keywords: list[ast.keyword] = []
 
     if config.freeze.enabled:
         if graphQLType in config.freeze.types:
@@ -363,9 +371,7 @@ def generate_pydantic_config(
                     config_keywords.append(
                         ast.keyword(
                             arg="populate_by_name",
-                            value=ast.Constant(
-                                value=config.options.populate_by_name
-                            ),
+                            value=ast.Constant(value=config.options.populate_by_name),
                         )
                     )
 
@@ -373,9 +379,7 @@ def generate_pydantic_config(
                     config_keywords.append(
                         ast.keyword(
                             arg="from_attributes",
-                            value=ast.Constant(
-                                value=config.options.from_attributes
-                            ),
+                            value=ast.Constant(value=config.options.from_attributes),
                         )
                     )
 
@@ -410,48 +414,71 @@ def generate_pydantic_config(
         return []
 
 
+def replace_node(node: NodeT, **changes: Any) -> NodeT:
+    """A copy of an AST node with ``changes`` applied.
+
+    graphql-core 3.3 made AST nodes frozen, so a node is never assigned into: it is
+    rebuilt. Every field is carried over by name (``keys``, which 3.2 and 3.3 both
+    define), so the copy keeps its ``loc`` and anything else it had.
+    """
+    fields = {key: getattr(node, key) for key in node.keys}
+    fields.update(changes)
+    return type(node)(**fields)
+
+
+def _typename_field() -> FieldNode:
+    return FieldNode(
+        name=NameNode(value="__typename"),
+        arguments=(),
+        directives=(),
+        selection_set=None,
+    )
+
+
 def add_typename_recursively(
     selection_set: SelectionSetNode | None, skip: bool = False
-) -> None:
-    if selection_set is None:
-        return
+) -> SelectionSetNode | None:
+    """``selection_set`` with ``__typename`` selected, and in every nested field's.
 
-    # Collect all existing fields in the selection set
-    selections = list(selection_set.selections)
+    Returns a new selection set rather than changing this one (AST nodes are
+    frozen in graphql-core 3.3). ``skip`` leaves this level alone and still
+    descends: an operation's root has no ``__typename`` of its own.
+    """
+    if selection_set is None:
+        return None
+
+    selections = [
+        replace_node(field, selection_set=add_typename_recursively(field.selection_set))
+        if isinstance(field, FieldNode) and field.selection_set
+        else field
+        for field in selection_set.selections
+    ]
+
     has_typename = any(
         isinstance(field, FieldNode) and field.name.value == "__typename"
         for field in selections
     )
-
-    # Add __typename if it's not already present
     if not has_typename and not skip:
-        selections.append(
-            FieldNode(
-                name=NameNode(value="__typename"),
-                arguments=[],
-                directives=[],
-                selection_set=None,
-            )
-        )
+        selections.append(_typename_field())
 
-    # Apply the function recursively to nested selection sets
-    for field in selections:
-        if isinstance(field, FieldNode) and field.selection_set:
-            add_typename_recursively(field.selection_set)
-
-    # Update the selection set with potentially added __typename fields
-    selection_set.selections = tuple(selections)
+    return replace_node(selection_set, selections=tuple(selections))
 
 
 def auto_add_typename_field_to_all_objects(document: DocumentNode) -> DocumentNode:
-    for definition in document.definitions:
-        if isinstance(definition, (OperationDefinitionNode, FragmentDefinitionNode)):
-            add_typename_recursively(
+    definitions = [
+        replace_node(
+            definition,
+            selection_set=add_typename_recursively(
                 definition.selection_set,
                 skip=isinstance(definition, OperationDefinitionNode),
-            )
+            ),
+        )
+        if isinstance(definition, (OperationDefinitionNode, FragmentDefinitionNode))
+        else definition
+        for definition in document.definitions
+    ]
 
-    return document
+    return replace_node(document, definitions=tuple(definitions))
 
 
 def parse_documents(
@@ -464,12 +491,12 @@ def parse_documents(
     x = glob.glob(scan_glob, recursive=True)
     x.sort()  # Ensure deterministic order
 
-    errors: List[GraphQLError] = []
+    errors: list[GraphQLError] = []
 
     dsl = ""
 
     for file in x:
-        with open(file, "r") as f:
+        with open(file) as f:
             dsl += f.read()
 
     if dsl == "":
@@ -495,6 +522,7 @@ fragment_searcher = re.compile(r"\.\.\.(?P<fragment>[a-zA-Z]*)")
 
 def auto_add_typename_field_to_fragment_str(fragment_str: str) -> str:
     x = parse(fragment_str)
+    definitions = []
     for fragment in x.definitions:
         if isinstance(fragment, FragmentDefinitionNode):
             selections = list(fragment.selection_set.selections)
@@ -502,23 +530,22 @@ def auto_add_typename_field_to_fragment_str(fragment_str: str) -> str:
                 isinstance(field, FieldNode) and field.name.value == "__typename"
                 for field in selections
             ):
-                selections.append(
-                    FieldNode(
-                        name=NameNode(value="__typename"),
-                        arguments=[],
-                        directives=[],
-                        selection_set=None,
-                    )
+                selections.append(_typename_field())
+                fragment = replace_node(
+                    fragment,
+                    selection_set=replace_node(
+                        fragment.selection_set, selections=tuple(selections)
+                    ),
                 )
-                fragment.selection_set.selections = tuple(selections)
+        definitions.append(fragment)
 
-    return print_ast(x)
+    return print_ast(replace_node(x, definitions=tuple(definitions)))
 
 
 def replace_iteratively(
     pattern: str,
     registry: ClassRegistry,
-    taken: list[str] = [],
+    taken: list[str] = [],  # noqa: B006 - only read, never mutated
 ) -> str:
     """Replaces the fragments in the pattern with their definitions"""
     z = set(fragment_searcher.findall(pattern))  # only set is important
@@ -550,7 +577,7 @@ def replace_iteratively(
 
 def get_additional_bases_for_type(
     typename: str, config: GeneratorConfig, registry: ClassRegistry
-) -> List[ast.Name]:
+) -> list[ast.Name]:
     if typename in config.additional_bases:
         for base in config.additional_bases[typename]:
             registry.register_import(base)
@@ -562,7 +589,7 @@ def get_additional_bases_for_type(
     return []
 
 
-def is_oneof_input_type(graphql_type) -> bool:
+def is_oneof_input_type(graphql_type: GraphQLNamedType) -> bool:
     """Whether an input object type is declared with the spec ``@oneOf`` directive.
 
     graphql-core 3.3+ exposes this as ``is_one_of``; on 3.2 the directive is only
@@ -573,10 +600,14 @@ def is_oneof_input_type(graphql_type) -> bool:
     ast_node = getattr(graphql_type, "ast_node", None)
     if ast_node is None:
         return False
-    return any(directive.name.value == "oneOf" for directive in ast_node.directives)
+    return any(
+        directive.name.value == "oneOf" for directive in ast_node.directives or ()
+    )
 
 
-def get_interface_bases(config: GeneratorConfig, registry: ClassRegistry):
+def get_interface_bases(
+    config: GeneratorConfig, registry: ClassRegistry
+) -> list[ast.Name]:
     if config.interface_bases:
         for base in config.interface_bases:
             registry.register_import(base)
@@ -596,7 +627,7 @@ def get_interface_bases(config: GeneratorConfig, registry: ClassRegistry):
 
 
 def interface_is_extended_by_other_interfaces(
-    interface: GraphQLInterfaceType, other_interfaces: Set[GraphQLInterfaceType]
+    interface: GraphQLInterfaceType, other_interfaces: set[GraphQLInterfaceType]
 ) -> bool:
     interfaces_implemented_by_other_interfaces = {
         nested_interface
@@ -610,7 +641,7 @@ def recurse_type_annotation(
     type: TypeNode,
     registry: ClassRegistry,
     optional: bool = True,
-    overwrite_final: Optional[Union[str, ast.expr]] = None,
+    overwrite_final: str | ast.expr | None = None,
 ) -> ast.expr:
     if isinstance(type, NonNullTypeNode):
         return recurse_type_annotation(
@@ -660,10 +691,10 @@ def recurse_type_annotation(
                         x = registry.reference_enum(
                             type.name.value, "", allow_forward=False
                         )
-                    except NoEnumFound:
+                    except NoEnumFound as e:
                         raise NotImplementedError(
                             f"Could not find corresponding type for type '{type.name.value}'. Did you register this scalar?"
-                        )
+                        ) from e
 
         if not x:
             raise Exception(f"Could not set value for {type}")
@@ -684,7 +715,7 @@ def recurse_outputtype_annotation(
     type: GraphQLNamedOutputType,
     registry: ClassRegistry,
     optional: bool = True,
-    overwrite_final: Optional[str] = None,
+    overwrite_final: str | None = None,
 ) -> ast.expr:
     if isinstance(type, GraphQLNonNull):
         # If the type is non-null, we need to recurse into the inner type
@@ -758,7 +789,7 @@ def recurse_outputtype_label(
     type: GraphQLOutputType,
     registry: ClassRegistry,
     optional: bool = True,
-    overwrite_final: Optional[str] = None,
+    overwrite_final: str | None = None,
 ) -> str:
     if isinstance(type, GraphQLNonNull):  # pragma: no cover
         return recurse_outputtype_label(
@@ -797,7 +828,7 @@ def recurse_type_label(
     type: TypeNode,
     registry: ClassRegistry,
     optional: bool = True,
-    overwrite_final: Optional[str] = None,
+    overwrite_final: str | None = None,
 ) -> str:
     if isinstance(type, NonNullTypeNode):
         return recurse_type_label(
@@ -827,10 +858,10 @@ def recurse_type_label(
                         x = registry.reference_enum(
                             type.name.value, "", allow_forward=False
                         )
-                    except NoEnumFound:
+                    except NoEnumFound as e:
                         raise NotImplementedError(
                             f"Could not find correspoinding type labler for {type.name.value}"
-                        )
+                        ) from e
 
         label = x.id if isinstance(x, ast.Name) else x.value
         return optional_label(label, registry.config) if optional else label
@@ -838,7 +869,7 @@ def recurse_type_label(
     raise NotImplementedError("Not implemented for this type")
 
 
-ParsedValue = Union[None, str, int, float, bool, List["ParsedValue"], dict]
+ParsedValue: TypeAlias = None | str | int | float | bool | list["ParsedValue"] | dict
 
 
 def parse_value_node(value_node: ValueNode) -> ParsedValue:
@@ -881,7 +912,7 @@ def parse_value_node(value_node: ValueNode) -> ParsedValue:
         )
 
 
-def convert_default_value_to_ast(value):
+def convert_default_value_to_ast(value: object) -> ast.expr | None:
     """Converts a coerced Python default value (as stored on a GraphQL input
     field / argument) into an AST node usable as a pydantic field default."""
     if value is Undefined:
@@ -911,11 +942,11 @@ def convert_default_value_to_ast(value):
 
 
 def compose_field_documentation(
-    description=None,
-    deprecation_reason=None,
-    default_string=None,
-    include_metadata=True,
-):
+    description: str | None = None,
+    deprecation_reason: str | None = None,
+    default_string: str | None = None,
+    include_metadata: bool = True,
+) -> str | None:
     """Builds a field's human-readable documentation. When ``include_metadata`` is
     True the GraphQL deprecation reason and default value are folded into the text
     alongside the description; otherwise only the plain description is returned.
@@ -934,11 +965,11 @@ def compose_field_documentation(
 
 
 def annotate_field_metadata(
-    annotation,
-    registry,
-    default_value_ast=None,
-    deprecation_reason=None,
-):
+    annotation: ast.expr,
+    registry: ClassRegistry,
+    default_value_ast: ast.expr | None = None,
+    deprecation_reason: str | None = None,
+) -> ast.expr:
     """Wraps a field annotation in ``Annotated[T, GraphQLDefault(...), Deprecated(...)]``
     when the field carries a GraphQL schema default and/or a deprecation reason.
 

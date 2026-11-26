@@ -1,7 +1,8 @@
 import ast
 import logging
 from collections import defaultdict, deque
-from typing import Any, DefaultDict, Dict, List, Literal, Optional, Sequence, Set
+from collections.abc import Sequence
+from typing import Literal
 
 from graphql import (
     DocumentNode,
@@ -10,21 +11,21 @@ from graphql import (
     FragmentSpreadNode,
     GraphQLInterfaceType,
     GraphQLObjectType,
+    GraphQLSchema,
     GraphQLUnionType,
     InlineFragmentNode,
     SelectionSetNode,
     language,
-    GraphQLSchema,
 )
-
-from graphql.utilities.type_info import get_field_def
 from pydantic import Field, model_validator
 from pydantic_settings import SettingsConfigDict
+
 from turms.config import GeneratorConfig, GraphQLTypes
+from turms.errors import GenerationError
 from turms.plugins.base import Plugin, PluginConfig, rename_deprecated_keys
 from turms.recurse import type_field_node
 from turms.registry import ClassRegistry
-from turms.errors import GenerationError
+from turms.schema_lookup import get_field_def
 from turms.utils import (
     field_is_conditional,
     generate_generic_typename_field,
@@ -34,9 +35,9 @@ from turms.utils import (
     get_interface_bases,
     merge_bases_sequences,
     merge_body_sequences,
-    replace_iteratively,
     non_typename_fields,
     parse_documents,
+    replace_iteratively,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,11 +45,11 @@ logger = logging.getLogger(__name__)
 
 def find_fragment_dependencies_recursive(
     selection_set: SelectionSetNode,
-    fragment_definitions: Dict[str, FragmentDefinitionNode],
-    visited: Set[str],
-):
+    fragment_definitions: dict[str, FragmentDefinitionNode],
+    visited: set[str],
+) -> set[str]:
     """Recursively find all fragment dependencies within a selection set."""
-    dependencies: Set[str] = set()
+    dependencies: set[str] = set()
     if selection_set is None:
         return dependencies
 
@@ -79,18 +80,18 @@ def find_fragment_dependencies_recursive(
 
 def build_recursive_dependency_graph(
     document: DocumentNode,
-) -> DefaultDict[str, Set[str]]:
+) -> defaultdict[str, set[str]]:
     """Build a dependency graph for fragments, accounting for deep nested fragment spreads."""
     fragment_definitions = {
         definition.name.value: definition
         for definition in document.definitions
         if isinstance(definition, FragmentDefinitionNode)
     }
-    dependencies: DefaultDict[str, Set[str]] = defaultdict(set)
+    dependencies: defaultdict[str, set[str]] = defaultdict(set)
 
     # Populate the dependency graph with deeply nested fragment dependencies
     for fragment_name, fragment in fragment_definitions.items():
-        visited: Set[str] = (
+        visited: set[str] = (
             set()
         )  # Track visited fragments to avoid cyclic dependencies
         dependencies[fragment_name] = find_fragment_dependencies_recursive(
@@ -100,9 +101,9 @@ def build_recursive_dependency_graph(
     return dependencies
 
 
-def topological_sort(dependency_graph: DefaultDict[str, Set[str]]) -> List[str]:
+def topological_sort(dependency_graph: defaultdict[str, set[str]]) -> list[str]:
     """Perform a topological sort on fragments based on recursive dependencies."""
-    sorted_fragments: List[str] = []
+    sorted_fragments: list[str] = []
     no_dependency_fragments = deque(
         [frag for frag, deps in dependency_graph.items() if not deps]
     )
@@ -131,15 +132,15 @@ def topological_sort(dependency_graph: DefaultDict[str, Set[str]]) -> List[str]:
 class FragmentsPluginConfig(PluginConfig):
     model_config = SettingsConfigDict(env_prefix="TURMS_PLUGINS_FRAGMENTS_")
     type: str = "turms.plugins.fragments.FragmentsPlugin"
-    fragment_bases: List[str] = []
-    object_bases: List[str] = []
-    fragments_glob: Optional[str] = None
+    fragment_bases: list[str] = []
+    object_bases: list[str] = []
+    fragments_glob: str | None = None
     extract_documentation: bool = True
     generate_meta_class: bool = True
 
     @model_validator(mode="before")
     @classmethod
-    def _rename_deprecated(cls, values: Any) -> Any:
+    def _rename_deprecated(cls, values: object) -> object:
         return rename_deprecated_keys(
             values, {"add_documentation": "extract_documentation"}
         )
@@ -150,7 +151,7 @@ def get_fragment_bases(
     config: GeneratorConfig,
     pluginConfig: FragmentsPluginConfig,
     registry: ClassRegistry,
-):
+) -> list[ast.Name]:
     bases: list[ast.Name] = []
     if pluginConfig.fragment_bases:
         for base in pluginConfig.fragment_bases:
@@ -185,7 +186,7 @@ def generate_fragment(
     config: GeneratorConfig,
     plugin_config: FragmentsPluginConfig,
     registry: ClassRegistry,
-) -> List[ast.ClassDef | ast.Assign | ast.AnnAssign | ast.Expr]:
+) -> list[ast.ClassDef | ast.Assign | ast.AnnAssign | ast.Expr]:
     """Generate a fragment class from a GraphQL fragment definition."""
     tree: list[ast.ClassDef | ast.Assign | ast.Expr] = []
     fields: list[ast.AnnAssign | ast.Expr] = []
@@ -228,10 +229,10 @@ def generate_fragment(
 
         # This is a map of the implementing types to their base classes
         # i.e eg subtype of the interface
-        implementing_class_base_classes: Dict[str, List[str]] = {}
+        implementing_class_base_classes: dict[str, list[str]] = {}
 
         # This is a map of inlien fragments field on their respective types
-        inline_fragment_fields: Dict[str, List[ast.AnnAssign | ast.Expr]] = {}
+        inline_fragment_fields: dict[str, list[ast.AnnAssign | ast.Expr]] = {}
 
         for sub_node in sub_nodes:
             if isinstance(sub_node, FragmentSpreadNode):
@@ -344,8 +345,11 @@ def generate_fragment(
             decorator_list=[],
             keywords=[],
             type_params=[],
-            body=merge_body_sequences(
-                mother_class_fields if mother_class_fields else [ast.Pass()]
+            body=registry.class_fields_for(
+                type.name,
+                merge_body_sequences(
+                    mother_class_fields if mother_class_fields else [ast.Pass()]
+                ),
             ),
         )
 
@@ -375,7 +379,7 @@ def generate_fragment(
         tree.append(mother_class)
         tree.append(catch_class)
 
-        implementaionMap: Dict[str, str] = {}
+        implementaionMap: dict[str, str] = {}
 
         for i in implementing_types.objects:
             class_name = f"{base_fragment_name}{i.name}"
@@ -407,12 +411,15 @@ def generate_fragment(
                 decorator_list=[],
                 keywords=[],
                 type_params=[],
-                body=merge_body_sequences(
-                    [
-                        description_field,
-                        generate_typename_field(i.name, registry, config),
-                    ],
-                    inline_fields,
+                body=registry.class_fields_for(
+                    i.name,
+                    merge_body_sequences(
+                        [
+                            description_field,
+                            generate_typename_field(i.name, registry, config),
+                        ],
+                        inline_fields,
+                    ),
                 ),
             )
 
@@ -526,10 +533,15 @@ def generate_fragment(
                 decorator_list=[],
                 keywords=[],
                 type_params=[],
-                body=merge_body_sequences(
-                    fields,
-                    generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry),
-                    meta_body,
+                body=registry.class_fields_for(
+                    type.name,
+                    merge_body_sequences(
+                        fields,
+                        generate_pydantic_config(
+                            GraphQLTypes.FRAGMENT, config, registry
+                        ),
+                        meta_body,
+                    ),
                 ),
             )
         )
@@ -543,9 +555,9 @@ def generate_fragment(
 
         mother_class_name = base_fragment_name  # + "Base"
 
-        member_class_base_classes: Dict[str, List[str]] = {}
+        member_class_base_classes: dict[str, list[str]] = {}
 
-        inline_fragment_fields: Dict[str, List[ast.Expr | ast.AnnAssign]] = {}
+        inline_fragment_fields: dict[str, list[ast.Expr | ast.AnnAssign]] = {}
 
         for sub_node in sub_nodes:
             if isinstance(sub_node, FragmentSpreadNode):
@@ -606,7 +618,7 @@ def generate_fragment(
             else:
                 raise AssertionError(f"Unknown node type: {(sub_node)}")
 
-        implementationMap: Dict[str, str] = {}
+        implementationMap: dict[str, str] = {}
 
         for i in type.types:
             class_name = f"{base_fragment_name}{i.name}"
@@ -628,8 +640,12 @@ def generate_fragment(
                 decorator_list=[],
                 keywords=[],
                 type_params=[],
-                body=merge_body_sequences(
-                    [generate_typename_field(i.name, registry, config)], inline_fields
+                body=registry.class_fields_for(
+                    i.name,
+                    merge_body_sequences(
+                        [generate_typename_field(i.name, registry, config)],
+                        inline_fields,
+                    ),
                 ),
             )
 
@@ -661,8 +677,8 @@ def generate_fragment(
 
 
 def reorder_definitions(
-    document: DocumentNode, sorted_fragments: List[str]
-) -> List[FragmentDefinitionNode]:
+    document: DocumentNode, sorted_fragments: list[str]
+) -> list[FragmentDefinitionNode]:
     """Reorder document definitions to place fragments in dependency order."""
     fragment_definitions = {
         defn.name.value: defn

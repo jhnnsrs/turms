@@ -1,3 +1,5 @@
+from graphql import GraphQLSchema
+
 from turms.config import GeneratorConfig
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.fragments import FragmentsPlugin
@@ -10,7 +12,9 @@ from turms.stylers.snake_case import SnakeCaseStyler
 from .utils import build_relative_glob, unit_test_with
 
 
-def test_fragment_spread_inside_inline_fragment(multi_interface_schema):
+def test_fragment_spread_inside_inline_fragment(
+    multi_interface_schema: GraphQLSchema,
+) -> None:
     """A fragment spread inside an inline fragment must reach the model.
 
     It used to be dropped by a bare ``if not isinstance(field, FieldNode):
@@ -47,8 +51,8 @@ def test_fragment_spread_inside_inline_fragment(multi_interface_schema):
 
 
 def test_directive_on_inline_fragment_makes_its_fields_optional(
-    multi_interface_schema,
-):
+    multi_interface_schema: GraphQLSchema,
+) -> None:
     """A @skip/@include on the inline fragment applies to every field inside it.
 
     ``kind`` is ``String!``, but the whole group is conditional, so it has to be

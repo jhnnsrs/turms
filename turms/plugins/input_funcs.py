@@ -13,21 +13,21 @@ plugin; the input model / pydantic performs the coercion.
 """
 
 import ast
-from typing import Dict, List
 
-from graphql import GraphQLInputObjectType, GraphQLNonNull, GraphQLSchema
+from graphql import GraphQLInputObjectType, GraphQLSchema
 from pydantic import Field
 from pydantic_settings import SettingsConfigDict
 
 from turms.config import GeneratorConfig, PythonType
 from turms.plugins.base import Plugin, PluginConfig
 from turms.plugins.funcs import (
-    dict_str_any_annotation,
+    dict_str_object_annotation,
     generate_input_type_descriptions,
     generate_input_type_params,
 )
 from turms.referencer import create_reference_registry_from_documents
 from turms.registry import ClassRegistry
+from turms.schema_lookup import input_field_is_required
 from turms.utils import parse_documents
 
 
@@ -36,9 +36,9 @@ class InputFuncsPluginConfig(PluginConfig):
         extra="forbid", env_prefix="TURMS_PLUGINS_INPUTFUNCS_"
     )
     type: str = "turms.plugins.input_funcs.InputFuncsPlugin"
-    coercible_scalars: Dict[str, PythonType] = {}
+    coercible_scalars: dict[str, PythonType] = {}
     """Map of scalar names to a coercible python type used in the factory params."""
-    coercible_inputs: Dict[str, PythonType] = {}
+    coercible_inputs: dict[str, PythonType] = {}
     """Map of input type names to an additional python type accepted in the factory
     params (unioned onto the input model)."""
     skip_underscore: bool = True
@@ -46,6 +46,11 @@ class InputFuncsPluginConfig(PluginConfig):
     prepend: str = ""
     """Optional prefix for the generated factory function name."""
     extract_documentation: bool = True
+
+
+#: Name of the generated argument-assembly local. Underscored so an input type with a field
+#: called ``data`` cannot shadow the generated function's own parameter of that name.
+INPUT_DATA_NAME = "_data"
 
 
 def generate_input_func(
@@ -77,7 +82,7 @@ def generate_input_func(
         input_type, plugin_config, registry
     )
 
-    body: List[ast.stmt] = []
+    body: list[ast.stmt] = []
 
     if plugin_config.extract_documentation:
         doc = f"Creates a {class_name}\n\nArguments:\n" + (
@@ -85,11 +90,11 @@ def generate_input_func(
         )
         body.append(ast.Expr(value=ast.Constant(value=doc)))
 
-    # data: Dict[str, Any] = {}
+    # _data: Dict[str, object] = {}
     body.append(
         ast.AnnAssign(
-            target=ast.Name(id="data", ctx=ast.Store()),
-            annotation=dict_str_any_annotation(registry),
+            target=ast.Name(id=INPUT_DATA_NAME, ctx=ast.Store()),
+            annotation=dict_str_object_annotation(registry),
             value=ast.Dict(keys=[], values=[]),
             simple=1,
         )
@@ -100,13 +105,13 @@ def generate_input_func(
         # Key by the GraphQL field name (the model's alias) so construction works
         # regardless of populate_by_name.
         subscript = ast.Subscript(
-            value=ast.Name(id="data", ctx=ast.Load()),
+            value=ast.Name(id=INPUT_DATA_NAME, ctx=ast.Load()),
             slice=ast.Constant(value=value_key),
             ctx=ast.Store(),
         )
         param_value = ast.Name(id=field_param, ctx=ast.Load())
 
-        if isinstance(value.type, GraphQLNonNull):
+        if input_field_is_required(value):
             # required -> always present
             body.append(ast.Assign(targets=[subscript], value=param_value))
         else:
@@ -143,21 +148,29 @@ def generate_input_func(
                         attr="validate_python",
                         ctx=ast.Load(),
                     ),
-                    args=[ast.Name(id="data", ctx=ast.Load())],
+                    args=[ast.Name(id=INPUT_DATA_NAME, ctx=ast.Load())],
                     keywords=[],
                 )
             )
         )
     else:
-        # return ClassName(**data)
+        # return ClassName.model_validate(_data)
+        #
+        # Validated rather than splatted as `ClassName(**_data)`: the buffer is keyed by GraphQL
+        # field name and typed `Dict[str, object]`, and `object` is not assignable to a typed
+        # field, so `**` would not check. `model_validate` takes the mapping whole, resolves the
+        # same aliases, and leaves `exclude_unset` reporting exactly the keys that were set --
+        # which is also what the @oneOf branch above already does.
         body.append(
             ast.Return(
                 value=ast.Call(
-                    func=ast.Name(id=class_name, ctx=ast.Load()),
-                    args=[],
-                    keywords=[
-                        ast.keyword(arg=None, value=ast.Name(id="data", ctx=ast.Load()))
-                    ],
+                    func=ast.Attribute(
+                        value=ast.Name(id=class_name, ctx=ast.Load()),
+                        attr="model_validate",
+                        ctx=ast.Load(),
+                    ),
+                    args=[ast.Name(id=INPUT_DATA_NAME, ctx=ast.Load())],
+                    keywords=[],
                 )
             )
         )
@@ -182,8 +195,8 @@ def generate_input_funcs(
     config: GeneratorConfig,
     plugin_config: InputFuncsPluginConfig,
     registry: ClassRegistry,
-) -> List[ast.AST]:
-    tree: List[ast.AST] = []
+) -> list[ast.AST]:
+    tree: list[ast.AST] = []
 
     inputobjects_type = {
         key: value
@@ -203,10 +216,10 @@ def generate_input_funcs(
     # factories must validate through pydantic instead. Mirror the detection.
     union_targets = set()
     for type in inputobjects_type.values():
-        for directive in type.ast_node.directives if type.ast_node else []:
+        for directive in (type.ast_node.directives or ()) if type.ast_node else ():
             if directive.name.value != "unionElementOf":
                 continue
-            for arg in directive.arguments:
+            for arg in directive.arguments or ():
                 if arg.name.value == "union":
                     union_targets.add(arg.value.value)
 
@@ -250,7 +263,7 @@ class InputFuncsPlugin(Plugin):
         client_schema: GraphQLSchema,
         config: GeneratorConfig,
         registry: ClassRegistry,
-    ) -> List[ast.AST]:
+    ) -> list[ast.AST]:
         # Merge the global coercible_scalars/coercible_inputs with this plugin's
         # overrides (plugin entries win) so funcs and input_funcs can share a
         # global config.

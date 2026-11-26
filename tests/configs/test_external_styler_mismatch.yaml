@@ -1,0 +1,28 @@
+# The same pair, but the two projects style class names differently -- so the
+# second would import names the first never exported.
+projects:
+  beasts_protocol:
+    schema: schemas/beasts.graphql
+    extensions:
+      turms:
+        out_dir: examples/protocol
+        stylers:
+          - type: turms.stylers.capitalize.CapitalizeStyler
+        plugins:
+          - type: turms.plugins.enums.EnumsPlugin
+
+  beasts:
+    schema: schemas/beasts.graphql
+    documents: documents/beasts/*.graphql
+    extensions:
+      turms:
+        out_dir: examples/api
+        external_modules:
+          - module: examples.protocol.schema
+            kinds: [enum]
+            from_project: beasts_protocol
+        stylers:
+          - type: turms.stylers.capitalize.CapitalizeStyler
+          - type: turms.stylers.snake_case.SnakeCaseStyler
+        plugins:
+          - type: turms.plugins.fragments.FragmentsPlugin

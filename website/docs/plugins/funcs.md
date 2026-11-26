@@ -74,7 +74,7 @@ arguments the caller actually passed are included:
 ```python
 variables: Dict[str, Any] = {}
 if limit is not UNSET:
-    variables['limit'] = limit
+    variables["limit"] = limit
 ```
 
 :::warning The exclude_unset contract

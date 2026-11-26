@@ -11,10 +11,13 @@ plus ``serialization_alias=graphql``. Both spellings still validate, the wire
 format is byte-identical, and the python spelling now type-checks.
 """
 
+import ast
+from pathlib import Path
+
 import pytest
 from graphql import build_ast_schema, parse
 
-from turms.config import GeneratorConfig, OptionsConfig
+from turms.config import AliasMode, GeneratorConfig, OptionsConfig
 from turms.errors import GenerationError
 from turms.plugins.inputs import InputsPlugin
 from turms.plugins.objects import ObjectsPlugin
@@ -48,7 +51,7 @@ query GetCountries($filter: Filter, $maxDepth: Int) {
 """
 
 
-def _generate(tmp_path, alias_mode):
+def _generate(tmp_path: Path, alias_mode: AliasMode) -> list[ast.AST]:
     doc = tmp_path / "ops.graphql"
     doc.write_text(operation)
     config = GeneratorConfig(
@@ -68,13 +71,13 @@ def _generate(tmp_path, alias_mode):
     )
 
 
-def test_single_is_the_default(tmp_path):
+def test_single_is_the_default(tmp_path: Path) -> None:
     generated = parse_to_code(_generate(tmp_path, "single"))
     assert "other_mandatory: str = Field(alias='otherMandatory')" in generated
     assert "AliasChoices" not in generated
 
 
-def test_split_emits_validation_and_serialization_alias(tmp_path):
+def test_split_emits_validation_and_serialization_alias(tmp_path: Path) -> None:
     generated = parse_to_code(_generate(tmp_path, "split"))
     assert (
         "other_mandatory: str = Field("
@@ -84,7 +87,7 @@ def test_split_emits_validation_and_serialization_alias(tmp_path):
     assert "from pydantic import" in generated and "AliasChoices" in generated
 
 
-def test_split_applies_to_operation_arguments(tmp_path):
+def test_split_applies_to_operation_arguments(tmp_path: Path) -> None:
     """Arguments is constructed by the generated funcs, so it follows the input
     policy rather than the output one."""
     generated = parse_to_code(_generate(tmp_path, "split"))
@@ -95,7 +98,7 @@ def test_split_applies_to_operation_arguments(tmp_path):
     ) in generated
 
 
-def test_split_leaves_output_types_on_a_single_alias(tmp_path):
+def test_split_leaves_output_types_on_a_single_alias(tmp_path: Path) -> None:
     """Output types are parsed from the wire, never constructed by the caller, so
     they keep one plain alias -- and __typename must stay a plain alias because
     pydantic forbids a split alias on a discriminated-union tag."""
@@ -104,7 +107,9 @@ def test_split_leaves_output_types_on_a_single_alias(tmp_path):
 
 
 @pytest.mark.parametrize("alias_mode", ["single", "split"])
-def test_both_spellings_validate_and_wire_format_is_identical(tmp_path, alias_mode):
+def test_both_spellings_validate_and_wire_format_is_identical(
+    tmp_path: Path, alias_mode: AliasMode
+) -> None:
     unit_test_with(
         _generate(tmp_path, alias_mode),
         """
@@ -118,7 +123,7 @@ def test_both_spellings_validate_and_wire_format_is_identical(tmp_path, alias_mo
     )
 
 
-def test_split_makes_the_python_spelling_type_check(tmp_path):
+def test_split_makes_the_python_spelling_type_check(tmp_path: Path) -> None:
     """The actual point of the feature -- and invisible to a runtime test."""
     probe = """
     Filter(other_mandatory="a")
@@ -133,7 +138,7 @@ def test_split_makes_the_python_spelling_type_check(tmp_path):
     assert not split, f"expected no errors under 'split', got {split}"
 
 
-def test_split_rejects_the_graphql_spelling_statically(tmp_path):
+def test_split_rejects_the_graphql_spelling_statically(tmp_path: Path) -> None:
     """Under split the wire spelling is serialization-only, so passing it as a
     keyword is a type error -- while still working at runtime."""
     diagnostics = type_check_with(
@@ -171,7 +176,9 @@ query A($element: ElementInput) { a(element: $element) }
 
 
 @pytest.mark.parametrize("alias_mode", ["single", "split"])
-def test_discriminator_tag_never_gets_an_alias(tmp_path, alias_mode):
+def test_discriminator_tag_never_gets_an_alias(
+    tmp_path: Path, alias_mode: AliasMode
+) -> None:
     """pydantic raises ``Alias [...] is not supported in a discriminated union``
     for a non-string alias on a tag field, so the tag must stay bare in both
     modes -- while its siblings still get the mode's aliasing."""
@@ -197,13 +204,14 @@ def test_discriminator_tag_never_gets_an_alias(tmp_path, alias_mode):
         assert "Field(alias='powerLevel'" in generated
 
 
-def test_styled_discriminator_is_refused(tmp_path):
+def test_styled_discriminator_is_refused(tmp_path: Path) -> None:
     """A multi-word discriminator would be emitted under its raw name while the
     ordinary-field loop styles it, so it would be emitted twice -- and could
     never carry the alias that would reconcile them."""
     sdl = discriminated_sdl.replace('discriminator: "kind"', 'discriminator: "myKind"')
     sdl = sdl.replace("input LaserInput", "input LaserInput").replace(
-        "    kind: String!\n    powerLevel: Float", "    myKind: String!\n    powerLevel: Float"
+        "    kind: String!\n    powerLevel: Float",
+        "    myKind: String!\n    powerLevel: Float",
     )
     doc = tmp_path / "ops.graphql"
     doc.write_text(discriminated_operation)
@@ -220,7 +228,7 @@ def test_styled_discriminator_is_refused(tmp_path):
         )
 
 
-def test_alias_mode_is_independent_of_enabled_and_types(tmp_path):
+def test_alias_mode_is_independent_of_enabled_and_types(tmp_path: Path) -> None:
     """``alias_mode`` chooses how a Field specifier spells its alias; ``enabled``
     and ``types`` choose which models get a generated ``model_config``. Gating
     the first on the second would be wrong -- ``Arguments`` is OPERATION-scoped
@@ -247,7 +255,7 @@ def test_alias_mode_is_independent_of_enabled_and_types(tmp_path):
     assert "model_config = ConfigDict(" not in generated
 
 
-def test_generated_enums_have_strenum_semantics(tmp_path):
+def test_generated_enums_have_strenum_semantics(tmp_path: Path) -> None:
     """``class X(str, Enum)`` inherits ``Enum.__str__``, so ``str(X.A)`` is
     "X.A". Generated enums restore ``str.__str__`` so a value that reaches a log
     line or an f-string reads as the wire value -- which is what makes dropping

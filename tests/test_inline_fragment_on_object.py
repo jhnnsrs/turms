@@ -1,3 +1,5 @@
+from graphql import GraphQLSchema
+
 from turms.config import GeneratorConfig
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.fragments import FragmentsPlugin
@@ -10,7 +12,7 @@ from turms.stylers.snake_case import SnakeCaseStyler
 from .utils import build_relative_glob, unit_test_with
 
 
-def test_inline_fragment_on_object_type(complex_defaults_schema):
+def test_inline_fragment_on_object_type(complex_defaults_schema: GraphQLSchema) -> None:
     """``... on X`` inside a selection already narrowed to X used to hard-fail.
 
     recurse.py raised ``NotImplementedError("Inline Fragments are not yet

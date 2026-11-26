@@ -15,12 +15,11 @@ generated code, so there is nothing to switch on for them.
 """
 
 import ast
-from typing import Dict, List, Set
 
 from turms.config import GeneratorConfig
 from turms.registry import ClassRegistry
 
-BUILTIN_GENERICS: Dict[str, str] = {
+BUILTIN_GENERICS: dict[str, str] = {
     "List": "list",
     "Dict": "dict",
     "Tuple": "tuple",
@@ -43,7 +42,7 @@ def _is_forward_ref(node: ast.expr) -> bool:
     return isinstance(node, ast.Constant) and isinstance(node.value, str)
 
 
-def _union_of(elements: List[ast.expr]) -> ast.expr:
+def _union_of(elements: list[ast.expr]) -> ast.expr:
     """Builds ``a | b | c`` from the given operands.
 
     If any operand is a forward reference the whole union is emitted as a single
@@ -75,8 +74,8 @@ class AnnotationModernizer(ast.NodeTransformer):
     """
 
     def __init__(
-        self, eligible: Set[str], builtin_generics: bool, union_operator: bool
-    ):
+        self, eligible: set[str], builtin_generics: bool, union_operator: bool
+    ) -> None:
         self.eligible = eligible
         self.builtin_generics = builtin_generics
         self.union_operator = union_operator
@@ -130,7 +129,7 @@ class AnnotationModernizer(ast.NodeTransformer):
         return node
 
 
-def _eligible_names(registry: ClassRegistry, config: GeneratorConfig) -> Set[str]:
+def _eligible_names(registry: ClassRegistry, config: GeneratorConfig) -> set[str]:
     """The typing names that may be rewritten.
 
     A name is eligible when it was registered as a ``typing`` import and is not
@@ -150,9 +149,9 @@ def _eligible_names(registry: ClassRegistry, config: GeneratorConfig) -> Set[str
     return (candidates & from_typing) - shadowed
 
 
-def _walk(node) -> "list":
+def _walk(node: object) -> list[ast.AST]:
     """``ast.walk`` that also descends into nested lists (see ``_visit_sequence``)."""
-    nodes = []
+    nodes: list[ast.AST] = []
     if isinstance(node, list):
         for item in node:
             nodes.extend(_walk(item))
@@ -163,15 +162,15 @@ def _walk(node) -> "list":
     return nodes
 
 
-def _used_names(tree: List[ast.AST]) -> Set[str]:
+def _used_names(tree: list[ast.AST]) -> set[str]:
     return {node.id for node in _walk(tree) if isinstance(node, ast.Name)}
 
 
 def modernize_annotations(
-    tree: List[ast.AST],
+    tree: list[ast.AST],
     config: GeneratorConfig,
     registry: ClassRegistry,
-) -> List[ast.AST]:
+) -> list[ast.AST]:
     """Rewrites ``tree`` in place-ish and drops the typing imports it made obsolete.
 
     Must run before ``registry.generate_imports()`` so the pruned imports never

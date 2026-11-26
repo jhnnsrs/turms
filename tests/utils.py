@@ -4,16 +4,14 @@ import subprocess
 import sys
 import tempfile
 from textwrap import dedent
-from typing import List
 
 from turms.run import write_code_to_file
 
 DIR_NAME = os.path.dirname(os.path.realpath(__file__))
 
 
-def build_relative_glob(path):
+def build_relative_glob(path: str) -> str:
     return DIR_NAME + path
-
 
 
 class ExecuteError(Exception):
@@ -50,6 +48,15 @@ class ExtraArguments(BaseModel):
     extra: Optional[str]
 
 
+class RecordingExecutor:
+    # Implements a client plugin delegate, so a generated class works alone.
+
+    def execute(self, operation, variables):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(beasts=["from base"])
+
+
 class ExtraOnOperations(BaseModel):
     extra: Optional[str]
 
@@ -77,12 +84,12 @@ CUSTOM_UNSET = CustomUnset()
 """
 
 
-def parse_to_code(tree: List[ast.AST]) -> str:
+def parse_to_code(tree: list[ast.AST]) -> str:
     md = ast.Module(body=tree, type_ignores=[])
     return ast.unparse(ast.fix_missing_locations(md))
 
 
-def find_type_checker():
+def find_type_checker() -> str | None:
     """Path to a pyright-compatible checker, or None.
 
     Looked up rather than assumed: the alias-mode guarantee is a *static* one, so
@@ -98,7 +105,9 @@ def find_type_checker():
     return None
 
 
-def type_check_with(generated_ast: List[ast.AST], test_string: str):
+def type_check_with(
+    generated_ast: list[ast.AST], test_string: str
+) -> list[tuple[int, str]] | None:
     """Type-checks the generated module plus ``test_string`` and returns the
     diagnostics as a list of ``(line, message)``, line numbers being relative to
     ``test_string`` (0-based, as the checker reports them for the appended code).
@@ -133,8 +142,10 @@ def type_check_with(generated_ast: List[ast.AST], test_string: str):
         )
         try:
             report = json.loads(s.stdout.decode())
-        except json.JSONDecodeError:  # pragma: no cover
-            raise ExecuteError(f"Type checker produced no JSON: {s.stdout.decode()[:2000]}")
+        except json.JSONDecodeError as e:  # pragma: no cover
+            raise ExecuteError(
+                f"Type checker produced no JSON: {s.stdout.decode()[:2000]}"
+            ) from e
 
     return [
         (d["range"]["start"]["line"], d["message"])
@@ -144,15 +155,14 @@ def type_check_with(generated_ast: List[ast.AST], test_string: str):
 
 
 def unit_test_with(
-    generated_ast: List[ast.AST], test_string: str, strict_warnings: bool = False
-):
+    generated_ast: list[ast.AST], test_string: str, strict_warnings: bool = False
+) -> bool:
 
     added_code = ast.parse(dedent(test_string)).body
     # We need to unparse before otherwise there might be complaints with missing lineno
     parsed_code = parse_to_code(generated_ast + added_code)
 
     with tempfile.TemporaryDirectory() as tmpdirname:
-
         filename = write_code_to_file(parsed_code, tmpdirname, "minimal.py")
         write_code_to_file(mocks_code, tmpdirname, "mocks.py")
         argv = [sys.executable]
@@ -163,4 +173,35 @@ def unit_test_with(
             return True
         else:
             # If the supbrocess failed we can break out of the sandbox and just return the actual error
-            raise ExecuteError(f"Failed with: {s.stderr.decode().strip()} Code: {parsed_code}" )
+            raise ExecuteError(
+                f"Failed with: {s.stderr.decode().strip()} Code: {parsed_code}"
+            )
+
+
+def unit_test_with_external(
+    external_ast: list[ast.AST],
+    generated_ast: list[ast.AST],
+    test_string: str,
+    module_name: str = "external_schema",
+) -> bool:
+    """Run a *pair* of generated modules, the second importing the first.
+
+    ``unit_test_with`` writes one module, so it cannot express the thing a split
+    generation produces: an api module whose import block reaches into a protocol
+    module. Here both land in the same temporary directory, so the plain
+    ``from <module_name> import X`` the generator emits resolves.
+    """
+    added_code = ast.parse(dedent(test_string)).body
+    parsed_code = parse_to_code(generated_ast + added_code)
+
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        write_code_to_file(parse_to_code(external_ast), tmpdirname, f"{module_name}.py")
+        write_code_to_file(mocks_code, tmpdirname, "mocks.py")
+        filename = write_code_to_file(parsed_code, tmpdirname, "minimal.py")
+
+        s = subprocess.run([sys.executable, filename], capture_output=True)
+        if s.returncode == 0:
+            return True
+        raise ExecuteError(
+            f"Failed with: {s.stderr.decode().strip()} Code: {parsed_code}"
+        )

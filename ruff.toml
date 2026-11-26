@@ -1,0 +1,14 @@
+# This repo's ruff settings: the arkitekt standard (ruff.shared.toml, synced
+# from arkitektio/.github) plus what is this repo's own. Add excludes for
+# vendored code and per-file ignores here; never edit ruff.shared.toml.
+extend = "ruff.shared.toml"
+target-version = "py310"
+# Generated code: turms output in the examples, and the fixtures and snapshots
+# the tests compare generated code against.
+extend-exclude = [
+  "examples/*/server/schema.py",
+  "examples/*/api/schema.py",
+  "examples/*/your_library/schema.py",
+  "tests/merge_pairs",
+  "tests/plugins/strawberry/snapshots",
+]

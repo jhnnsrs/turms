@@ -1,20 +1,22 @@
 import ast
 
 import pytest
-from .utils import build_relative_glob, unit_test_with, ExecuteError
+from graphql import GraphQLSchema
 from pydantic import ValidationError
 
 from turms.config import GeneratorConfig, OptionsConfig
-from turms.run import generate_ast
 from turms.plugins.enums import EnumsPlugin
-from turms.plugins.inputs import InputsPlugin
 from turms.plugins.fragments import FragmentsPlugin
+from turms.plugins.inputs import InputsPlugin
 from turms.plugins.operations import OperationsPlugin
+from turms.run import generate_ast
 from turms.stylers.default import DefaultStyler
+
+from .utils import ExecuteError, build_relative_glob, unit_test_with
 
 
 @pytest.mark.network
-def test_allow_population_by_field_name(countries_schema):
+def test_allow_population_by_field_name(countries_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/countries/**.graphql"),
         options=OptionsConfig(
@@ -41,11 +43,12 @@ def test_allow_population_by_field_name(countries_schema):
         generated_ast,
         "Countries(countries=[CountriesCountries(emoji_u='soinsisn',phone='sdf', capital='dfsdf')]).countries[0].emoji_u",
     )
-    assert "from enum import Enum" in generated, "EnumPlugin not working"
+    # Enum is imported exactly when an enum is generated.
+    assert ("from enum import Enum" in generated) == ("(str, Enum)" in generated)
 
 
 @pytest.mark.network
-def test_extra_forbid(countries_schema):
+def test_extra_forbid(countries_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/countries/**.graphql"),
         options=OptionsConfig(
@@ -76,7 +79,7 @@ def test_extra_forbid(countries_schema):
 
 
 @pytest.mark.network
-def test_extra_allow(countries_schema):
+def test_extra_allow(countries_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/countries/**.graphql"),
         options=OptionsConfig(
@@ -106,7 +109,7 @@ def test_extra_allow(countries_schema):
 
 
 @pytest.mark.network
-def test_from_attributes(countries_schema):
+def test_from_attributes(countries_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         documents=build_relative_glob("/documents/countries/**.graphql"),
         options=OptionsConfig(
@@ -139,14 +142,16 @@ def test_from_attributes(countries_schema):
     "removed_option, replacement",
     [("orm_mode", "from_attributes"), ("allow_mutation", "freeze")],
 )
-def test_pydantic_v1_options_are_rejected(removed_option, replacement):
+def test_pydantic_v1_options_are_rejected(
+    removed_option: str, replacement: str
+) -> None:
     """The pydantic v1 option spellings name their replacement instead of
     failing as an anonymous 'extra inputs are not permitted'."""
     with pytest.raises(ValidationError, match=replacement):
         OptionsConfig(enabled=True, **{removed_option: True})
 
 
-def test_pydantic_v1_target_is_rejected():
+def test_pydantic_v1_target_is_rejected() -> None:
     """pydantic_version: v2 still loads but is dropped entirely; v1 is an error."""
     config = GeneratorConfig(pydantic_version="v2")
     assert not hasattr(config, "pydantic_version")
@@ -154,7 +159,7 @@ def test_pydantic_v1_target_is_rejected():
         GeneratorConfig(pydantic_version="v1")
 
 
-def test_pydantic_version_does_not_survive_a_dump():
+def test_pydantic_version_does_not_survive_a_dump() -> None:
     """The dead key carries forward into neither the dump nor the json schema,
     so a dumped project.json does not resurrect it."""
     assert "pydantic_version" not in GeneratorConfig().model_dump()
@@ -162,7 +167,9 @@ def test_pydantic_version_does_not_survive_a_dump():
 
 
 @pytest.mark.network
-def test_generated_options_module_imports_without_warnings(countries_schema):
+def test_generated_options_module_imports_without_warnings(
+    countries_schema: GraphQLSchema,
+) -> None:
     """Every option the OptionsConfig can emit must be a config key pydantic v2
     actually accepts -- a v1 leftover surfaces as a UserWarning on import."""
     config = GeneratorConfig(
@@ -190,7 +197,7 @@ def test_generated_options_module_imports_without_warnings(countries_schema):
 # --------------------------------------------------------------------------- #
 
 
-def test_dumped_project_can_be_loaded_back():
+def test_dumped_project_can_be_loaded_back() -> None:
     """`dump_configuration: true` has to emit the graphql-config `schema` key, not
     the python field name, or the file it writes is neither valid graphql-config
     nor loadable by turms itself."""
@@ -207,7 +214,9 @@ def test_dumped_project_can_be_loaded_back():
     assert GraphQLProject(**dumped).schema_url == project.schema_url
 
 
-def test_option_sections_ignore_bare_environment_variables(monkeypatch):
+def test_option_sections_ignore_bare_environment_variables(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """OptionsConfig/FreezeConfig used to be BaseSettings without an env_prefix, so
     a stray `ENABLED` or `EXTRA` in the environment silently rewrote every
     generated model's config."""
@@ -224,12 +233,12 @@ def test_option_sections_ignore_bare_environment_variables(monkeypatch):
 @pytest.mark.parametrize(
     "spelling", ["populate_by_name", "allow_population_by_field_name"]
 )
-def test_populate_by_name_accepts_both_spellings(spelling):
+def test_populate_by_name_accepts_both_spellings(spelling: str) -> None:
     """The v1 spelling stays a deprecated alias so existing configs keep loading."""
     assert OptionsConfig(**{spelling: True}).populate_by_name is True
 
 
-def test_operations_plugin_accepts_both_populate_by_name_spellings():
+def test_operations_plugin_accepts_both_populate_by_name_spellings() -> None:
     from turms.plugins.operations import OperationsPluginConfig
 
     for spelling in (
@@ -240,7 +249,9 @@ def test_operations_plugin_accepts_both_populate_by_name_spellings():
         assert config.arguments_populate_by_name is True
 
 
-def test_operations_plugin_env_override_still_works(monkeypatch):
+def test_operations_plugin_env_override_still_works(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A validation_alias on a BaseSettings field would silently replace the
     prefixed env lookup rather than add to it, so the alias lives in a
     before-validator instead."""
@@ -250,14 +261,14 @@ def test_operations_plugin_env_override_still_works(monkeypatch):
     assert OperationsPluginConfig().arguments_populate_by_name is True
 
 
-def test_inputs_plugin_names_the_replacement_for_the_removed_option():
+def test_inputs_plugin_names_the_replacement_for_the_removed_option() -> None:
     from turms.plugins.inputs import InputsPluginConfig
 
     with pytest.raises(ValidationError, match="options.populate_by_name"):
         InputsPluginConfig(allow_population_by_field_name=True)
 
 
-def test_removed_polyfill_parser_names_itself():
+def test_removed_polyfill_parser_names_itself() -> None:
     """A config still listing the parser must say it was removed rather than
     failing as an opaque 'Invalid import'."""
     from turms.config import ConfigProxy
@@ -269,12 +280,12 @@ def test_removed_polyfill_parser_names_itself():
 
 
 @pytest.mark.parametrize("version", ["3.7", "3.8"])
-def test_eol_python_targets_are_rejected(version):
+def test_eol_python_targets_are_rejected(version: str) -> None:
     with pytest.raises(ValidationError):
         GeneratorConfig(min_python_version=version)
 
 
-def test_omited_document_rules_is_a_deprecated_alias():
+def test_omited_document_rules_is_a_deprecated_alias() -> None:
     """The public key was misspelled; the old spelling still loads, with a warning."""
     import warnings
 
@@ -288,7 +299,7 @@ def test_omited_document_rules_is_a_deprecated_alias():
     assert any(issubclass(w.category, DeprecationWarning) for w in caught)
 
 
-def test_omited_and_omitted_together_is_an_error():
+def test_omited_and_omitted_together_is_an_error() -> None:
     import pytest as _pytest
 
     from turms.config import GeneratorConfig

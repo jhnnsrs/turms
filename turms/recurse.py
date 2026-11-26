@@ -1,13 +1,28 @@
-from typing import Any, Dict, List, Union, cast
-from turms.config import GeneratorConfig
+import ast
+from typing import Any, TypeAlias, cast
+
 from graphql import GraphQLSchema, GraphQLWrappingType
 from graphql.language.ast import (
     FieldNode,
     FragmentSpreadNode,
     InlineFragmentNode,
 )
-from turms.registry import ClassRegistry
+from graphql.type.definition import (
+    GraphQLEnumType,
+    GraphQLField,
+    GraphQLInterfaceType,
+    GraphQLList,
+    GraphQLNonNull,
+    GraphQLObjectType,
+    GraphQLScalarType,
+    GraphQLType,
+    GraphQLUnionType,
+)
+
+from turms.config import GeneratorConfig, GraphQLTypes
 from turms.errors import GenerationError
+from turms.registry import ClassRegistry
+from turms.schema_lookup import get_field_def
 from turms.utils import (
     annotate_field_metadata,
     capitalize_first,
@@ -23,22 +38,6 @@ from turms.utils import (
     non_typename_fields,
     target_from_node,
 )
-from graphql.utilities.type_info import get_field_def
-
-import ast
-from graphql.type.definition import (
-    GraphQLEnumType,
-    GraphQLField,
-    GraphQLInterfaceType,
-    GraphQLList,
-    GraphQLNonNull,
-    GraphQLObjectType,
-    GraphQLScalarType,
-    GraphQLType,
-    GraphQLUnionType,
-)
-
-from turms.config import GraphQLTypes
 
 
 def recurse_annotation(
@@ -82,7 +81,7 @@ def recurse_annotation(
     """
 
     if isinstance(type, GraphQLUnionType):
-        union_class_names: List[str] = []
+        union_class_names: list[str] = []
 
         sub_nodes = non_typename_fields(node)
 
@@ -160,10 +159,13 @@ def recurse_annotation(
                     for base in config.object_bases
                 ]
 
-                merged_body = merge_body_sequences(
-                    this_inline_fragment_fields,
-                    generate_pydantic_config(
-                        GraphQLTypes.FRAGMENT, config, registry
+                merged_body = registry.class_fields_for(
+                    sub_node.type_condition.name.value,
+                    merge_body_sequences(
+                        this_inline_fragment_fields,
+                        generate_pydantic_config(
+                            GraphQLTypes.FRAGMENT, config, registry
+                        ),
                     ),
                 )
                 if not merged_body:
@@ -232,9 +234,9 @@ def recurse_annotation(
 
         implementing_types = client_schema.get_implementations(type)
 
-        implementing_class_base_classes: Dict[str, List[str]] = {}
+        implementing_class_base_classes: dict[str, list[str]] = {}
 
-        inline_fragment_fields: Dict[str, List[ast.AnnAssign | ast.Expr]] = {}
+        inline_fragment_fields: dict[str, list[ast.AnnAssign | ast.Expr]] = {}
 
         for sub_node in sub_nodes:
             if isinstance(sub_node, FragmentSpreadNode):
@@ -354,8 +356,12 @@ def recurse_annotation(
             decorator_list=[],
             keywords=[],
             type_params=[],
-            body=merge_body_sequences(
-                body, generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry)
+            body=registry.class_fields_for(
+                type.name,
+                merge_body_sequences(
+                    body,
+                    generate_pydantic_config(GraphQLTypes.FRAGMENT, config, registry),
+                ),
             ),
         )
         subtree.append(mother_class)
@@ -380,8 +386,8 @@ def recurse_annotation(
             ]
             implementaionMap[i.name] = class_name
 
-            inline_fields: List[ast.AnnAssign | ast.Expr] = inline_fragment_fields.get(
-                i.name, cast(List[ast.AnnAssign | ast.Expr], [])
+            inline_fields: list[ast.AnnAssign | ast.Expr] = inline_fragment_fields.get(
+                i.name, cast(list[ast.AnnAssign | ast.Expr], [])
             )
 
             implementing_class = ast.ClassDef(
@@ -395,12 +401,15 @@ def recurse_annotation(
                 decorator_list=[],
                 keywords=[],
                 type_params=[],
-                body=merge_body_sequences(
-                    [
-                        description_field,
-                        generate_typename_field(i.name, registry, config),
-                    ],
-                    inline_fields,
+                body=registry.class_fields_for(
+                    i.name,
+                    merge_body_sequences(
+                        [
+                            description_field,
+                            generate_typename_field(i.name, registry, config),
+                        ],
+                        inline_fields,
+                    ),
                 ),
             )
 
@@ -514,10 +523,8 @@ def recurse_annotation(
                 # An interface fragment spread into a concrete object field
                 # resolves to that object's implementation class, not the bare
                 # (non-existent) fragment name.
-                implementation = (
-                    registry.get_interface_fragment_implementation_or_none(
-                        sub_node.name.value, type.name
-                    )
+                implementation = registry.get_interface_fragment_implementation_or_none(
+                    sub_node.name.value, type.name
                 )
                 if implementation is not None:
                     reference: ast.expr = ast.Name(id=implementation, ctx=ast.Load())
@@ -543,15 +550,11 @@ def recurse_annotation(
             if isinstance(sub_node, FragmentSpreadNode):
                 # An interface fragment mixed with additional fields inherits
                 # from the concrete object's implementation class.
-                implementation = (
-                    registry.get_interface_fragment_implementation_or_none(
-                        sub_node.name.value, type.name
-                    )
+                implementation = registry.get_interface_fragment_implementation_or_none(
+                    sub_node.name.value, type.name
                 )
                 if implementation is not None:
-                    additional_bases.append(
-                        ast.Name(id=implementation, ctx=ast.Load())
-                    )
+                    additional_bases.append(ast.Name(id=implementation, ctx=ast.Load()))
                 else:
                     additional_bases.append(
                         ast.Name(
@@ -590,9 +593,7 @@ def recurse_annotation(
                             ast.Name(
                                 id=implementation
                                 if implementation is not None
-                                else registry.inherit_fragment(
-                                    inline_node.name.value
-                                ),
+                                else registry.inherit_fragment(inline_node.name.value),
                                 ctx=ast.Load(),
                             )
                         )
@@ -643,8 +644,12 @@ def recurse_annotation(
             decorator_list=[],
             keywords=[],
             type_params=[],
-            body=merge_body_sequences(
-                body, generate_pydantic_config(GraphQLTypes.OBJECT, config, registry)
+            body=registry.class_fields_for(
+                type.name,
+                merge_body_sequences(
+                    body,
+                    generate_pydantic_config(GraphQLTypes.OBJECT, config, registry),
+                ),
             ),
         )
 
@@ -705,7 +710,9 @@ def recurse_annotation(
         if config.freeze.enabled and config.freeze.convert_list_to_tuple:
             registry.register_import("typing.Tuple")
 
-            def list_builder(x: ast.Name | ast.Subscript | ast.Constant):
+            def list_builder(
+                x: ast.Name | ast.Subscript | ast.Constant,
+            ) -> ast.Subscript:
                 return ast.Subscript(
                     value=ast.Name("Tuple", ctx=ast.Load()),
                     slice=ast.Tuple(elts=[x, ast.Constant(value=...)], ctx=ast.Load()),
@@ -715,7 +722,9 @@ def recurse_annotation(
         else:
             registry.register_import("typing.List")
 
-            def list_builder(x: ast.Name | ast.Subscript | ast.Constant):
+            def list_builder(
+                x: ast.Name | ast.Subscript | ast.Constant,
+            ) -> ast.Subscript:
                 return ast.Subscript(
                     value=ast.Name("List", ctx=ast.Load()), slice=x, ctx=ast.Load()
                 )
@@ -753,14 +762,14 @@ def recurse_annotation(
             )
 
 
-BoundType = Union[
-    GraphQLScalarType,
-    GraphQLObjectType,
-    GraphQLInterfaceType,
-    GraphQLUnionType,
-    GraphQLEnumType,
-    GraphQLWrappingType[Any],
-]
+BoundType: TypeAlias = (
+    GraphQLScalarType
+    | GraphQLObjectType
+    | GraphQLInterfaceType
+    | GraphQLUnionType
+    | GraphQLEnumType
+    | GraphQLWrappingType[Any]
+)
 
 
 def type_field_node(
@@ -769,11 +778,11 @@ def type_field_node(
     field: GraphQLField,
     client_schema: GraphQLSchema,
     config: GeneratorConfig,
-    subtree: List[ast.ClassDef | ast.Assign],
+    subtree: list[ast.ClassDef | ast.Assign],
     registry: ClassRegistry,
     is_optional: bool = True,
     force_optional: bool = False,
-) -> List[ast.AnnAssign | ast.Expr]:
+) -> list[ast.AnnAssign | ast.Expr]:
     """Types a field node
 
     This

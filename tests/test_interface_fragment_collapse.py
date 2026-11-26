@@ -10,6 +10,8 @@ is emitted for an interface fragment, so the generated module raised
 
 import ast
 
+from graphql import GraphQLSchema
+
 from turms.config import GeneratorConfig
 from turms.plugins.enums import EnumsPlugin
 from turms.plugins.fragments import FragmentsPlugin
@@ -23,7 +25,7 @@ from turms.stylers.snake_case import SnakeCaseStyler
 from .utils import build_relative_glob, unit_test_with
 
 
-def _generate(schema, with_funcs=True):
+def _generate(schema: GraphQLSchema, with_funcs: bool = True) -> list[ast.AST]:
     plugins = [
         EnumsPlugin(),
         InputsPlugin(),
@@ -59,7 +61,9 @@ def _generate(schema, with_funcs=True):
     )
 
 
-def _class_field_annotation(tree, class_name, field_name):
+def _class_field_annotation(
+    tree: list[ast.AST], class_name: str, field_name: str
+) -> str:
     for node in tree:
         if isinstance(node, ast.ClassDef) and node.name == class_name:
             for stmt in node.body:
@@ -72,7 +76,7 @@ def _class_field_annotation(tree, class_name, field_name):
     raise AssertionError(f"{class_name}.{field_name} not found in generated tree")
 
 
-def _func_return_annotation(tree, func_name):
+def _func_return_annotation(tree: list[ast.AST], func_name: str) -> str:
     for node in tree:
         if isinstance(node, ast.FunctionDef) and node.name == func_name:
             assert node.returns is not None
@@ -80,7 +84,9 @@ def _func_return_annotation(tree, func_name):
     raise AssertionError(f"function {func_name} not found in generated tree")
 
 
-def test_interface_fragment_collapse_imports(interface_fragment_collapse_schema):
+def test_interface_fragment_collapse_imports(
+    interface_fragment_collapse_schema: GraphQLSchema,
+) -> None:
     """The generated module must be valid, importable Python (no dangling
     reference to the interface fragment name)."""
     generated_ast = _generate(interface_fragment_collapse_schema)
@@ -88,8 +94,8 @@ def test_interface_fragment_collapse_imports(interface_fragment_collapse_schema)
 
 
 def test_interface_fragment_collapses_to_implementation(
-    interface_fragment_collapse_schema,
-):
+    interface_fragment_collapse_schema: GraphQLSchema,
+) -> None:
     """Spreading the ``Layer`` interface fragment into the concrete
     ``ImageLayer`` field resolves to the implementation class."""
     generated_ast = _generate(interface_fragment_collapse_schema)
@@ -104,8 +110,8 @@ def test_interface_fragment_collapses_to_implementation(
 
 
 def test_interface_fragment_with_extra_field_inherits_implementation(
-    interface_fragment_collapse_schema,
-):
+    interface_fragment_collapse_schema: GraphQLSchema,
+) -> None:
     """Selecting an extra field alongside the interface fragment must inherit
     from the implementation class (additional-bases path)."""
     generated_ast = _generate(interface_fragment_collapse_schema, with_funcs=False)
@@ -122,7 +128,9 @@ def test_interface_fragment_with_extra_field_inherits_implementation(
         raise AssertionError("CreateLayerWithStatusCreateLayer not generated")
 
 
-def test_interface_field_still_produces_union(interface_fragment_collapse_schema):
+def test_interface_field_still_produces_union(
+    interface_fragment_collapse_schema: GraphQLSchema,
+) -> None:
     """A field that genuinely returns the interface must still generate the
     discriminated union (unchanged behaviour)."""
     generated_ast = _generate(interface_fragment_collapse_schema, with_funcs=False)
@@ -131,7 +139,7 @@ def test_interface_field_still_produces_union(interface_fragment_collapse_schema
     assert "discriminator" in annotation
 
 
-def test_generated_class_names_preserve_inner_capitals():
+def test_generated_class_names_preserve_inner_capitals() -> None:
     """``str.capitalize`` also lower-cased the remainder of the name.
 
     A field ``createLayer`` produced the class ``...Createlayer`` rather than

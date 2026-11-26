@@ -1,31 +1,32 @@
-import warnings
 import builtins
+import warnings
+from collections.abc import Callable
+from enum import Enum
+from typing import (
+    Any,
+    Literal,
+    Protocol,
+    TypeAlias,
+    runtime_checkable,
+)
+
 from graphql import ASTValidationRule
 from pydantic import (
     AliasChoices,
     AnyHttpUrl,
     BaseModel,
+    ConfigDict,
     Field,
     GetCoreSchemaHandler,
     field_validator,
     model_validator,
-    ConfigDict,
 )
 from pydantic_core import core_schema
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Union,
-    Protocol,
-    Literal,
-    runtime_checkable,
-)
+
+from turms.class_fields import ClassField
 from turms.helpers import import_string
-from enum import Enum
+
 from .rules import specified_rules_map
 
 
@@ -37,14 +38,12 @@ class ConfigProxy(BaseModel):
 class ImportableFunctionMixin(Protocol):
     @classmethod
     def __get_pydantic_core_schema__(
-        cls, source_type: Any, handler: GetCoreSchemaHandler
+        cls, source_type: object, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        return core_schema.no_info_before_validator_function(
-            cls.validate, handler(Any)
-        )
+        return core_schema.no_info_before_validator_function(cls.validate, handler(Any))
 
     @classmethod
-    def validate(cls, value: Union[str, Callable[[Any], Any]]):
+    def validate(cls, value: str | Callable[[Any], Any]) -> object:
         if not callable(value):
             if not isinstance(value, str):  # type: ignore
                 raise TypeError("string required")
@@ -61,12 +60,12 @@ class PythonType(str):
 
     @classmethod
     def __get_pydantic_core_schema__(
-        cls, source_type: Any, handler: GetCoreSchemaHandler
+        cls, source_type: object, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
         return core_schema.no_info_after_validator_function(cls.validate, handler(str))
 
     @classmethod
-    def validate(cls, v: str):
+    def validate(cls, v: str) -> "PythonType":
         if v not in dir(builtins):
             assert "." in v, "You need to point to a module if its not a builtin type"
         return cls(v)
@@ -116,17 +115,17 @@ class FreezeConfig(BaseModel):
     )
     """Enabling this, will freeze the schema"""
 
-    types: List[GraphQLTypes] = Field(
+    types: list[GraphQLTypes] = Field(
         default=[GraphQLTypes.INPUT, GraphQLTypes.FRAGMENT, GraphQLTypes.OBJECT],
         description="The types to freeze",
     )
     """The core types (Input, Fragment, Object, Operation) to freeze"""
 
-    exclude: Optional[List[str]] = Field(
+    exclude: list[str] | None = Field(
         default=None, description="List of types to exclude from freezing"
     )
     """List of types to exclude from freezing"""
-    include: Optional[List[str]] = Field(
+    include: list[str] | None = Field(
         default=None, description="List of types to include in freezing"
     )
     """The types to freeze"""
@@ -136,7 +135,7 @@ class FreezeConfig(BaseModel):
     """Convert GraphQL List to tuple (with varying length)"""
 
 
-ExtraOptions = Optional[Literal["ignore", "allow", "forbid"]]
+ExtraOptions: TypeAlias = Literal["ignore", "allow", "forbid"] | None
 
 AliasMode = Literal["single", "split"]
 """How a field whose python name differs from its GraphQL name carries that name.
@@ -169,7 +168,7 @@ class OptionsConfig(BaseModel):
     """Enabling this, will freeze the schema"""
     extra: ExtraOptions = None
     """Extra options for pydantic"""
-    populate_by_name: Optional[bool] = Field(
+    populate_by_name: bool | None = Field(
         default=None,
         validation_alias=AliasChoices(
             "populate_by_name", "allow_population_by_field_name"
@@ -179,12 +178,12 @@ class OptionsConfig(BaseModel):
 
     ``allow_population_by_field_name`` -- the pydantic v1 spelling of this key --
     is still accepted as a deprecated alias."""
-    from_attributes: Optional[bool] = None
+    from_attributes: bool | None = None
     """Let the generated models validate from arbitrary class instances"""
-    use_enum_values: Optional[bool] = None
+    use_enum_values: bool | None = None
     """Use enum values"""
 
-    validate_assignment: Optional[bool] = None
+    validate_assignment: bool | None = None
     """Validate assignment"""
 
     alias_mode: AliasMode = "single"
@@ -206,7 +205,7 @@ class OptionsConfig(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def _reject_pydantic_v1_options(cls, values: Any) -> Any:
+    def _reject_pydantic_v1_options(cls, values: object) -> object:
         if isinstance(values, dict):
             if "orm_mode" in values:
                 raise ValueError(
@@ -221,17 +220,17 @@ class OptionsConfig(BaseModel):
                 )
         return values
 
-    types: List[GraphQLTypes] = Field(
+    types: list[GraphQLTypes] = Field(
         default=[GraphQLTypes.INPUT, GraphQLTypes.FRAGMENT, GraphQLTypes.OBJECT],
         description="The types to freeze",
     )
     """The core types (Input, Fragment, Object, Operation) to enable this option"""
 
-    exclude: Optional[List[str]] = Field(
+    exclude: list[str] | None = Field(
         default=None, description="List of types to exclude from setting this option"
     )
     """List of types to exclude from setting this option"""
-    include: Optional[List[str]] = Field(
+    include: list[str] | None = Field(
         default=None, description="List of types to include in setting these options"
     )
     """The types to freeze"""
@@ -258,7 +257,6 @@ def parse_python_version(version: str) -> tuple:
     return tuple(int(part) for part in version.split("."))
 
 
-
 #: Components removed in turms 2.0, mapped to the error a config still naming one gets.
 #: Without this they would fail as an opaque "Invalid import".
 REMOVED_COMPONENTS = {
@@ -273,6 +271,59 @@ REMOVED_COMPONENTS = {
         "parser from your configuration."
     ),
 }
+
+
+ExternalKind = Literal["enum", "input"]
+"""What an :class:`ExternalModuleConfig` can take over from a project.
+
+Only enums and inputs. A fragment carries a selection set, so two projects'
+fragments of the same GraphQL type are not interchangeable, and an operation
+belongs to whoever generated its document."""
+
+
+class ExternalModuleConfig(BaseModel):
+    """A module that already holds generated types for this schema.
+
+    Referencing a type of one of the declared ``kinds`` emits
+    ``from <module> import <Name>`` instead of generating the type again.
+
+    The class names are **derived**, not listed: ``ClassRegistry.style_enum_class``
+    and ``style_inputtype_class`` are pure functions of the GraphQL typename and
+    the styler list, so a project that declares the same ``stylers:`` as the one
+    that generated ``module`` computes exactly the names that module exported.
+    That is why there is nothing here to keep in sync, and why ``stylers`` must
+    match -- see ``from_project``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    module: str
+    """The dotted python path of the module to import from.
+
+    The one thing turms cannot derive: an ``out_dir`` says where a file lands on
+    disk, not what it is called on the import path."""
+
+    kinds: list[ExternalKind] = Field(default_factory=lambda: ["enum", "input"])
+    """Which kinds of type that module provides."""
+
+    names: dict[str, str] = Field(default_factory=dict)
+    """Per-type overrides, for when the styler-derived name is not the exported one."""
+
+    include: list[str] | None = None
+    """The GraphQL typenames this module provides; ``None`` means every type of ``kinds``.
+
+    Set it when the module holds only part of the schema's vocabulary -- a
+    hand-maintained package that owns some inputs and enums while this project
+    generates the rest. A name that is not an enum or input of the declared kinds
+    in the schema is an error, so a typo cannot silently fall back to generating
+    the type. Another external module without ``include`` then provides every
+    remaining type of its kinds."""
+
+    from_project: str | None = None
+    """A sibling project in the same config whose stylers must match this one's.
+
+    Validation only: it never supplies the names. Set it and a styler mismatch is
+    a clear error instead of a wrong import."""
 
 
 class GeneratorConfig(BaseSettings):
@@ -290,9 +341,10 @@ class GeneratorConfig(BaseSettings):
         env_prefix="TURMS_",
         extra="forbid",
     )
+
     @model_validator(mode="before")
     @classmethod
-    def _rename_omited_document_rules(cls, values: Any) -> Any:
+    def _rename_omited_document_rules(cls, values: object) -> object:
         """``omited_document_rules`` was a typo; accept it with a warning.
 
         Done here rather than with a validation alias because an alias on a
@@ -315,7 +367,7 @@ class GeneratorConfig(BaseSettings):
 
     @model_validator(mode="before")
     @classmethod
-    def _drop_pydantic_version(cls, values: Any) -> Any:
+    def _drop_pydantic_version(cls, values: object) -> object:
         """``pydantic_version`` is a dead key: turms only targets pydantic v2.
 
         Configurations saying ``pydantic_version: v2`` keep loading -- the key
@@ -333,7 +385,7 @@ class GeneratorConfig(BaseSettings):
                 )
         return values
 
-    domain: Optional[str] = None
+    domain: str | None = None
     """The domain of the GraphQL API ( will be set as a config variable)"""
     out_dir: str = "api"
     """The output directory for the generated models"""
@@ -343,7 +395,7 @@ class GeneratorConfig(BaseSettings):
     schema_name: str = "schema.graphql"
     generated_name: str = "schema.py"
     """ The name of the generated file within the output directory"""
-    documents: Optional[str] = None
+    documents: str | None = None
     """The documents to parse. Setting this will overwrite the documents in the graphql config"""
     verbose: bool = False
     """Enable verbose logging"""
@@ -354,41 +406,41 @@ class GeneratorConfig(BaseSettings):
     allow_introspection: bool = True
     """Allow introspection queries"""
 
-    object_bases: List[str] = ["pydantic.BaseModel"]
+    object_bases: list[str] = ["pydantic.BaseModel"]
     """The base classes for the generated objects. This is useful if you want to change the base class from BaseModel to something else"""
 
-    interface_bases: Optional[List[str]] = None
+    interface_bases: list[str] | None = None
     """List of base classes for interfaces"""
     always_resolve_interfaces: bool = True
     """Always resolve interfaces to concrete types"""
     exclude_typenames: bool = False
     """Exclude __typename from generated models when calling dict or json"""
 
-    scalar_definitions: Dict[str, PythonType] = Field(
+    scalar_definitions: dict[str, PythonType] = Field(
         default_factory=dict,
         description="Additional config for mapping scalars to python types (e.g. ID: str). Can use dotted paths to import types from other modules.",
     )
     """Additional config for mapping scalars to python types (e.g. ID: str). Can use dotted paths to import types from other modules."""
 
-    coercible_scalars: Dict[str, PythonType] = Field(
+    coercible_scalars: dict[str, PythonType] = Field(
         default_factory=dict,
         description="Global map of scalar names to a coercible python type used in generated function/factory parameters (e.g. ID: pydantic.UUID4). Plugins (funcs, input_funcs) merge their own coercible_scalars on top of this, overriding per-scalar.",
     )
     """Global coercible scalar map. Plugins merge their own coercible_scalars on top (plugin entries override)."""
 
-    coercible_inputs: Dict[str, PythonType] = Field(
+    coercible_inputs: dict[str, PythonType] = Field(
         default_factory=dict,
         description="Global map of input type names to an additional python type accepted in generated function/factory parameters. The annotation is generated as a Union of the input model and the given type (e.g. AxisInput: str -> Union[AxisInput, str]); the input model performs the coercion (e.g. via a before-validator). Plugins (funcs, input_funcs) merge their own coercible_inputs on top of this, overriding per-type.",
     )
     """Global coercible input-type map (input model unioned with the given type). Plugins merge their own coercible_inputs on top (plugin entries override)."""
 
-    graphql_default_class: Optional[PythonType] = Field(
+    graphql_default_class: PythonType | None = Field(
         default=None,
         description="Importable class used as the Annotated marker carrying a field's GraphQL schema default value. If unset, a GraphQLDefault marker is generated into the output module.",
     )
     """Importable class for the GraphQLDefault Annotated marker. If unset, it is generated into the output module."""
 
-    deprecated_class: Optional[PythonType] = Field(
+    deprecated_class: PythonType | None = Field(
         default=None,
         description="Importable class used as the Annotated marker for deprecated fields. If unset, a Deprecated marker is generated into the output module.",
     )
@@ -400,13 +452,13 @@ class GeneratorConfig(BaseSettings):
     )
     """Include the deprecation warning and default value in the field documentation. Opt out by setting False."""
 
-    unset_type_class: Optional[PythonType] = Field(
+    unset_type_class: PythonType | None = Field(
         default=None,
         description="Importable class used as the UNSET sentinel TYPE (the type referenced in Union[..., UnsetType] parameter annotations). If unset, an UnsetType class is generated into the output module. Must be set together with unset_instance.",
     )
     """Importable class for the UNSET sentinel type. If unset, it is generated. Set together with unset_instance."""
 
-    unset_instance: Optional[PythonType] = Field(
+    unset_instance: PythonType | None = Field(
         default=None,
         description="Importable UNSET sentinel INSTANCE (used as the omitted-argument default and in identity checks). If unset, an UNSET instance is generated into the output module. Must be set together with unset_type_class.",
     )
@@ -443,43 +495,60 @@ class GeneratorConfig(BaseSettings):
     )
     """How type annotations are spelled: auto (derived from min_python_version), modern, or legacy"""
 
-    additional_bases: Dict[str, List[str]] = Field(
+    external_modules: list["ExternalModuleConfig"] = Field(
+        default_factory=list,
+        description="Modules that already hold generated enums/inputs for this schema. Types of the declared kinds are imported from there instead of being generated again.",
+    )
+    """Modules that already hold generated types for this schema.
+
+    This is how one project generates the enums and inputs and a second project
+    generates the fragments, operations and client over them: the second declares
+    the first's output module here and emits ``from that.module import X`` wherever
+    it references one."""
+
+    additional_bases: dict[str, list[str]] = Field(
         default_factory=dict,
         description="Additional bases for the generated models as map of GraphQL Type to importable base class (e.g. module.package.Class)",
     )
     "Additional bases for the generated models as map of GraphQL Type to importable base class (e.g. module.package.Class)"
-    additional_config: Dict[str, Dict[str, Any]] = Field(
+    additional_config: dict[str, dict[str, Any]] = Field(
         default_factory=dict,
         description="Additional config for the generated models as map of GraphQL Type to config attributes",
     )
     "Additional config for the generated models as map of GraphQL Type to config attributes"
 
+    class_fields: list[ClassField] = Field(
+        default_factory=list,
+        description="Class variables of every class generated for a GraphQL type: a name, a kind, what collects their values off the type and how they combine",
+    )
+    "Class variables of every class generated for a GraphQL type (see turms.class_fields.ClassField): e.g. a directive's argument, stamped as __identifier__"
+
     force_plugin_order: bool = True
     "Should the plugins be forced to run in the order they are defined"
 
-    omitted_document_rules: List[str] = Field(
+    omitted_document_rules: list[str] = Field(
         default_factory=list,
         description="List of rules to omit from the document validation. This is useful if you want to skip certain rules that are not relevant for your use case.",
     )
     "List of rules to omit from the document validation."
 
-    parsers: List[ConfigProxy] = Field(
+    parsers: list[ConfigProxy] = Field(
         default_factory=list,
         description="List of parsers to use. Parsers are used to parse the generated AST and translate it before it is converted to python code",
     )
     "List of parsers to use. Parsers are used to parse the generated AST and translate it before it is converted to python code"
 
-    plugins: List[ConfigProxy] = Field(
+    plugins: list[ConfigProxy] = Field(
         default_factory=list,
         description="List of plugins to use. Plugins are used to generated the python ast from the graphql documents, objects, etc.",
     )
     "List of plugins to use. Plugins are used to generated the python ast from the graphql documents, objects, etc."
-    processors: List[ConfigProxy] = Field(
+    processors: list[ConfigProxy] = Field(
         default_factory=list,
         description="List of processors to use. Processor are used to enforce specific styles on the generated python code",
     )
     "List of processors to use. Processor are used to enforce specific styles on the generated python code"
-    stylers: List[ConfigProxy] = Field(
+    stylers: list[ConfigProxy] = Field(
         default_factory=list,
         description="List of stylers to use. Style are used to enforce specific styles on the generaded class or fieldnames. ",
     )
@@ -509,7 +578,7 @@ class GeneratorConfig(BaseSettings):
         return self._target_python_version >= UNION_OPERATOR_SINCE
 
     @model_validator(mode="after")
-    def validate_unset_override(self):
+    def validate_unset_override(self) -> "GeneratorConfig":
         """The UNSET sentinel type and instance must be overridden together (the
         generated ``UNSET = UnsetType()`` bundle is emitted only when neither is
         overridden)."""
@@ -520,7 +589,7 @@ class GeneratorConfig(BaseSettings):
         return self
 
     @field_validator("parsers", "plugins", "processors", "stylers", mode="after")
-    def validate_importable(cls, v: List[ConfigProxy]) -> List[ConfigProxy]:
+    def validate_importable(cls, v: list[ConfigProxy]) -> list[ConfigProxy]:
         """Validate that the importable is a valid importable function or class"""
 
         for parser in v:
@@ -534,7 +603,7 @@ class GeneratorConfig(BaseSettings):
         return v
 
     @field_validator("omitted_document_rules", mode="after")
-    def validate_omitted_document_rules(cls, v: List[str]) -> List[str]:
+    def validate_omitted_document_rules(cls, v: list[str]) -> list[str]:
         """Validate that the omitted document rules are valid"""
         for rule in v:
             if rule not in specified_rules_map:
@@ -547,9 +616,9 @@ class GeneratorConfig(BaseSettings):
         "additional_bases",
         mode="after",
     )
-    def validate_additional_bases(cls, v: Dict[str, List[str]]) -> Dict[str, List[str]]:
+    def validate_additional_bases(cls, v: dict[str, list[str]]) -> dict[str, list[str]]:
         """Validate that the additional bases are valid importable functions or classes"""
-        for key, value_list in v.items():
+        for _key, value_list in v.items():
             for value in value_list:
                 if not isinstance(value, str):  # type: ignore
                     raise ValueError("string required")
@@ -560,7 +629,7 @@ class GeneratorConfig(BaseSettings):
                         )
         return v
 
-    def get_document_rules(self) -> List[ASTValidationRule]:
+    def get_document_rules(self) -> list[ASTValidationRule]:
         """Get the schema rules to use for validation"""
         rules = []
         for key, rule in specified_rules_map.items():
@@ -578,11 +647,11 @@ class Extensions(BaseModel):
 
 
 class AdvancedSchemaField(BaseModel):
-    headers: Dict[str, str]
+    headers: dict[str, str]
 
 
-SchemaField = Union[AnyHttpUrl, str, Dict[str, AdvancedSchemaField]]
-SchemaType = Union[SchemaField, List[SchemaField]]
+SchemaField: TypeAlias = AnyHttpUrl | str | dict[str, AdvancedSchemaField]
+SchemaType: TypeAlias = SchemaField | list[SchemaField]
 
 
 class GraphQLProject(BaseSettings):
@@ -606,7 +675,7 @@ class GraphQLProject(BaseSettings):
         serialization_alias="schema",
     )
     """The schema url or path to the schema file"""
-    documents: Optional[str] = None
+    documents: str | None = None
     """The documents (operations,fragments) to parse"""
     extensions: Extensions
     """The extensions configuration for the project (here resides the turms configuration)"""
@@ -622,7 +691,7 @@ class GraphQLConfigMultiple(BaseModel):
         extra="allow",
     )
 
-    projects: Dict[str, GraphQLProject]
+    projects: dict[str, GraphQLProject]
     """ The projects that should be parsed. The key is the name of the project and the value is the graphql project"""
 
 

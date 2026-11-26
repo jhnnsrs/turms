@@ -9,6 +9,7 @@ schema says the field is optional to provide.
 import pathlib
 
 from graphql import parse
+from pytest_snapshot.plugin import Snapshot
 
 from turms.config import GeneratorConfig
 from turms.plugins.strawberry import StrawberryPlugin
@@ -43,11 +44,13 @@ input ListDefaultInput {
 """
 
 
-def _config():
-    return GeneratorConfig(scalar_definitions={"_Any": "typing.Any"}, skip_forwards=True)
+def _config() -> GeneratorConfig:
+    return GeneratorConfig(
+        scalar_definitions={"_Any": "typing.Any"}, skip_forwards=True
+    )
 
 
-def _generate_schema(schema: str):
+def _generate_schema(schema: str) -> str:
     return generate_code(
         _config(),
         schema=build_ast_schema(parse(schema)),
@@ -56,12 +59,12 @@ def _generate_schema(schema: str):
     )
 
 
-def test_generates_schema(snapshot):
+def test_generates_schema(snapshot: Snapshot) -> None:
     snapshot.snapshot_dir = SNAPSHOTS_DIR
     snapshot.assert_match(_generate_schema(schema), "input_field_defaults.py")
 
 
-def test_omitting_every_optional_field_constructs_successfully():
+def test_omitting_every_optional_field_constructs_successfully() -> None:
     """The exact crash this fix addresses: a caller supplying only the
     required field must not hit a missing-keyword-argument TypeError for
     fields it left out."""
@@ -81,7 +84,7 @@ def test_omitting_every_optional_field_constructs_successfully():
     )
 
 
-def test_omitted_list_default_uses_a_fresh_list_each_time():
+def test_omitted_list_default_uses_a_fresh_list_each_time() -> None:
     """A mutable default must go through default_factory, not default= -
     otherwise every instance would share (and could mutate) the same list."""
     generated_ast = generate_ast(

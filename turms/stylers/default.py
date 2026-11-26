@@ -1,9 +1,11 @@
-from pydantic import Field
-from turms.stylers.base import BaseStyler, StylerConfig
 import re
 
+from pydantic import Field
 
-def camel_to_snake(name):
+from turms.stylers.base import BaseStyler, StylerConfig
+
+
+def camel_to_snake(name: str) -> str:
     name = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
     return re.sub("([a-z0-9])([A-Z])", r"\1_\2", name).lower()
 
@@ -20,22 +22,22 @@ class DefaultStyler(BaseStyler):
 
     config: DefaultStylerConfig = Field(default_factory=DefaultStylerConfig)
 
-    def style_fragment_name(self, typename):
+    def style_fragment_name(self, typename: str) -> str:
         return typename[0].upper() + typename[1:]
 
-    def style_query_name(self, typename):
+    def style_query_name(self, typename: str) -> str:
         return typename[0].upper() + typename[1:]
 
-    def style_subscription_name(self, typename):
+    def style_subscription_name(self, typename: str) -> str:
         return typename[0].upper() + typename[1:]
 
-    def style_mutation_name(self, typename):
+    def style_mutation_name(self, typename: str) -> str:
         return typename[0].upper() + typename[1:]
 
-    def style_input_name(self, typename):
+    def style_input_name(self, typename: str) -> str:
         return typename[0].upper() + typename[1:]
 
-    def style_enum_name(self, typename):
+    def style_enum_name(self, typename: str) -> str:
         return typename[0].upper() + typename[1:]
 
     def style_node_name(self, name: str) -> str:

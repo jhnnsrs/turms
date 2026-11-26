@@ -1,14 +1,13 @@
 import shlex
 import subprocess
-from typing import List, Union
 
-from turms.processors.base import Processor, ProcessorConfig
 from turms.config import GeneratorConfig
+from turms.processors.base import Processor, ProcessorConfig
 
 
 class CommandProcessorConfig(ProcessorConfig):
     type: str = "turms.processors.command.CommandProcessor"
-    command: Union[str, List[str]]
+    command: str | list[str]
     """The command to run. The generated code is piped to the command's stdin and the
     formatted code is read back from its stdout. Can be given as a single string (parsed
     with shell-like splitting) or as a list of arguments.
@@ -34,7 +33,7 @@ class CommandProcessor(Processor):
 
     config: CommandProcessorConfig
 
-    def run(self, gen_file: str, config: GeneratorConfig):
+    def run(self, gen_file: str, config: GeneratorConfig) -> str:
         command = self.config.command
         if isinstance(command, str):
             command = shlex.split(command)

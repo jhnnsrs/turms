@@ -11,13 +11,15 @@ These tests pin both down so adding a new python release means touching one
 list, not four.
 """
 
+import ast
 import re
 import sys
 from pathlib import Path
-from typing import get_args
+from typing import Any, get_args
 
 import pytest
 from graphql import build_ast_schema, parse
+from pydantic import ValidationError
 
 from turms.config import GeneratorConfig, PythonVersion, parse_python_version
 from turms.plugins.inputs import InputsPlugin
@@ -51,7 +53,7 @@ type Query {
 """
 
 
-def generate(**config_kwargs):
+def generate(**config_kwargs: Any) -> list[ast.AST]:
     config = GeneratorConfig(**config_kwargs)
     return generate_ast(
         config,
@@ -70,7 +72,7 @@ def _pyproject() -> str:
     return (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
 
-def test_classifiers_declare_every_supported_host_version():
+def test_classifiers_declare_every_supported_host_version() -> None:
     """Every interpreter we test on is advertised on PyPI, and no more."""
     declared = re.findall(
         r'"Programming Language :: Python :: (\d+\.\d+)"', _pyproject()
@@ -78,7 +80,7 @@ def test_classifiers_declare_every_supported_host_version():
     assert declared == SUPPORTED_HOST_VERSIONS
 
 
-def test_ci_matrix_covers_every_supported_host_version():
+def test_ci_matrix_covers_every_supported_host_version() -> None:
     """A version nobody runs the suite on is not actually supported."""
     workflow = (REPO_ROOT / ".github/workflows/tests.yaml").read_text(encoding="utf-8")
     matrix = re.search(r"python-version: \[([^\]]*)\]", workflow)
@@ -87,19 +89,19 @@ def test_ci_matrix_covers_every_supported_host_version():
     assert versions == SUPPORTED_HOST_VERSIONS
 
 
-def test_running_interpreter_is_supported():
+def test_running_interpreter_is_supported() -> None:
     """Guards against the suite quietly running on an undeclared interpreter."""
     running = "{}.{}".format(*sys.version_info[:2])
     assert running in SUPPORTED_HOST_VERSIONS
 
 
-def test_requires_python_matches_the_oldest_supported_version():
+def test_requires_python_matches_the_oldest_supported_version() -> None:
     match = re.search(r'requires-python = ">=(\d+\.\d+)"', _pyproject())
     assert match
     assert match.group(1) == SUPPORTED_HOST_VERSIONS[0]
 
 
-def test_outbound_tests_only_run_on_the_coverage_path():
+def test_outbound_tests_only_run_on_the_coverage_path() -> None:
     """The tests marked `network` must stay off the matrix and on in coverage.
 
     The matrix runs the same tests on five interpreters times two operating
@@ -115,7 +117,7 @@ def test_outbound_tests_only_run_on_the_coverage_path():
     assert "not network" not in coverage
 
 
-def test_toml_configs_load_without_a_third_party_parser():
+def test_toml_configs_load_without_a_third_party_parser() -> None:
     """TOML support must not depend on a package that only happens to be around.
 
     On 3.11+ this is stdlib ``tomllib``, on 3.10 the declared ``tomli``
@@ -124,7 +126,7 @@ def test_toml_configs_load_without_a_third_party_parser():
     from turms.run import toml_loader
 
     class _Reader:
-        def read(self):
+        def read(self) -> str:
             return 'name = "turms"\n'
 
     assert toml_loader(_Reader()) == {"name": "turms"}
@@ -135,14 +137,14 @@ def test_toml_configs_load_without_a_third_party_parser():
 # --------------------------------------------------------------------------- #
 
 
-def test_every_supported_host_version_is_targetable():
+def test_every_supported_host_version_is_targetable() -> None:
     """You can always target the interpreter you are generating on."""
     for version in SUPPORTED_HOST_VERSIONS:
         assert version in get_args(PythonVersion)
 
 
 @pytest.mark.parametrize("version", get_args(PythonVersion))
-def test_target_version_is_accepted_everywhere(version):
+def test_target_version_is_accepted_everywhere(version: PythonVersion) -> None:
     assert GeneratorConfig(min_python_version=version).min_python_version == version
     # a version that parses into a comparable tuple is a version the annotation
     # style can be resolved against
@@ -150,15 +152,15 @@ def test_target_version_is_accepted_everywhere(version):
 
 
 @pytest.mark.parametrize("version", ["3.6", "3.7", "3.8", "4.0", "nonsense"])
-def test_unknown_target_version_is_rejected(version):
+def test_unknown_target_version_is_rejected(version: str) -> None:
     """3.7 and 3.8 went with the polyfill parser in turms 2.0: pydantic v2 never
     supported 3.7, and turms emits ``typing.Annotated``, which is 3.9+."""
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         GeneratorConfig(min_python_version=version)
 
 
 @pytest.mark.parametrize("version", ["3.13", "3.14"])
-def test_recent_targets_generate_modern_annotations(version):
+def test_recent_targets_generate_modern_annotations(version: PythonVersion) -> None:
     """3.13 and 3.14 are past both PEP 585 and PEP 604, so `auto` is modern."""
     config = GeneratorConfig(min_python_version=version)
     assert config.use_builtin_generics is True
@@ -172,7 +174,7 @@ def test_recent_targets_generate_modern_annotations(version):
 
 
 @pytest.mark.parametrize("version", ["3.13", "3.14"])
-def test_recent_targets_generate_importable_code(version):
+def test_recent_targets_generate_importable_code(version: PythonVersion) -> None:
     """The output has to be valid syntax for the interpreter running it."""
     code = parse_to_code(generate(min_python_version=version))
     compile(code, "<generated>", "exec")

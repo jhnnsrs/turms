@@ -1,6 +1,7 @@
 from pydantic import Field
-from turms.processors.base import Processor, ProcessorConfig
+
 from turms.config import GeneratorConfig
+from turms.processors.base import Processor, ProcessorConfig
 
 
 class IsortProcessorConfig(ProcessorConfig):
@@ -15,7 +16,7 @@ class IsortProcessor(Processor):
 
     config: IsortProcessorConfig = Field(default_factory=IsortProcessorConfig)
 
-    def run(self, gen_file: str, config: GeneratorConfig):
+    def run(self, gen_file: str, config: GeneratorConfig) -> str:
         import isort
 
         return isort.code(gen_file)

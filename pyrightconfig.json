@@ -1,0 +1,19 @@
+{
+  "extends": "./pyright.shared.json",
+  "include": [
+    "."
+  ],
+  "exclude": [
+    "**/migrations",
+    "**/__pycache__",
+    "**/node_modules",
+    ".venv",
+    "build",
+    "dist",
+    "examples/*/server/schema.py",
+    "examples/*/api/schema.py",
+    "examples/*/your_library/schema.py",
+    "tests/merge_pairs",
+    "tests/plugins/strawberry/snapshots"
+  ]
+}

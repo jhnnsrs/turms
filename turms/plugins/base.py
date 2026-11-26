@@ -1,11 +1,12 @@
-from abc import abstractmethod
 import ast
 import warnings
-from typing import Any, Sequence
+from abc import abstractmethod
+from collections.abc import Sequence
 
+from graphql import GraphQLSchema
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from graphql import GraphQLSchema
+
 from turms.config import GeneratorConfig, LogFunction, print_logger  # noqa: F401
 from turms.registry import ClassRegistry
 
@@ -15,7 +16,7 @@ class PluginConfig(BaseSettings):
     type: str
 
 
-def rename_deprecated_keys(values: Any, renames: dict) -> Any:
+def rename_deprecated_keys(values: object, renames: dict[str, str]) -> object:
     """Accept the old spelling of renamed plugin config keys, with a warning.
 
     Used by ``model_validator(mode="before")`` hooks on plugin configs. Done

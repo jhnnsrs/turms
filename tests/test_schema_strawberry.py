@@ -1,15 +1,16 @@
 import pytest
+from graphql import GraphQLSchema
 
-from turms.config import GeneratorConfig
-from turms.run import generate_ast
+from turms.config import GeneratorConfig, PythonType
 from turms.plugins.strawberry import StrawberryPlugin, StrawberryPluginConfig
-from turms.stylers.default import DefaultStyler
 from turms.run import generate_ast
+from turms.stylers.default import DefaultStyler
+
 from .utils import parse_to_code, unit_test_with
 
 
 @pytest.mark.network
-def test_countries_schema(countries_schema):
+def test_countries_schema(countries_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(scalar_definitions={"_Any": "typing.Any"})
 
     generated_ast = generate_ast(
@@ -25,7 +26,7 @@ def test_countries_schema(countries_schema):
     unit_test_with(generated_ast, "")
 
 
-def test_union_schema(union_schema):
+def test_union_schema(union_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(scalar_definitions={"_Any": "typing.Any"})
 
     generated_ast = generate_ast(
@@ -41,7 +42,7 @@ def test_union_schema(union_schema):
     unit_test_with(generated_ast, "")
 
 
-def test_arkitekt_schema(arkitekt_schema):
+def test_arkitekt_schema(arkitekt_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         scalar_definitions={
             "QString": "str",
@@ -64,7 +65,7 @@ def test_arkitekt_schema(arkitekt_schema):
     unit_test_with(generated_ast, "")
 
 
-def test_multiple_interface(multi_interface_schema):
+def test_multiple_interface(multi_interface_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         scalar_definitions={
             "QString": "str",
@@ -87,7 +88,7 @@ def test_multiple_interface(multi_interface_schema):
     unit_test_with(generated_ast, "")
 
 
-def test_schema_directive_generation(schema_directive_schema):
+def test_schema_directive_generation(schema_directive_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         scalar_definitions={
             "QString": "str",
@@ -110,7 +111,7 @@ def test_schema_directive_generation(schema_directive_schema):
     unit_test_with(generated_ast, "")
 
 
-def test_custom_scalar_generation(scalar_schema):
+def test_custom_scalar_generation(scalar_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         scalar_definitions={
             "QString": "str",
@@ -133,13 +134,13 @@ def test_custom_scalar_generation(scalar_schema):
     unit_test_with(generated_ast, "")
 
 
-def test_resolver_info_argument(arkitekt_schema):
+def test_resolver_info_argument(arkitekt_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         scalar_definitions={
-            "QString": "str",
-            "Any": "str",
-            "UUID": "pydantic.UUID4",
-            "Callback": "str",
+            "QString": PythonType("str"),
+            "Any": PythonType("str"),
+            "UUID": PythonType("pydantic.UUID4"),
+            "Callback": PythonType("str"),
         }
     )
 
@@ -162,7 +163,7 @@ def test_resolver_info_argument(arkitekt_schema):
     unit_test_with(generated_ast, "")
 
 
-def test_custom_func_generation(scalar_schema):
+def test_custom_func_generation(scalar_schema: GraphQLSchema) -> None:
     config = GeneratorConfig(
         scalar_definitions={
             "QString": "str",
