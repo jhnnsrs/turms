@@ -24,6 +24,19 @@ def retrieve_symbol_name(simple_statement: cst.SimpleStatementLine) -> str | Non
         return None
 
 
+def is_enum(cls: cst.ClassDef) -> bool:
+    for base in cls.bases:
+        value = base.value
+        name = (
+            value.attr.value
+            if isinstance(value, cst.Attribute)
+            else getattr(value, "value", "")
+        )
+        if isinstance(name, str) and name.endswith("Enum"):
+            return True
+    return False
+
+
 def merge_functions(
     generated: cst.FunctionDef, existing: cst.FunctionDef
 ) -> cst.FunctionDef:
@@ -75,7 +88,7 @@ def merge_class(generated: cst.ClassDef, existing: cst.ClassDef) -> cst.ClassDef
                     body_symbol_position[name] = len(new_body)
                     new_body.append(merge_statements(body_symbols[name], node))
                     body_implemented_symbols.append(name)
-                else:
+                elif not is_enum(generated):
                     new_body.append(node)
             else:
                 new_body.append(node)

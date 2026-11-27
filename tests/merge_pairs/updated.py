@@ -23,4 +23,3 @@ class SchemaEnum(str, Enum):
     NEW_FIRST = "new_first"
     A = "A"
     NEW_LAST = "new_last"
-    CUSTOM = "custom"
