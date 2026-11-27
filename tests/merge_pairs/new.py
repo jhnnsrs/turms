@@ -1,3 +1,6 @@
+from enum import Enum
+
+
 class SchemaClass:
     new_before_schema_field: str
     old_schema_field: str
