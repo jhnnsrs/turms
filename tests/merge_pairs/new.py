@@ -13,3 +13,9 @@ def schema_function(x: str) -> str:
 
 def new_schema_function(x: str, t: int):
     pass
+
+
+class SchemaEnum(str, Enum):
+    NEW_FIRST = "new_first"
+    A = "A"
+    NEW_LAST = "new_last"

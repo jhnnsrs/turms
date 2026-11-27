@@ -12,3 +12,8 @@ class SchemaClass:
 def schema_function(x: str):
     len(x)
     return None
+
+
+class SchemaEnum(str, Enum):
+    A = "a"
+    CUSTOM = "custom"

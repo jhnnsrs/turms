@@ -14,6 +14,12 @@ def retrieve_symbol_name(simple_statement: cst.SimpleStatementLine) -> str | Non
     for node in simple_statement.body:
         if isinstance(node, cst.AnnAssign):
             return node.target.value
+        if (
+            isinstance(node, cst.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0].target, cst.Name)
+        ):
+            return node.targets[0].target.value
     else:
         return None
 
