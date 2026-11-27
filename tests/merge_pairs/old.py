@@ -1,3 +1,6 @@
+from enum import Enum
+
+
 class SchemaClass:
     old_schema_field: str
     random_field: str
@@ -12,3 +15,8 @@ class SchemaClass:
 def schema_function(x: str):
     len(x)
     return None
+
+
+class SchemaEnum(str, Enum):
+    A = "a"
+    CUSTOM = "custom"
